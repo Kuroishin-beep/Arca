@@ -17,14 +17,14 @@ Everything below is delivered differently depending on your stack, so pick it
 first ([choosing your stack](../m3-styling/07-choosing-your-stack.md)). Your
 tokens land in a different place in each:
 
-| Approach | Where your tokens live |
-| --- | --- |
-| **CSS Modules / plain CSS** | `:root` custom properties (`--color-primary`) |
-| **Tailwind** | the `theme` block in `tailwind.config.js` |
-| **styled-components** | a `theme` object passed through `ThemeProvider` |
+| Approach                       | Where your tokens live                                 |
+| ------------------------------ | ------------------------------------------------------ |
+| **CSS Modules / plain CSS**    | `:root` custom properties (`--color-primary`)          |
+| **Tailwind**                   | the `theme` block in `tailwind.config.js`              |
+| **styled-components**          | a `theme` object passed through `ThemeProvider`        |
 | **A UI library (MUI, Chakra)** | the library's theme object - you override its defaults |
 
-My approach: _______________
+My approach: **<u> Tailwind </u>**
 
 ## Step B: Colour tokens (6 min)
 
@@ -32,13 +32,13 @@ Pick **3 to 5 colours**, no more. Give each a **token name** - the name is what
 your components reference, so you can rebrand or add a dark theme by changing one
 value ([design tokens](../react-theory/09-design-systems.md)).
 
-| Token | Role | Your colour (hex) |
-| --- | --- | --- |
-| `--color-primary` | links, buttons, active states | |
-| `--color-accent` | one call-to-action, highlights | |
-| `--color-bg` | page background | |
-| `--color-surface` | cards, panels | |
-| `--color-text` | body text | |
+| Token             | Role                           | Your colour (hex) |
+| ----------------- | ------------------------------ | ----------------- |
+| `--color-primary` | links, buttons, active states  | #d2c088           |
+| `--color-accent`  | one call-to-action, highlights | #6db8a6           |
+| `--color-bg`      | page background                | #1b1b1b           |
+| `--color-surface` | cards, panels                  | #212121           |
+| `--color-text`    | body text                      | #f2f2f2           |
 
 Check every text-on-background pair reaches at least **4.5 : 1 contrast** (run it
 through the WebAIM Contrast Checker).
@@ -49,20 +49,20 @@ You do not need fancy fonts. Decide **3 sizes** and when each is used - that is
 enough for this project. These become type tokens too (`--font-size-lg`, or
 Tailwind's `text-2xl`).
 
-| Style | Size | Weight | Used for |
-| --- | --- | --- | --- |
-| Heading | | Bold | screen and section titles |
-| Body | | Regular | paragraphs, lists |
-| Small | | Regular | captions, labels, footer |
+| Style   | Size            | Weight  | Used for                  |
+| ------- | --------------- | ------- | ------------------------- |
+| Heading | 36px (2.25 rem) | Bold    | screen and section titles |
+| Body    | 16px (1 rem)    | Regular | paragraphs, lists         |
+| Small   | 12px (0.75 rem) | Regular | captions, labels, footer  |
 
 ## Step D: Spacing rule (4 min)
 
 Pick **one base unit** (commonly 8px) and use multiples of it everywhere -
 padding, gaps, margins. Write your scale as tokens:
 
-- Tight spacing (between related items): ___ px  (`--space-1`)
-- Standard spacing (between sections): ___ px  (`--space-4`)
-- Screen edge padding: ___ px
+- Tight spacing (between related items): 8 px (`--space-1`)
+- Standard spacing (between sections): 32 px (`--space-4`)
+- Screen edge padding: 24 px
 
 This single rule is what makes a UI feel "designed" instead of ad hoc - more
 valuable than picking exact pixel values.
@@ -74,11 +74,16 @@ every component that shows up on **more than one screen** - these are the
 atoms/molecules of your design system. Describe each once so every screen renders
 the same version.
 
-| Component | Level | Appears on | Props it takes |
-| --- | --- | --- | --- |
-| _e.g. `Card`_ | molecule | Home, Detail | `title`, `body`, `image` |
-| _e.g. `Button`_ | atom | everywhere | `variant`, `onClick`, `children` |
-| | | | |
+| Component      | Level    | Appears on                 | Props it takes                                                         |
+| -------------- | -------- | -------------------------- | ---------------------------------------------------------------------- |
+| `Button`       | atom     | everywhere                 | `variant`, `type`, `children`, `icon`, `onClick`                       |
+| `Icon`         | atom     | everywhere                 | `size`, `color`                                                        |
+| `Text Field`   | atom     | everywhere                 | `label`, `placeholder`, `value`, `type`, `isRequired`                  |
+| `Avatar`       | atom     | Side Bar, Settings         | `src`, `alt`, `name`, `shape`                                          |
+| `Search Field` | molecule | Side Bar, Main Page        | `value`, `placeholder`, `onChange`, `onSearch`                         |
+| `Comment Card` | molecule | Comment Section, Main Page | `id`, `author`, `content`, `createdAt`, `onReply`, `onDelete`          |
+| `Side Bar`     | organism | Side Bar                   | `items`, `activeItem`, `onToggleCollapse`, `onItemSelect` `isRequired` |
+| `Table`        | organism | Main Page                  | `columns`, `data`, `pagination`                                        |
 
 Common ones worth checking for: a **`Button`**, a **`Card`** (repeated list
 item), the **`Header`/nav**, and the **`Footer`**. If you adopt a UI library,
@@ -88,8 +93,8 @@ note which of these you get for free and which you still build yourself.
 
 Where does your layout change, and to what? Note your breakpoint(s).
 
-- Below ___ px (phone): _(e.g. cards stack to one column, nav collapses)_
-- Above ___ px (desktop): _(e.g. cards sit three across via Grid)_
+- Below 768 px (phone): \_(e.g. cards stack to one column, nav collapses)\_
+- Above 768 px (desktop): \_(e.g. cards sit three across via Grid)\_
 
 These become the `min-width` values in your media queries (or Tailwind's `md:` /
 `lg:` prefixes). Remember the hard requirement: **no horizontal scrolling on a
@@ -99,17 +104,18 @@ These become the `min-width` values in your media queries (or Tailwind's `md:` /
 
 Tick each one - these are scored by the [design rubric](../m3-styling/ASSESSMENT.md):
 
-- [ ] Every text-on-background pair passes 4.5 : 1 contrast
-- [ ] Real semantic elements (`<header>`, `<nav>`, `<main>`, `<button>`), not a
-      `<div>` with an `onClick` for everything
-- [ ] Every meaningful image has `alt` text (decorative ones use `alt=""`)
-- [ ] Every form input has a matching `<label>` (`htmlFor` + `id`)
-- [ ] You can reach every link and button with the Tab key, and see the focus
+- [ / ] Every text-on-background pair passes 4.5 : 1 contrast
+- [ / ] Real semantic elements (`<header>`, `<nav>`, `<main>`, `<button>`), not a
+  `<div>` with an `onClick` for everything
+- [ / ] Every meaningful image has `alt` text (decorative ones use `alt=""`)
+- [ / ] Every form input has a matching `<label>` (`htmlFor` + `id`)
+- [ / ] You can reach every link and button with the Tab key, and see the focus
 
 ## What to keep
 
 This page - filled in - is your design reference for the whole project. When you
 start building:
+
 - Your **colour, type, and spacing tokens** become your theme (`:root`
   variables, `tailwind.config.js`, or a `ThemeProvider` theme).
 - Each **reusable component** becomes one component in `src/components/`, built
