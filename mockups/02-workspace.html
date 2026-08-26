@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="en" class="h-full">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arca — Workspace</title>
+<link rel="stylesheet" href="tokens.css">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="tailwind.config.js"></script>
+</head>
+
+<!--
+  SCREEN 2 — WORKSPACE  (the app)
+  Route in Next.js: app/(app)/c/[containerId]/page.tsx
+
+  Component boundaries are marked with data-component="..." — each one is a file
+  under src/components/. Nothing in this file uses a gradient.
+-->
+
+<body class="h-full">
+<div class="flex h-screen flex-col bg-bg">
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       TopBar (organism) — src/components/organisms/TopBar.tsx
+       Props: { user, syncStatus, searchQuery, onSearchChange }
+       ═══════════════════════════════════════════════════════════════ -->
+  <header data-component="TopBar"
+          class="flex h-topbar shrink-0 items-center gap-3 border-b border-border bg-surface px-3 md:px-4">
+
+    <!-- Sidebar toggle: icon rail <-> pinned. Hidden once the sidebar is pinned at lg. -->
+    <button type="button" data-component="IconButton"
+            class="grid h-8 w-8 shrink-0 place-items-center rounded-md text-muted hover:bg-surface2 hover:text-text lg:hidden">
+      <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
+        <path d="M2 4h12M2 8h12M2 12h12"/>
+      </svg>
+      <span class="sr-only">Toggle container list</span>
+    </button>
+
+    <!-- Wordmark -->
+    <a href="index.html" class="flex shrink-0 items-center gap-2 text-primary">
+      <svg viewBox="0 0 16 16" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <rect x="1.5" y="4.5" width="13" height="9" rx="1"/>
+        <path d="M1.5 8h13" stroke-linecap="round"/>
+        <rect x="7" y="6.5" width="2" height="3" rx="0.5" fill="currentColor" stroke="none"/>
+      </svg>
+      <span class="font-serif text-lg font-bold tracking-wide">Arca</span>
+    </a>
+
+    <!-- SearchField (molecule) — src/components/molecules/SearchField.tsx -->
+    <div data-component="SearchField" class="relative ml-auto min-w-0 flex-1 md:ml-4 md:max-w-md">
+      <label for="search" class="sr-only">Search items</label>
+      <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5"
+           class="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-faint" aria-hidden="true">
+        <circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14" stroke-linecap="round"/>
+      </svg>
+      <input id="search" type="search" value="rope"
+             placeholder="Search the Party Wagon…"
+             class="h-8 w-full rounded-md border border-border bg-surface2 pl-7 pr-7 text-base text-text placeholder:text-faint">
+      <button type="button" class="absolute right-1 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-sm text-faint hover:text-text">
+        <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
+          <path d="M4 4l8 8M12 4l-8 8"/>
+        </svg>
+        <span class="sr-only">Clear search</span>
+      </button>
+    </div>
+
+    <!-- SyncPill (atom) — status: 'idle' | 'syncing' | 'error' -->
+    <div data-component="SyncPill" data-status="idle" title="Last synced 4 seconds ago"
+         class="hidden shrink-0 items-center gap-2 rounded-sm border border-border bg-successWeak px-2 py-1 sm:flex">
+      <span class="h-2 w-2 rounded-full bg-success" aria-hidden="true"></span>
+      <span class="text-xs font-medium text-success">Synced</span>
+    </div>
+
+    <!-- Avatar (atom) + role badge. Role is text, never colour alone. -->
+    <div data-component="Avatar" class="flex shrink-0 items-center gap-2">
+      <span class="grid h-7 w-7 place-items-center rounded-full bg-primaryWeak text-xs font-bold text-primary">KV</span>
+      <span class="hidden text-xs font-medium text-muted md:inline">Kova · Player</span>
+    </div>
+  </header>
+
+  <div class="flex min-h-0 flex-1">
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Sidebar (organism) — src/components/organisms/Sidebar.tsx
+         Props: { containers, selectedId, collapsed, onToggleCollapse, onItemSelect }
+         Below lg this is a drawer; at lg it is pinned.
+         ═══════════════════════════════════════════════════════════════ -->
+    <nav data-component="Sidebar" aria-label="Containers"
+         class="hidden w-sidebar shrink-0 flex-col overflow-y-auto border-r border-border bg-surface lg:flex">
+
+      <!-- ── Group: My Packs (character containers) ── -->
+      <div class="px-3 pt-4">
+        <h2 class="mb-2 px-2 font-serif text-sm font-bold uppercase tracking-wider text-muted">My Packs</h2>
+        <ul class="flex flex-col gap-1">
+
+          <!-- ContainerRow (molecule) — selected state -->
+          <li>
+            <a href="#" data-component="ContainerRow" data-type="character" aria-current="false"
+               class="flex h-row items-center gap-2 rounded-md px-2 text-base text-text hover:bg-surface2">
+              <span class="h-2 w-2 shrink-0 rounded-full bg-cCharacter" aria-hidden="true"></span>
+              <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4" class="shrink-0 text-muted" aria-hidden="true">
+                <path d="M4 6V4.5a4 4 0 0 1 8 0V6"/><rect x="2.5" y="6" width="11" height="7.5" rx="1.5"/>
+              </svg>
+              <span class="min-w-0 flex-1 truncate">Kova’s Pack</span>
+              <span class="shrink-0 font-mono text-xs text-faint">18</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <!-- ── Group: Party ── -->
+      <div class="px-3 pt-5">
+        <h2 class="mb-2 px-2 font-serif text-sm font-bold uppercase tracking-wider text-muted">Party</h2>
+        <ul class="flex flex-col gap-1">
+          <li>
+            <!-- SELECTED: gold left rule + raised surface. Also aria-current. -->
+            <a href="#" data-component="ContainerRow" data-type="party" aria-current="page"
+               class="flex h-row items-center gap-2 rounded-md border-l-2 border-cParty bg-surface2 px-2 text-base font-medium text-text">
+              <span class="h-2 w-2 shrink-0 rounded-full bg-cParty" aria-hidden="true"></span>
+              <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4" class="shrink-0 text-cParty" aria-hidden="true">
+                <rect x="1.5" y="4" width="10" height="6" rx="1"/><circle cx="4.5" cy="12" r="1.8"/><circle cx="11" cy="12" r="1.8"/><path d="M11.5 6h2l1 4" stroke-linecap="round"/>
+              </svg>
+              <span class="min-w-0 flex-1 truncate">Party Wagon</span>
+              <span class="shrink-0 font-mono text-xs text-muted">42</span>
+            </a>
+          </li>
+          <li>
+            <a href="#" data-component="ContainerRow" data-type="party"
+               class="flex h-row items-center gap-2 rounded-md px-2 text-base text-text hover:bg-surface2">
+              <span class="h-2 w-2 shrink-0 rounded-full bg-cParty" aria-hidden="true"></span>
+              <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4" class="shrink-0 text-muted" aria-hidden="true">
+                <rect x="2" y="5" width="12" height="8" rx="1"/><path d="M2 8h12" stroke-linecap="round"/>
+              </svg>
+              <span class="min-w-0 flex-1 truncate">Ravenholt Stash</span>
+              <span class="shrink-0 font-mono text-xs text-faint">7</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <!-- ── Group: World (GM-owned; a player sees only revealed ones) ── -->
+      <div class="px-3 pt-5 pb-4">
+        <h2 class="mb-2 px-2 font-serif text-sm font-bold uppercase tracking-wider text-muted">World</h2>
+        <ul class="flex flex-col gap-1">
+          <li>
+            <a href="#" data-component="ContainerRow" data-type="world"
+               class="flex h-row items-center gap-2 rounded-md px-2 text-base text-text hover:bg-surface2">
+              <span class="h-2 w-2 shrink-0 rounded-full bg-cWorld" aria-hidden="true"></span>
+              <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4" class="shrink-0 text-muted" aria-hidden="true">
+                <rect x="2" y="5" width="12" height="8" rx="1"/><path d="M2 8h12" stroke-linecap="round"/><rect x="7" y="7" width="2" height="3" rx="0.5" fill="currentColor" stroke="none"/>
+              </svg>
+              <span class="min-w-0 flex-1 truncate">Barrow Chest</span>
+              <span class="shrink-0 font-mono text-xs text-faint">3</span>
+            </a>
+          </li>
+          <!-- Disabled, NOT hidden: hiding it produces "where did the vault go?" -->
+          <li>
+            <span data-component="ContainerRow" data-type="world" aria-disabled="true"
+                  class="flex h-row cursor-not-allowed items-center gap-2 rounded-md px-2 text-base text-faint"
+                  title="GM-only — you do not have access to this container">
+              <span class="h-2 w-2 shrink-0 rounded-full bg-surface3" aria-hidden="true"></span>
+              <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4" class="shrink-0" aria-hidden="true">
+                <rect x="3.5" y="7" width="9" height="6" rx="1"/><path d="M5.5 7V5.2a2.5 2.5 0 0 1 5 0V7"/>
+              </svg>
+              <span class="min-w-0 flex-1 truncate">The Sunken Vault</span>
+              <span class="shrink-0 text-xs">GM</span>
+            </span>
+          </li>
+        </ul>
+      </div>
+    </nav>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Main — item table for the selected container
+         ═══════════════════════════════════════════════════════════════ -->
+    <main class="flex min-w-0 flex-1 flex-col">
+
+      <!-- Container header + view toolbar -->
+      <div class="shrink-0 border-b border-border bg-bg px-3 pt-3 md:px-4 md:pt-4">
+        <div class="flex flex-wrap items-center gap-3">
+          <!-- ContainerBadge (atom) + title -->
+          <div class="flex min-w-0 items-center gap-2">
+            <span class="h-2.5 w-2.5 shrink-0 rounded-full bg-cParty" aria-hidden="true"></span>
+            <h1 class="min-w-0 truncate font-serif text-xl font-bold text-text">Party Wagon</h1>
+            <span data-component="Chip" class="shrink-0 rounded-sm border border-border bg-accentWeak px-2 py-0.5 text-xs font-medium text-accent">Shared</span>
+          </div>
+
+          <div class="ml-auto flex items-center gap-2">
+            <!-- Button variant="secondary" -->
+            <button type="button" data-component="Button" data-variant="secondary"
+                    class="flex h-8 items-center gap-2 rounded-md border border-border bg-surface px-3 text-sm font-medium text-text hover:bg-surface2">
+              <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
+                <path d="M2 4h12M4.5 8h7M6.5 12h3"/>
+              </svg>
+              <span class="hidden sm:inline">Filter</span>
+            </button>
+            <!-- Button variant="primary" — the only gold fill on the screen -->
+            <a href="04-item-editor.html" data-component="Button" data-variant="primary"
+               class="flex h-8 items-center gap-2 rounded-md bg-primary px-3 text-sm font-bold text-invert hover:bg-primaryHover">
+              <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                <path d="M8 3v10M3 8h10"/>
+              </svg>
+              <span>Add item</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- View tabs. A view changes presentation only — never the data. -->
+        <div role="tablist" aria-label="View" class="mt-3 flex gap-1">
+          <button role="tab" aria-selected="true"
+                  class="rounded-t-md border-b-2 border-primary px-3 py-2 text-sm font-medium text-text">Table</button>
+          <button role="tab" aria-selected="false"
+                  class="rounded-t-md border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted hover:text-text">Cards</button>
+          <button role="tab" aria-selected="false"
+                  class="rounded-t-md border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted hover:text-text">Grouped</button>
+          <!-- Active tag filters live next to the tabs, not in a hidden drawer -->
+          <div class="ml-auto hidden items-center gap-2 pb-2 sm:flex">
+            <span data-component="Chip" class="flex items-center gap-1 rounded-sm border border-border bg-surface2 px-2 py-0.5 text-xs text-muted">
+              tag: consumable
+              <svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ItemTable (organism) — src/components/organisms/ItemTable.tsx
+           Props: { items, sort, onSortChange, selectedId }
+           Real <table>. Sort state announced with aria-sort, not just a glyph. -->
+      <div class="min-h-0 flex-1 overflow-y-auto">
+        <table data-component="ItemTable" class="w-full text-base">
+          <thead class="sticky top-0 z-10 bg-bg">
+            <tr class="border-b border-border text-left">
+              <th scope="col" aria-sort="ascending"
+                  class="px-3 py-2 text-sm font-medium text-muted md:px-4">
+                <button type="button" class="flex items-center gap-1 hover:text-text">
+                  Name
+                  <svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="text-primary" aria-hidden="true"><path d="M4 10l4-4 4 4"/></svg>
+                </button>
+              </th>
+              <th scope="col" class="w-16 px-3 py-2 text-right text-sm font-medium text-muted">Qty</th>
+              <th scope="col" class="w-20 px-3 py-2 text-right text-sm font-medium text-muted">Wt</th>
+              <th scope="col" class="hidden w-20 px-3 py-2 text-right text-sm font-medium text-muted md:table-cell">Value</th>
+              <th scope="col" class="hidden px-3 py-2 text-sm font-medium text-muted md:table-cell">Tags</th>
+              <th scope="col" class="w-10 px-2 py-2"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+
+            <!-- ItemRow (molecule) — SELECTED
+                 src/components/molecules/ItemRow.tsx, rendered from items.map(), key={item.id} -->
+            <tr data-component="ItemRow" aria-selected="true"
+                class="h-row cursor-pointer border-b border-border bg-surface2">
+              <td class="max-w-0 px-3 md:px-4">
+                <div class="flex items-center gap-2">
+                  <span class="h-4 w-0.5 shrink-0 rounded-full bg-primary" aria-hidden="true"></span>
+                  <span class="truncate font-medium text-text">Rope, hempen (10 m)</span>
+                </div>
+              </td>
+              <td class="px-3 text-right font-mono text-base tabular-nums text-text">2</td>
+              <td class="px-3 text-right font-mono text-base tabular-nums text-text">2.0</td>
+              <td class="hidden px-3 text-right font-mono text-base tabular-nums text-muted md:table-cell">4 sp</td>
+              <td class="hidden px-3 md:table-cell">
+                <span class="rounded-sm border border-border bg-surface3 px-1.5 py-0.5 text-xs text-muted">gear</span>
+              </td>
+              <td class="px-2 text-right">
+                <button type="button" class="grid h-7 w-7 place-items-center rounded-md text-muted hover:bg-surface3 hover:text-text">
+                  <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><circle cx="8" cy="3.5" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="8" cy="12.5" r="1.3"/></svg>
+                  <span class="sr-only">Actions for Rope, hempen</span>
+                </button>
+              </td>
+            </tr>
+
+            <tr data-component="ItemRow" class="h-row cursor-pointer border-b border-border hover:bg-surface">
+              <td class="max-w-0 px-3 md:px-4"><span class="block truncate text-text">Healing Potion</span></td>
+              <td class="px-3 text-right font-mono text-base tabular-nums text-text">5</td>
+              <td class="px-3 text-right font-mono text-base tabular-nums text-text">0.5</td>
+              <td class="hidden px-3 text-right font-mono text-base tabular-nums text-muted md:table-cell">50 gp</td>
+              <td class="hidden px-3 md:table-cell"><span class="rounded-sm border border-border bg-successWeak px-1.5 py-0.5 text-xs text-success">consumable</span></td>
+              <td class="px-2 text-right">
+                <button type="button" class="grid h-7 w-7 place-items-center rounded-md text-muted hover:bg-surface3 hover:text-text">
+                  <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><circle cx="8" cy="3.5" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="8" cy="12.5" r="1.3"/></svg>
+                  <span class="sr-only">Actions for Healing Potion</span>
+                </button>
+              </td>
+            </tr>
+
+            <!-- A row that just arrived over the live channel. The tint is a flat
+                 token fill that fades out after 2s — no gradient, no animation lib. -->
+            <tr data-component="ItemRow" data-just-synced="true" class="h-row cursor-pointer border-b border-border bg-infoWeak">
+              <td class="max-w-0 px-3 md:px-4">
+                <div class="flex items-center gap-2">
+                  <span class="block truncate text-text">Longsword +1</span>
+                  <span class="shrink-0 rounded-sm bg-info px-1.5 py-0.5 text-xs font-medium text-invert">Milo added</span>
+                </div>
+              </td>
+              <td class="px-3 text-right font-mono text-base tabular-nums text-text">1</td>
+              <td class="px-3 text-right font-mono text-base tabular-nums text-text">1.5</td>
+              <td class="hidden px-3 text-right font-mono text-base tabular-nums text-muted md:table-cell">150 gp</td>
+              <td class="hidden px-3 md:table-cell"><span class="rounded-sm border border-border bg-surface3 px-1.5 py-0.5 text-xs text-muted">weapon</span></td>
+              <td class="px-2 text-right">
+                <button type="button" class="grid h-7 w-7 place-items-center rounded-md text-muted hover:bg-surface3 hover:text-text">
+                  <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><circle cx="8" cy="3.5" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="8" cy="12.5" r="1.3"/></svg>
+                  <span class="sr-only">Actions for Longsword +1</span>
+                </button>
+              </td>
+            </tr>
+
+            <tr data-component="ItemRow" class="h-row cursor-pointer border-b border-border hover:bg-surface">
+              <td class="max-w-0 px-3 md:px-4"><span class="block truncate text-text">Rations, dried (1 day)</span></td>
+              <td class="px-3 text-right font-mono text-base tabular-nums text-text">14</td>
+              <td class="px-3 text-right font-mono text-base tabular-nums text-text">0.5</td>
+              <td class="hidden px-3 text-right font-mono text-base tabular-nums text-muted md:table-cell">2 sp</td>
+              <td class="hidden px-3 md:table-cell"><span class="rounded-sm border border-border bg-successWeak px-1.5 py-0.5 text-xs text-success">consumable</span></td>
+              <td class="px-2 text-right">
+                <button type="button" class="grid h-7 w-7 place-items-center rounded-md text-muted hover:bg-surface3 hover:text-text">
+                  <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><circle cx="8" cy="3.5" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="8" cy="12.5" r="1.3"/></svg>
+                  <span class="sr-only">Actions for Rations</span>
+                </button>
+              </td>
+            </tr>
+
+            <tr data-component="ItemRow" class="h-row cursor-pointer border-b border-border hover:bg-surface">
+              <td class="max-w-0 px-3 md:px-4"><span class="block truncate text-text">Lantern, hooded</span></td>
+              <td class="px-3 text-right font-mono text-base tabular-nums text-text">1</td>
+              <td class="px-3 text-right font-mono text-base tabular-nums text-text">1.0</td>
+              <td class="hidden px-3 text-right font-mono text-base tabular-nums text-muted md:table-cell">5 gp</td>
+              <td class="hidden px-3 md:table-cell"><span class="rounded-sm border border-border bg-surface3 px-1.5 py-0.5 text-xs text-muted">gear</span></td>
+              <td class="px-2 text-right">
+                <button type="button" class="grid h-7 w-7 place-items-center rounded-md text-muted hover:bg-surface3 hover:text-text">
+                  <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><circle cx="8" cy="3.5" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="8" cy="12.5" r="1.3"/></svg>
+                  <span class="sr-only">Actions for Lantern</span>
+                </button>
+              </td>
+            </tr>
+
+            <tr data-component="ItemRow" class="h-row cursor-pointer border-b border-border hover:bg-surface">
+              <td class="max-w-0 px-3 md:px-4"><span class="block truncate text-text">Iron spikes (bundle of 10)</span></td>
+              <td class="px-3 text-right font-mono text-base tabular-nums text-text">3</td>
+              <td class="px-3 text-right font-mono text-base tabular-nums text-text">1.0</td>
+              <td class="hidden px-3 text-right font-mono text-base tabular-nums text-muted md:table-cell">1 gp</td>
+              <td class="hidden px-3 md:table-cell"><span class="rounded-sm border border-border bg-surface3 px-1.5 py-0.5 text-xs text-muted">gear</span></td>
+              <td class="px-2 text-right">
+                <button type="button" class="grid h-7 w-7 place-items-center rounded-md text-muted hover:bg-surface3 hover:text-text">
+                  <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><circle cx="8" cy="3.5" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="8" cy="12.5" r="1.3"/></svg>
+                  <span class="sr-only">Actions for Iron spikes</span>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Footer summary. Every number here is DERIVED at read time — see SCOPE §5.4.
+           WeightMeter (molecule) is a flat two-colour bar; no gradient. -->
+      <div class="shrink-0 border-t border-border bg-surface px-3 py-2 md:px-4">
+        <div class="flex items-center gap-3">
+          <span class="shrink-0 font-mono text-xs text-muted">42 items</span>
+          <div data-component="WeightMeter" class="flex min-w-0 flex-1 items-center gap-2">
+            <div class="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-surface3"
+                 role="progressbar" aria-valuenow="34" aria-valuemin="0" aria-valuemax="40" aria-label="Carried weight">
+              <div class="h-full rounded-full bg-accent" style="width:86%"></div>
+            </div>
+            <span class="shrink-0 font-mono text-xs tabular-nums text-muted">34.5 / 40.0 kg</span>
+          </div>
+        </div>
+        <!-- Live region: screen readers hear sync events, they are not silent. -->
+        <p aria-live="polite" class="sr-only">Milo added Longsword +1 to Party Wagon.</p>
+      </div>
+    </main>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         DetailPanel (organism) — src/components/organisms/DetailPanel.tsx
+         Props: { item, comments, canEdit, onClose }
+         At lg it is pinned; below lg it overlays as a sheet.
+         ═══════════════════════════════════════════════════════════════ -->
+    <aside data-component="DetailPanel" aria-label="Item detail"
+           class="hidden w-detail shrink-0 flex-col overflow-y-auto border-l border-border bg-surface lg:flex">
+
+      <div class="flex items-start gap-2 border-b border-border p-4">
+        <div class="min-w-0 flex-1">
+          <h2 class="font-serif text-lg font-bold text-text">Rope, hempen (10 m)</h2>
+          <!-- Composable types, per the object model: one object, several types. -->
+          <div class="mt-2 flex flex-wrap gap-1">
+            <span class="rounded-sm border border-border bg-surface2 px-1.5 py-0.5 text-xs text-muted">Physical Object</span>
+            <span class="rounded-sm border border-border bg-surface2 px-1.5 py-0.5 text-xs text-muted">Gear</span>
+          </div>
+        </div>
+        <button type="button" class="grid h-7 w-7 shrink-0 place-items-center rounded-md text-muted hover:bg-surface2 hover:text-text">
+          <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+          <span class="sr-only">Close detail panel</span>
+        </button>
+      </div>
+
+      <!-- Properties — values of PropertyDefinitions, rendered by data type -->
+      <section class="border-b border-border p-4">
+        <h3 class="mb-3 font-serif text-sm font-bold uppercase tracking-wider text-muted">Properties</h3>
+        <dl class="flex flex-col gap-2">
+          <div class="flex items-baseline justify-between gap-3">
+            <dt class="text-sm text-muted">Quantity</dt>
+            <dd class="font-mono text-base tabular-nums text-text">2</dd>
+          </div>
+          <div class="flex items-baseline justify-between gap-3">
+            <dt class="text-sm text-muted">Weight (each)</dt>
+            <dd class="font-mono text-base tabular-nums text-text">1.0 kg</dd>
+          </div>
+          <div class="flex items-baseline justify-between gap-3">
+            <dt class="text-sm text-muted">Value (each)</dt>
+            <dd class="font-mono text-base tabular-nums text-text">2 sp</dd>
+          </div>
+          <div class="flex items-baseline justify-between gap-3 border-t border-border pt-2">
+            <dt class="text-sm text-muted">Total weight <span class="text-faint">(derived)</span></dt>
+            <dd class="font-mono text-base tabular-nums text-accent">2.0 kg</dd>
+          </div>
+        </dl>
+      </section>
+
+      <!-- Containment. Plural on purpose: the model is many-to-many even though
+           MVP restricts it to one edge. -->
+      <section class="border-b border-border p-4">
+        <h3 class="mb-3 font-serif text-sm font-bold uppercase tracking-wider text-muted">Contained in</h3>
+        <ul class="flex flex-col gap-2">
+          <li class="flex items-center gap-2 rounded-md border border-border bg-surface2 px-2 py-2">
+            <span class="h-2 w-2 shrink-0 rounded-full bg-cParty" aria-hidden="true"></span>
+            <span class="min-w-0 flex-1 truncate text-base text-text">Party Wagon</span>
+            <span class="shrink-0 text-xs text-muted">×2</span>
+          </li>
+        </ul>
+        <!-- THE headline action. Given full-width weight in the panel. -->
+        <a href="03-move-item.html" data-component="Button" data-variant="primary"
+           class="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-md bg-primary text-sm font-bold text-invert hover:bg-primaryHover">
+          <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M2 8h11M9.5 4.5 13 8l-3.5 3.5"/>
+          </svg>
+          Move item
+        </a>
+        <div class="mt-2 flex gap-2">
+          <button type="button" class="h-8 flex-1 rounded-md border border-border bg-surface px-3 text-sm font-medium text-text hover:bg-surface2">Edit</button>
+          <button type="button" class="h-8 rounded-md border border-border bg-surface px-3 text-sm font-medium text-danger hover:bg-dangerWeak">Archive</button>
+        </div>
+      </section>
+
+      <!-- Notes: a Block on the object -->
+      <section class="border-b border-border p-4">
+        <h3 class="mb-2 font-serif text-sm font-bold uppercase tracking-wider text-muted">Notes</h3>
+        <p class="text-base text-muted">Frayed at one end. Milo says it will hold a person but not a horse.</p>
+      </section>
+
+      <!-- CommentCard (molecule) × n -->
+      <section class="p-4">
+        <h3 class="mb-3 font-serif text-sm font-bold uppercase tracking-wider text-muted">Comments</h3>
+        <ul class="flex flex-col gap-3">
+          <li data-component="CommentCard" class="rounded-md border border-border bg-surface2 p-3">
+            <div class="mb-1 flex items-baseline gap-2">
+              <span class="text-sm font-bold text-text">Milo</span>
+              <span class="text-xs text-faint">2h ago</span>
+            </div>
+            <p class="text-base text-muted">Cut 2 m off for the barrow. Adjusted the length.</p>
+            <button type="button" class="mt-2 text-sm font-medium text-primary hover:underline">Reply</button>
+          </li>
+          <li data-component="CommentCard" class="ml-4 rounded-md border-l-2 border-border bg-surface2 p-3">
+            <div class="mb-1 flex items-baseline gap-2">
+              <span class="text-sm font-bold text-text">GM</span>
+              <span class="rounded-sm bg-primaryWeak px-1.5 py-0.5 text-xs font-medium text-primary">GM</span>
+              <span class="text-xs text-faint">1h ago</span>
+            </div>
+            <p class="text-base text-muted">Noted. It is 8 m now for encumbrance.</p>
+          </li>
+        </ul>
+        <div class="mt-3">
+          <label for="new-comment" class="sr-only">Add a comment</label>
+          <textarea id="new-comment" rows="2" placeholder="Add a comment…"
+                    class="w-full rounded-md border border-border bg-surface2 p-2 text-base text-text placeholder:text-faint"></textarea>
+        </div>
+      </section>
+    </aside>
+  </div>
+</div>
+</body>
+</html>

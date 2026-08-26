@@ -1,0 +1,158 @@
+/* ============================================================
+   Arca — Design Tokens
+   Single source of truth for colour, type, spacing, radius.
+   Port to Next.js: paste this file into `app/globals.css`.
+   RULE: no gradients. Every fill in this system is a solid colour.
+   ============================================================ */
+
+:root {
+  /* --- Colour: surfaces ----------------------------------- */
+  --color-bg:          #14110F; /* app background — warm near-black */
+  --color-surface:     #1F1B18; /* cards, sidebar, panels          */
+  --color-surface-2:   #2A2521; /* raised: hover, selected, inputs  */
+  --color-surface-3:   #35302B; /* highest: menus, tooltips         */
+  --color-border:      #3A322C; /* hairlines, dividers, input edge  */
+  --color-border-strong:#544940;/* focus ring track, table outline  */
+
+  /* --- Colour: text --------------------------------------- */
+  --color-text:        #EDE6DA; /* body            15.9:1 on bg     */
+  --color-text-muted:  #A99C8A; /* labels, meta     7.6:1 on bg     */
+  --color-text-faint:  #7C7062; /* disabled only — never body copy  */
+  --color-text-invert: #14110F; /* text ON primary/accent fills     */
+
+  /* --- Colour: brand -------------------------------------- */
+  --color-primary:     #C9A227; /* arcane gold: links, active, CTA  */
+  --color-primary-hover:#DDB63A;
+  --color-primary-weak:#3A2F13; /* solid tint for gold-on-dark chips*/
+  --color-accent:      #4E9A8F; /* teal: secondary action, party    */
+  --color-accent-hover:#5FB0A4;
+  --color-accent-weak: #16302D;
+
+  /* --- Colour: semantic ----------------------------------- */
+  --color-success:     #5FA777;  --color-success-weak: #16281C;
+  --color-warning:     #D08B3C;  --color-warning-weak: #33220F;
+  --color-danger:      #C2564B;  --color-danger-weak:  #331714;
+  --color-info:        #6E93C9;  --color-info-weak:    #162233;
+
+  /* --- Colour: container semantics ------------------------ */
+  /* Each container type carries one fixed hue so a player can tell
+     "mine" from "ours" from "the world's" at a glance. */
+  --color-container-character: #C9A227; /* gold  — your own pack    */
+  --color-container-party:     #4E9A8F; /* teal  — shared wagon     */
+  --color-container-world:     #9B6BC9; /* violet— GM-only, world   */
+
+  /* --- Type ----------------------------------------------- */
+  --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-serif: ui-serif, "Iowan Old Style", Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
+
+  --font-size-xs:  11px;  --line-height-xs:  16px; /* table meta, chips     */
+  --font-size-sm:  12px;  --line-height-sm:  18px; /* labels, captions      */
+  --font-size-base:14px;  --line-height-base:20px; /* body, table cells     */
+  --font-size-lg:  16px;  --line-height-lg:  24px; /* section titles        */
+  --font-size-xl:  20px;  --line-height-xl:  28px; /* screen titles         */
+  --font-size-2xl: 28px;  --line-height-2xl: 34px; /* login / hero only     */
+
+  --font-weight-regular: 400;
+  --font-weight-medium:  500;
+  --font-weight-bold:    700;
+
+  /* --- Spacing: 4px base unit ----------------------------- */
+  --space-1: 4px;   /* icon-to-label            */
+  --space-2: 8px;   /* inside a control         */
+  --space-3: 12px;  /* between related rows     */
+  --space-4: 16px;  /* screen edge, card pad    */
+  --space-5: 24px;  /* between sections         */
+  --space-6: 32px;  /* between major blocks     */
+  --space-8: 48px;  /* empty-state breathing    */
+
+  /* --- Radius --------------------------------------------- */
+  --radius-sm: 3px;  /* chips, tags             */
+  --radius-md: 5px;  /* buttons, inputs, rows   */
+  --radius-lg: 8px;  /* cards, modals, panels   */
+
+  /* --- Elevation (flat: solid shadow, never a gradient) ---- */
+  --shadow-panel: 0 1px 0 0 var(--color-border);
+  --shadow-modal: 0 8px 24px rgba(0, 0, 0, 0.55);
+
+  /* --- Layout --------------------------------------------- */
+  --topbar-h: 48px;
+  --sidebar-w: 248px;
+  --sidebar-w-collapsed: 48px;
+  --detail-w: 320px;
+  --row-h: 36px;
+
+  /* --- Motion --------------------------------------------- */
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --dur-fast: 90ms;
+  --dur-base: 160ms;
+}
+
+/* ============================================================
+   Base — semantic elements only. No component styling here;
+   components are Tailwind utilities so they lift into JSX as-is.
+   ============================================================ */
+
+/* Tailwind's preflight is disabled (see tailwind.config.js) so that this file
+   stays the single base layer. These four rules are the only parts of preflight
+   the utilities actually depend on. */
+*, *::before, *::after {
+  box-sizing: border-box;
+  border-width: 0;
+  border-style: solid;          /* `border` utilities set width only */
+  border-color: var(--color-border);
+}
+
+button, input, select, textarea {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border-radius: 0;
+}
+button { cursor: pointer; }
+table { border-collapse: collapse; }
+ul, ol { list-style: none; margin: 0; padding: 0; }
+p { margin: 0; }
+svg { display: block; }
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+  -webkit-font-smoothing: antialiased;
+  /* Hard requirement: never scroll sideways at 375px. */
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4 { font-family: var(--font-serif); margin: 0; font-weight: var(--font-weight-bold); }
+
+/* One focus treatment, everywhere, always visible. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Scrollbars, so panels don't look like a different app. */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--color-bg); }
+::-webkit-scrollbar-thumb { background: var(--color-surface-3); border-radius: 999px; border: 2px solid var(--color-bg); }
+::-webkit-scrollbar-thumb:hover { background: var(--color-border-strong); }
+
+/* Screen-reader-only text (used on icon-only buttons). */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* Mockup-only chrome. Delete when porting — nothing below ships. */
+.mock-frame { border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; }
+.mock-label {
+  font-family: var(--font-mono); font-size: var(--font-size-xs);
+  color: var(--color-text-faint); letter-spacing: 0.04em; text-transform: uppercase;
+}

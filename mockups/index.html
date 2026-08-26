@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en" class="h-full">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arca — Mockups</title>
+<link rel="stylesheet" href="tokens.css">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="tailwind.config.js"></script>
+</head>
+
+<body class="min-h-full">
+<div class="mx-auto flex max-w-5xl flex-col gap-6 p-4 md:p-6">
+
+  <header class="flex flex-wrap items-end gap-4 border-b border-border pb-5">
+    <div class="min-w-0 flex-1">
+      <div class="mb-2 flex items-center gap-2 text-primary">
+        <svg viewBox="0 0 16 16" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
+          <rect x="1.5" y="4.5" width="13" height="9" rx="1"/><path d="M1.5 8h13" stroke-linecap="round"/>
+          <rect x="7" y="6.5" width="2" height="3" rx="0.5" fill="currentColor" stroke="none"/>
+        </svg>
+        <h1 class="font-serif text-2xl font-bold">Arca — Mockups</h1>
+      </div>
+      <p class="max-w-[70ch] text-base text-muted">
+        Static, gradient-free mockups for the TaleSpire Symbiote inventory app.
+        Built on the tokens in <a href="../final-project-planning/Design.md" class="font-medium text-primary hover:underline">Design.md</a>
+        and scoped by <a href="../SCOPE.md" class="font-medium text-primary hover:underline">SCOPE.md</a>.
+      </p>
+    </div>
+    <span class="rounded-sm border border-border bg-surface px-2 py-1 font-mono text-xs text-muted">Tailwind via CDN — connect once to render</span>
+  </header>
+
+  <!-- ═══ Screens ═══════════════════════════════════════════════════ -->
+  <section>
+    <h2 class="mb-3 font-serif text-lg font-bold text-text">Screens</h2>
+    <ul class="grid gap-3 sm:grid-cols-2">
+      <li>
+        <a href="01-signin.html" class="flex h-full flex-col rounded-lg border border-border bg-surface p-4 hover:bg-surface2">
+          <span class="mb-1 flex items-center gap-2">
+            <span class="font-mono text-xs text-faint">01</span>
+            <span class="font-serif text-lg font-bold text-text">Sign in</span>
+          </span>
+          <span class="text-base text-muted">Discord OAuth, loading, and the not-a-member gate.</span>
+        </a>
+      </li>
+      <li>
+        <a href="02-workspace.html" class="flex h-full flex-col rounded-lg border border-primary bg-surface p-4 hover:bg-surface2">
+          <span class="mb-1 flex items-center gap-2">
+            <span class="font-mono text-xs text-faint">02</span>
+            <span class="font-serif text-lg font-bold text-text">Workspace</span>
+            <span class="rounded-sm bg-primaryWeak px-1.5 py-0.5 text-xs font-medium text-primary">Start here</span>
+          </span>
+          <span class="text-base text-muted">The app: container sidebar, item table, detail panel, live-sync row.</span>
+        </a>
+      </li>
+      <li>
+        <a href="03-move-item.html" class="flex h-full flex-col rounded-lg border border-border bg-surface p-4 hover:bg-surface2">
+          <span class="mb-1 flex items-center gap-2">
+            <span class="font-mono text-xs text-faint">03</span>
+            <span class="font-serif text-lg font-bold text-text">Move item</span>
+            <span class="rounded-sm bg-primaryWeak px-1.5 py-0.5 text-xs font-medium text-primary">Headline flow</span>
+          </span>
+          <span class="text-base text-muted">Partial stacks, both-ends permission, consequence preview, rollback.</span>
+        </a>
+      </li>
+      <li>
+        <a href="04-item-editor.html" class="flex h-full flex-col rounded-lg border border-border bg-surface p-4 hover:bg-surface2">
+          <span class="mb-1 flex items-center gap-2">
+            <span class="font-mono text-xs text-faint">04</span>
+            <span class="font-serif text-lg font-bold text-text">Item editor</span>
+          </span>
+          <span class="text-base text-muted">Add and edit, clean and with validation errors.</span>
+        </a>
+      </li>
+      <li>
+        <a href="05-states.html" class="flex h-full flex-col rounded-lg border border-border bg-surface p-4 hover:bg-surface2">
+          <span class="mb-1 flex items-center gap-2">
+            <span class="font-mono text-xs text-faint">05</span>
+            <span class="font-serif text-lg font-bold text-text">States</span>
+          </span>
+          <span class="text-base text-muted">Empty, loading, 403, offline, and the three encumbrance levels.</span>
+        </a>
+      </li>
+      <li>
+        <a href="06-panel-widths.html" class="flex h-full flex-col rounded-lg border border-border bg-surface p-4 hover:bg-surface2">
+          <span class="mb-1 flex items-center gap-2">
+            <span class="font-mono text-xs text-faint">06</span>
+            <span class="font-serif text-lg font-bold text-text">Panel widths</span>
+          </span>
+          <span class="text-base text-muted">The real workspace at 375 / 380 / 1280, plus the sub-380 stacked layout.</span>
+        </a>
+      </li>
+      <li>
+        <a href="07-character-sheet.html" class="flex h-full flex-col rounded-lg border border-border bg-surface p-4 hover:bg-surface2">
+          <span class="mb-1 flex items-center gap-2">
+            <span class="font-mono text-xs text-faint">07</span>
+            <span class="font-serif text-lg font-bold text-text">Character sheet</span>
+            <span class="rounded-sm border border-warning bg-warningWeak px-1.5 py-0.5 text-xs font-medium text-warning">Stretch</span>
+          </span>
+          <span class="text-base text-muted">Attributes, skills, equipment, spells — reusing the item table verbatim.</span>
+        </a>
+      </li>
+      <li>
+        <a href="08-dicefinder.html" class="flex h-full flex-col rounded-lg border border-border bg-surface p-4 hover:bg-surface2">
+          <span class="mb-1 flex items-center gap-2">
+            <span class="font-mono text-xs text-faint">08</span>
+            <span class="font-serif text-lg font-bold text-text">diceFinder</span>
+            <span class="rounded-sm border border-warning bg-warningWeak px-1.5 py-0.5 text-xs font-medium text-warning">Stretch</span>
+          </span>
+          <span class="text-base text-muted">Notation bar, parse preview, parse errors, roll history.</span>
+        </a>
+      </li>
+    </ul>
+  </section>
+
+  <!-- ═══ Tokens ════════════════════════════════════════════════════ -->
+  <section>
+    <h2 class="mb-1 font-serif text-lg font-bold text-text">Tokens</h2>
+    <p class="mb-3 text-base text-muted">
+      Every swatch is a flat fill. There is no <code class="font-mono text-sm text-text">linear-gradient</code> anywhere in this folder.
+    </p>
+
+    <div class="grid gap-4 md:grid-cols-2">
+      <div class="rounded-lg border border-border bg-surface p-4">
+        <h3 class="mb-3 font-serif text-sm font-bold uppercase tracking-wider text-muted">Surfaces &amp; text</h3>
+        <ul class="flex flex-col gap-2">
+          <li class="flex items-center gap-3"><span class="h-8 w-8 shrink-0 rounded-md border border-border bg-bg"></span><code class="font-mono text-sm text-text">--color-bg</code><span class="ml-auto font-mono text-xs text-faint">#14110F</span></li>
+          <li class="flex items-center gap-3"><span class="h-8 w-8 shrink-0 rounded-md border border-border bg-surface"></span><code class="font-mono text-sm text-text">--color-surface</code><span class="ml-auto font-mono text-xs text-faint">#1F1B18</span></li>
+          <li class="flex items-center gap-3"><span class="h-8 w-8 shrink-0 rounded-md border border-border bg-surface2"></span><code class="font-mono text-sm text-text">--color-surface-2</code><span class="ml-auto font-mono text-xs text-faint">#2A2521</span></li>
+          <li class="flex items-center gap-3"><span class="h-8 w-8 shrink-0 rounded-md border border-border bg-surface3"></span><code class="font-mono text-sm text-text">--color-surface-3</code><span class="ml-auto font-mono text-xs text-faint">#35302B</span></li>
+          <li class="flex items-center gap-3"><span class="h-8 w-8 shrink-0 rounded-md bg-text"></span><code class="font-mono text-sm text-text">--color-text</code><span class="ml-auto font-mono text-xs text-faint">15.9:1</span></li>
+          <li class="flex items-center gap-3"><span class="h-8 w-8 shrink-0 rounded-md bg-muted"></span><code class="font-mono text-sm text-text">--color-text-muted</code><span class="ml-auto font-mono text-xs text-faint">7.6:1</span></li>
+        </ul>
+      </div>
+
+      <div class="rounded-lg border border-border bg-surface p-4">
+        <h3 class="mb-3 font-serif text-sm font-bold uppercase tracking-wider text-muted">Brand, semantic &amp; container</h3>
+        <ul class="flex flex-col gap-2">
+          <li class="flex items-center gap-3"><span class="h-8 w-8 shrink-0 rounded-md bg-primary"></span><code class="font-mono text-sm text-text">--color-primary</code><span class="ml-auto font-mono text-xs text-faint">#C9A227</span></li>
+          <li class="flex items-center gap-3"><span class="h-8 w-8 shrink-0 rounded-md bg-accent"></span><code class="font-mono text-sm text-text">--color-accent</code><span class="ml-auto font-mono text-xs text-faint">#4E9A8F</span></li>
+          <li class="flex items-center gap-3"><span class="h-8 w-8 shrink-0 rounded-md bg-success"></span><code class="font-mono text-sm text-text">--color-success</code><span class="ml-auto font-mono text-xs text-faint">#5FA777</span></li>
+          <li class="flex items-center gap-3"><span class="h-8 w-8 shrink-0 rounded-md bg-warning"></span><code class="font-mono text-sm text-text">--color-warning</code><span class="ml-auto font-mono text-xs text-faint">#D08B3C</span></li>
+          <li class="flex items-center gap-3"><span class="h-8 w-8 shrink-0 rounded-md bg-danger"></span><code class="font-mono text-sm text-text">--color-danger</code><span class="ml-auto font-mono text-xs text-faint">#C2564B</span></li>
+          <li class="flex items-center gap-3"><span class="h-8 w-8 shrink-0 rounded-md bg-cWorld"></span><code class="font-mono text-sm text-text">--color-container-world</code><span class="ml-auto font-mono text-xs text-faint">#9B6BC9</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ Component reference ═══════════════════════════════════════ -->
+  <section>
+    <h2 class="mb-1 font-serif text-lg font-bold text-text">Atoms, in every state</h2>
+    <p class="mb-3 text-base text-muted">Build these first; every screen is assembled from them.</p>
+
+    <div class="flex flex-col gap-4 rounded-lg border border-border bg-surface p-4">
+
+      <div>
+        <p class="mb-2 font-mono text-xs uppercase tracking-wider text-faint">Button</p>
+        <div class="flex flex-wrap items-center gap-2">
+          <button class="h-9 rounded-md bg-primary px-4 text-sm font-bold text-invert hover:bg-primaryHover">Primary</button>
+          <button class="h-9 rounded-md border border-border bg-surface px-4 text-sm font-medium text-text hover:bg-surface2">Secondary</button>
+          <button class="h-9 rounded-md px-4 text-sm font-medium text-muted hover:bg-surface2 hover:text-text">Ghost</button>
+          <button class="h-9 rounded-md border border-border px-4 text-sm font-medium text-danger hover:bg-dangerWeak">Danger</button>
+          <button disabled class="h-9 cursor-not-allowed rounded-md bg-surface3 px-4 text-sm font-bold text-faint">Disabled</button>
+        </div>
+      </div>
+
+      <div class="border-t border-border pt-4">
+        <p class="mb-2 font-mono text-xs uppercase tracking-wider text-faint">Chip</p>
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="rounded-sm border border-border bg-surface2 px-1.5 py-0.5 text-xs text-muted">neutral</span>
+          <span class="rounded-sm border border-border bg-primaryWeak px-1.5 py-0.5 text-xs text-primary">primary</span>
+          <span class="rounded-sm border border-border bg-accentWeak px-1.5 py-0.5 text-xs text-accent">accent</span>
+          <span class="rounded-sm border border-border bg-successWeak px-1.5 py-0.5 text-xs text-success">success</span>
+          <span class="rounded-sm border border-border bg-warningWeak px-1.5 py-0.5 text-xs text-warning">warning</span>
+          <span class="rounded-sm border border-border bg-dangerWeak px-1.5 py-0.5 text-xs text-danger">danger</span>
+        </div>
+      </div>
+
+      <div class="border-t border-border pt-4">
+        <p class="mb-2 font-mono text-xs uppercase tracking-wider text-faint">ContainerBadge</p>
+        <div class="flex flex-wrap items-center gap-4">
+          <span class="flex items-center gap-2 text-base text-text"><span class="h-2 w-2 rounded-full bg-cCharacter"></span>character</span>
+          <span class="flex items-center gap-2 text-base text-text"><span class="h-2 w-2 rounded-full bg-cParty"></span>party</span>
+          <span class="flex items-center gap-2 text-base text-text"><span class="h-2 w-2 rounded-full bg-cWorld"></span>world</span>
+        </div>
+      </div>
+
+      <div class="border-t border-border pt-4">
+        <p class="mb-2 font-mono text-xs uppercase tracking-wider text-faint">Input — default, focus, error</p>
+        <div class="grid gap-3 sm:grid-cols-3">
+          <div>
+            <label for="d1" class="mb-1 block text-sm font-medium text-muted">Default</label>
+            <input id="d1" value="Rope, hempen" class="h-9 w-full rounded-md border border-border bg-surface2 px-2 text-base text-text">
+          </div>
+          <div>
+            <label for="d2" class="mb-1 block text-sm font-medium text-muted">Focus</label>
+            <input id="d2" value="Rope, hempen" style="outline:2px solid var(--color-primary); outline-offset:2px" class="h-9 w-full rounded-md border border-border bg-surface2 px-2 text-base text-text">
+          </div>
+          <div>
+            <label for="d3" class="mb-1 block text-sm font-medium text-muted">Error</label>
+            <input id="d3" value="" aria-invalid="true" class="h-9 w-full rounded-md border border-danger bg-surface2 px-2 text-base text-text">
+          </div>
+        </div>
+      </div>
+
+      <div class="border-t border-border pt-4">
+        <p class="mb-2 font-mono text-xs uppercase tracking-wider text-faint">Type scale</p>
+        <p class="font-serif text-xl font-bold text-text">Screen title — 20 / 28 serif bold</p>
+        <p class="font-serif text-lg font-bold text-text">Section title — 16 / 24 serif bold</p>
+        <p class="text-base text-text">Body — 14 / 20 regular. The size the table is designed around.</p>
+        <p class="text-sm font-medium text-muted">Label — 12 / 18 medium</p>
+        <p class="text-xs text-muted">Meta — 11 / 16 regular</p>
+        <p class="mt-1 font-mono text-base tabular-nums text-text">Numerals — 1234567890 tabular</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ Porting ═══════════════════════════════════════════════════ -->
+  <section class="rounded-lg border border-border bg-surface p-4">
+    <h2 class="mb-3 font-serif text-lg font-bold text-text">Turning these into the Next.js app</h2>
+    <ol class="flex list-decimal flex-col gap-2 pl-5 text-base text-muted marker:text-primary">
+      <li>Copy the <code class="font-mono text-sm text-text">:root</code> block from <code class="font-mono text-sm text-text">tokens.css</code> into <code class="font-mono text-sm text-text">app/globals.css</code>, and re-enable Tailwind preflight (delete the four base rules the mockups add for the CDN build).</li>
+      <li>Copy <code class="font-mono text-sm text-text">theme.extend</code> from <code class="font-mono text-sm text-text">tailwind.config.js</code> into <code class="font-mono text-sm text-text">tailwind.config.ts</code>. Class names stay identical, so no markup changes.</li>
+      <li>Every element marked <code class="font-mono text-sm text-text">data-component="X"</code> becomes <code class="font-mono text-sm text-text">src/components/&lt;level&gt;/X.tsx</code>, with the props listed in Design.md Step E.</li>
+      <li>Swap the hard-coded rows for <code class="font-mono text-sm text-text">items.map()</code> with <code class="font-mono text-sm text-text">key={item.id}</code>. The markup does not change.</li>
+      <li>Rename attributes for JSX: <code class="font-mono text-sm text-text">class</code> → <code class="font-mono text-sm text-text">className</code>, <code class="font-mono text-sm text-text">for</code> → <code class="font-mono text-sm text-text">htmlFor</code>, inline <code class="font-mono text-sm text-text">style</code> to an object. <code class="font-mono text-sm text-text">data-*</code> and <code class="font-mono text-sm text-text">aria-*</code> carry over unchanged.</li>
+      <li>Each <code class="font-mono text-sm text-text">.sr-only</code> span on an icon-only button becomes that button's <code class="font-mono text-sm text-text">aria-label</code>.</li>
+      <li>Replace the three modals with Radix Dialog for focus trapping and <kbd class="rounded-sm border border-border bg-surface2 px-1 font-mono text-xs text-text">Esc</kbd> handling — keep the markup inside.</li>
+      <li>Delete the <code class="font-mono text-sm text-text">.mock-frame</code> / <code class="font-mono text-sm text-text">.mock-label</code> rules. Nothing else in <code class="font-mono text-sm text-text">tokens.css</code> is mockup-only.</li>
+    </ol>
+  </section>
+
+  <footer class="border-t border-border pt-4 text-sm text-muted">
+    <a href="../SCOPE.md" class="font-medium text-primary hover:underline">SCOPE.md</a> ·
+    <a href="../final-project-planning/Design.md" class="font-medium text-primary hover:underline">Design.md</a> ·
+    <a href="../docs/research/superhuman-docs-and-capacities.md" class="font-medium text-primary hover:underline">Research</a>
+  </footer>
+</div>
+</body>
+</html>

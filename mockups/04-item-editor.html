@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en" class="h-full">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arca — Item editor</title>
+<link rel="stylesheet" href="tokens.css">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="tailwind.config.js"></script>
+</head>
+
+<!--
+  SCREEN 4 — ITEM EDITOR (add / edit)
+  Component: src/components/organisms/ItemEditorDialog.tsx
+  Fields map 1:1 onto the Zod `NewItem` schema in src/domain/types.ts, so the
+  same schema validates the form and the Server Action. One definition, not two.
+
+  Below `panel` this dialog becomes a full-screen sheet — see 06-panel-widths.html.
+-->
+
+<body class="min-h-full">
+<div class="mx-auto max-w-6xl p-4 md:p-6">
+  <p class="mock-label mb-4">04 · Item editor — clean, and with validation errors</p>
+
+  <div class="grid items-start gap-4 lg:grid-cols-2">
+
+    <!-- ══ A: Add item, clean ═══════════════════════════════════════ -->
+    <div class="mock-frame relative flex min-h-[620px] items-start justify-center bg-bg p-4">
+      <div class="absolute inset-0" style="background-color: rgba(0,0,0,0.6)" aria-hidden="true"></div>
+
+      <form role="dialog" aria-modal="true" aria-labelledby="add-title"
+            data-component="ItemEditorDialog"
+            class="relative w-full max-w-sm rounded-lg border border-border bg-surface shadow-modal">
+
+        <div class="flex items-start gap-3 border-b border-border p-4">
+          <div class="min-w-0 flex-1">
+            <h2 id="add-title" class="font-serif text-xl font-bold text-text">Add item</h2>
+            <p class="mt-1 flex items-center gap-2 text-sm text-muted">
+              <span class="h-2 w-2 shrink-0 rounded-full bg-cParty" aria-hidden="true"></span>
+              into Party Wagon
+            </p>
+          </div>
+          <button type="button" class="grid h-8 w-8 shrink-0 place-items-center rounded-md text-muted hover:bg-surface2 hover:text-text">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+            <span class="sr-only">Close</span>
+          </button>
+        </div>
+
+        <div class="flex flex-col gap-4 p-4">
+
+          <!-- Name — required. Input (atom), label always present. -->
+          <div>
+            <label for="name" class="mb-1 block text-sm font-medium text-muted">
+              Name <span class="text-danger" aria-hidden="true">*</span>
+            </label>
+            <input id="name" name="name" type="text" required value="Lantern, hooded"
+                   class="h-9 w-full rounded-md border border-border bg-surface2 px-2 text-base text-text placeholder:text-faint">
+          </div>
+
+          <!-- Type membership: composable, per the object model -->
+          <div>
+            <label for="types" class="mb-1 block text-sm font-medium text-muted">Types</label>
+            <div class="flex flex-wrap items-center gap-1 rounded-md border border-border bg-surface2 p-2">
+              <span class="flex items-center gap-1 rounded-sm border border-border bg-surface3 px-1.5 py-0.5 text-xs text-text">
+                Physical Object
+                <svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+              </span>
+              <span class="flex items-center gap-1 rounded-sm border border-border bg-surface3 px-1.5 py-0.5 text-xs text-text">
+                Gear
+                <svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+              </span>
+              <input id="types" type="text" placeholder="Add a type…"
+                     class="min-w-[8ch] flex-1 bg-transparent text-base text-text placeholder:text-faint">
+            </div>
+            <p class="mt-1 text-sm text-faint">An object may hold several types. Each type contributes its properties.</p>
+          </div>
+
+          <!-- Numeric trio. Mono + tabular so columns line up in the table later. -->
+          <div class="grid grid-cols-3 gap-3">
+            <div>
+              <label for="qty" class="mb-1 block text-sm font-medium text-muted">Qty</label>
+              <input id="qty" name="qty" type="number" value="1" min="1" step="1"
+                     class="h-9 w-full rounded-md border border-border bg-surface2 px-2 text-right font-mono text-base tabular-nums text-text">
+            </div>
+            <div>
+              <label for="weight" class="mb-1 block text-sm font-medium text-muted">Weight</label>
+              <input id="weight" name="weight" type="number" value="1.0" min="0" step="0.5"
+                     class="h-9 w-full rounded-md border border-border bg-surface2 px-2 text-right font-mono text-base tabular-nums text-text">
+            </div>
+            <div>
+              <label for="value" class="mb-1 block text-sm font-medium text-muted">Value</label>
+              <input id="value" name="value" type="text" value="5 gp"
+                     class="h-9 w-full rounded-md border border-border bg-surface2 px-2 text-right font-mono text-base tabular-nums text-text">
+            </div>
+          </div>
+          <p class="-mt-2 text-sm text-faint">Dragonbane counts light items as 0.5 and tiny ones as 0.</p>
+
+          <!-- Notes: a Block on the object -->
+          <div>
+            <label for="notes" class="mb-1 block text-sm font-medium text-muted">Notes</label>
+            <textarea id="notes" name="notes" rows="3" placeholder="Anything the table should know…"
+                      class="w-full rounded-md border border-border bg-surface2 p-2 text-base text-text placeholder:text-faint"></textarea>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 border-t border-border p-4">
+          <label class="mr-auto flex items-center gap-2 text-sm text-muted">
+            <input type="checkbox" class="h-4 w-4">
+            Add another
+          </label>
+          <button type="button" class="h-9 rounded-md border border-border bg-surface px-4 text-sm font-medium text-text hover:bg-surface2">Cancel</button>
+          <button type="submit" class="h-9 rounded-md bg-primary px-4 text-sm font-bold text-invert hover:bg-primaryHover">Save item</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- ══ B: Edit item, with errors + a live-edit collision ═════════ -->
+    <div class="mock-frame relative flex min-h-[620px] items-start justify-center bg-bg p-4">
+      <div class="absolute inset-0" style="background-color: rgba(0,0,0,0.6)" aria-hidden="true"></div>
+
+      <form role="dialog" aria-modal="true" aria-labelledby="edit-title"
+            class="relative w-full max-w-sm rounded-lg border border-border bg-surface shadow-modal">
+
+        <div class="flex items-start gap-3 border-b border-border p-4">
+          <div class="min-w-0 flex-1">
+            <h2 id="edit-title" class="font-serif text-xl font-bold text-text">Edit item</h2>
+            <p class="mt-1 truncate text-sm text-muted">Rope, hempen (10 m)</p>
+          </div>
+          <button type="button" class="grid h-8 w-8 shrink-0 place-items-center rounded-md text-muted hover:bg-surface2 hover:text-text">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+            <span class="sr-only">Close</span>
+          </button>
+        </div>
+
+        <!-- Someone else is editing the same object. Informational, not a lock. -->
+        <div class="flex items-start gap-2 border-b border-border bg-infoWeak px-4 py-3">
+          <span class="mt-0.5 shrink-0 text-info">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 7.5v3.5M8 5v.01"/></svg>
+          </span>
+          <p class="text-sm text-text">Milo is editing this item right now. Last write wins, and you will both see the result.</p>
+        </div>
+
+        <div class="flex flex-col gap-4 p-4">
+
+          <!-- ERROR: empty required field -->
+          <div>
+            <label for="e-name" class="mb-1 block text-sm font-medium text-muted">
+              Name <span class="text-danger" aria-hidden="true">*</span>
+            </label>
+            <input id="e-name" type="text" value="" aria-invalid="true" aria-describedby="e-name-err"
+                   class="h-9 w-full rounded-md border border-danger bg-surface2 px-2 text-base text-text">
+            <p id="e-name-err" class="mt-1 flex items-center gap-1 text-sm text-danger">
+              <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 5v3.5M8 11v.01"/></svg>
+              A name is required.
+            </p>
+          </div>
+
+          <div class="grid grid-cols-3 gap-3">
+            <!-- ERROR: qty must be a positive integer -->
+            <div>
+              <label for="e-qty" class="mb-1 block text-sm font-medium text-muted">Qty</label>
+              <input id="e-qty" type="number" value="0" aria-invalid="true" aria-describedby="e-qty-err"
+                     class="h-9 w-full rounded-md border border-danger bg-surface2 px-2 text-right font-mono text-base tabular-nums text-text">
+            </div>
+            <div>
+              <label for="e-weight" class="mb-1 block text-sm font-medium text-muted">Weight</label>
+              <input id="e-weight" type="number" value="1.0"
+                     class="h-9 w-full rounded-md border border-border bg-surface2 px-2 text-right font-mono text-base tabular-nums text-text">
+            </div>
+            <div>
+              <label for="e-value" class="mb-1 block text-sm font-medium text-muted">Value</label>
+              <input id="e-value" type="text" value="2 sp"
+                     class="h-9 w-full rounded-md border border-border bg-surface2 px-2 text-right font-mono text-base tabular-nums text-text">
+            </div>
+          </div>
+          <p id="e-qty-err" class="-mt-2 flex items-center gap-1 text-sm text-danger">
+            <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 5v3.5M8 11v.01"/></svg>
+            Quantity must be at least 1. To remove it entirely, archive the item.
+          </p>
+
+          <div>
+            <label for="e-notes" class="mb-1 block text-sm font-medium text-muted">Notes</label>
+            <textarea id="e-notes" rows="3"
+                      class="w-full rounded-md border border-border bg-surface2 p-2 text-base text-text">Frayed at one end. Milo says it will hold a person but not a horse.</textarea>
+          </div>
+
+          <!-- Destructive action, visually separated and never adjacent to Save -->
+          <div class="border-t border-border pt-4">
+            <button type="button" class="flex h-9 items-center gap-2 rounded-md border border-border px-3 text-sm font-medium text-danger hover:bg-dangerWeak">
+              <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5 5 13h6l.5-8.5"/></svg>
+              Archive item
+            </button>
+            <p class="mt-1 text-sm text-faint">Archiving is reversible. Nothing is ever hard-deleted.</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 border-t border-border p-4">
+          <p class="mr-auto text-xs text-danger">2 problems</p>
+          <button type="button" class="h-9 rounded-md border border-border bg-surface px-4 text-sm font-medium text-text hover:bg-surface2">Cancel</button>
+          <!-- Disabled uses --color-text-faint, the one place it is allowed -->
+          <button type="submit" disabled class="h-9 cursor-not-allowed rounded-md bg-surface3 px-4 text-sm font-bold text-faint">Save item</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <p class="mt-6 text-sm text-muted">
+    Back to <a href="02-workspace.html" class="font-medium text-primary hover:underline">the Workspace</a>.
+  </p>
+</div>
+</body>
+</html>

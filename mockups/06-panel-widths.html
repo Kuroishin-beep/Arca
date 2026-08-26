@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en" class="h-full">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arca — Panel widths</title>
+<link rel="stylesheet" href="tokens.css">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="tailwind.config.js"></script>
+</head>
+
+<!--
+  SCREEN 6 — RESPONSIVE PROOF
+  The TaleSpire Symbiote panel is the PRIMARY target, not the degraded one, so
+  the layout is authored narrow-first and widened up.
+
+  The three frames below are live iframes of the real 02-workspace.html at fixed
+  widths — they are not redrawn, so what you see is what the CSS actually does.
+  Then the sub-380 stacked-card treatment, which is a genuinely different layout
+  rather than a squeezed table.
+-->
+
+<body class="min-h-full">
+<div class="mx-auto flex max-w-[1400px] flex-col gap-6 p-4 md:p-6">
+  <p class="mock-label">06 · The same workspace at three widths</p>
+
+  <div class="flex flex-wrap items-start gap-5">
+
+    <!-- 375px — phone / undocked narrow -->
+    <figure class="flex flex-col gap-2">
+      <figcaption class="flex items-baseline gap-2">
+        <span class="font-mono text-sm text-primary">375px</span>
+        <span class="text-sm text-muted">phone — below <code class="font-mono text-xs">panel</code></span>
+      </figcaption>
+      <div class="mock-frame" style="width:375px;height:560px">
+        <iframe src="02-workspace.html" title="Arca workspace at 375px" style="width:375px;height:560px;border:0"></iframe>
+      </div>
+      <p class="max-w-[375px] text-sm text-muted">Sidebar is a drawer. Table keeps Name / Qty / Wt only. Detail panel is a sheet. <strong class="text-text">No sideways scroll.</strong></p>
+    </figure>
+
+    <!-- 380px — the docked Symbiote panel -->
+    <figure class="flex flex-col gap-2">
+      <figcaption class="flex items-baseline gap-2">
+        <span class="font-mono text-sm text-primary">380px</span>
+        <span class="text-sm text-muted">docked TaleSpire Symbiote panel</span>
+      </figcaption>
+      <div class="mock-frame" style="width:380px;height:560px">
+        <iframe src="02-workspace.html" title="Arca workspace at 380px" style="width:380px;height:560px;border:0"></iframe>
+      </div>
+      <p class="max-w-[380px] text-sm text-muted">The default case. 36px rows and 14px body are chosen so this width shows ~11 items without scrolling.</p>
+    </figure>
+
+    <!-- 1280px — undocked / browser tab -->
+    <figure class="min-w-0 flex-1 flex-col gap-2" style="min-width:520px">
+      <figcaption class="flex items-baseline gap-2">
+        <span class="font-mono text-sm text-primary">1280px</span>
+        <span class="text-sm text-muted">undocked window — three panes pinned</span>
+      </figcaption>
+      <div class="mock-frame mt-2 overflow-x-auto">
+        <iframe src="02-workspace.html" title="Arca workspace at 1280px" style="width:1280px;height:560px;border:0"></iframe>
+      </div>
+      <p class="mt-2 text-sm text-muted">Sidebar + table + detail panel all pinned. Table gains Value and Tags columns. This frame is the one place a horizontal scrollbar is allowed — it belongs to the demo container, not to the app.</p>
+    </figure>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       Below `panel`: the table STOPS BEING A TABLE.
+       This is the rule that keeps the 375px promise. Squeezing six
+       columns into 340px is how you end up with a sideways scrollbar.
+       ═══════════════════════════════════════════════════════════════ -->
+  <p class="mock-label mt-2">06b · Below 380px — stacked cards, not a squeezed table</p>
+
+  <div class="flex flex-wrap items-start gap-5">
+
+    <figure class="flex flex-col gap-2">
+      <figcaption class="text-sm text-muted">Item list as two-line rows</figcaption>
+      <div class="mock-frame flex flex-col bg-bg" style="width:340px;height:520px">
+
+        <!-- Compact top bar: wordmark drops, search takes the width -->
+        <header class="flex h-topbar shrink-0 items-center gap-2 border-b border-border bg-surface px-3">
+          <button type="button" class="grid h-8 w-8 shrink-0 place-items-center rounded-md text-muted hover:bg-surface2">
+            <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12"/></svg>
+            <span class="sr-only">Containers</span>
+          </button>
+          <div class="flex min-w-0 flex-1 items-center gap-2">
+            <span class="h-2 w-2 shrink-0 rounded-full bg-cParty" aria-hidden="true"></span>
+            <h1 class="min-w-0 truncate font-serif text-lg font-bold text-text">Party Wagon</h1>
+          </div>
+          <span class="h-2 w-2 shrink-0 rounded-full bg-success" title="Synced" aria-hidden="true"></span>
+          <span class="sr-only">Synced</span>
+        </header>
+
+        <ul class="min-h-0 flex-1 overflow-y-auto">
+          <li class="border-b border-border bg-surface2 px-3 py-2">
+            <div class="flex items-baseline gap-2">
+              <span class="min-w-0 flex-1 truncate text-base font-medium text-text">Rope, hempen (10 m)</span>
+              <span class="shrink-0 font-mono text-base tabular-nums text-text">×2</span>
+            </div>
+            <div class="mt-0.5 flex items-center gap-2 text-xs text-muted">
+              <span class="font-mono tabular-nums">2.0 kg</span>
+              <span aria-hidden="true">·</span>
+              <span class="font-mono tabular-nums">4 sp</span>
+              <span aria-hidden="true">·</span>
+              <span class="truncate">gear</span>
+            </div>
+          </li>
+          <li class="border-b border-border px-3 py-2">
+            <div class="flex items-baseline gap-2">
+              <span class="min-w-0 flex-1 truncate text-base text-text">Healing Potion</span>
+              <span class="shrink-0 font-mono text-base tabular-nums text-text">×5</span>
+            </div>
+            <div class="mt-0.5 flex items-center gap-2 text-xs text-muted">
+              <span class="font-mono tabular-nums">0.5 kg</span><span aria-hidden="true">·</span>
+              <span class="font-mono tabular-nums">50 gp</span><span aria-hidden="true">·</span>
+              <span class="truncate text-success">consumable</span>
+            </div>
+          </li>
+          <li class="border-b border-border bg-infoWeak px-3 py-2">
+            <div class="flex items-baseline gap-2">
+              <span class="min-w-0 flex-1 truncate text-base text-text">Longsword +1</span>
+              <span class="shrink-0 font-mono text-base tabular-nums text-text">×1</span>
+            </div>
+            <div class="mt-0.5 flex items-center gap-2 text-xs text-muted">
+              <span class="font-mono tabular-nums">1.5 kg</span><span aria-hidden="true">·</span>
+              <span class="truncate text-info">Milo just added</span>
+            </div>
+          </li>
+          <li class="border-b border-border px-3 py-2">
+            <div class="flex items-baseline gap-2">
+              <span class="min-w-0 flex-1 truncate text-base text-text">Rations, dried (1 day)</span>
+              <span class="shrink-0 font-mono text-base tabular-nums text-text">×14</span>
+            </div>
+            <div class="mt-0.5 flex items-center gap-2 text-xs text-muted">
+              <span class="font-mono tabular-nums">0.5 kg</span><span aria-hidden="true">·</span>
+              <span class="truncate text-success">consumable</span>
+            </div>
+          </li>
+          <li class="border-b border-border px-3 py-2">
+            <div class="flex items-baseline gap-2">
+              <span class="min-w-0 flex-1 truncate text-base text-text">Lantern, hooded</span>
+              <span class="shrink-0 font-mono text-base tabular-nums text-text">×1</span>
+            </div>
+            <div class="mt-0.5 flex items-center gap-2 text-xs text-muted">
+              <span class="font-mono tabular-nums">1.0 kg</span><span aria-hidden="true">·</span>
+              <span class="truncate">gear</span>
+            </div>
+          </li>
+        </ul>
+
+        <!-- Summary collapses to the two numbers that matter -->
+        <div class="flex shrink-0 items-center gap-2 border-t border-border bg-surface px-3 py-2">
+          <span class="font-mono text-xs text-muted">42</span>
+          <div class="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-surface3">
+            <div class="h-full rounded-full bg-accent" style="width:86%"></div>
+          </div>
+          <span class="font-mono text-xs tabular-nums text-muted">34.5kg</span>
+          <button type="button" class="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-primary text-invert">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg>
+            <span class="sr-only">Add item</span>
+          </button>
+        </div>
+      </div>
+    </figure>
+
+    <!-- Sidebar as a drawer -->
+    <figure class="flex flex-col gap-2">
+      <figcaption class="text-sm text-muted">Sidebar as an overlay drawer</figcaption>
+      <div class="mock-frame relative flex flex-col bg-bg" style="width:340px;height:520px">
+        <div class="absolute inset-0 z-10" style="background-color: rgba(0,0,0,0.6)" aria-hidden="true"></div>
+        <nav aria-label="Containers" class="absolute inset-y-0 left-0 z-20 flex w-[264px] flex-col overflow-y-auto border-r border-border bg-surface">
+          <div class="flex h-topbar shrink-0 items-center justify-between border-b border-border px-3">
+            <span class="font-serif text-lg font-bold text-primary">Arca</span>
+            <button type="button" class="grid h-8 w-8 place-items-center rounded-md text-muted hover:bg-surface2">
+              <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+              <span class="sr-only">Close</span>
+            </button>
+          </div>
+          <div class="px-3 pt-4">
+            <h2 class="mb-2 px-2 font-serif text-sm font-bold uppercase tracking-wider text-muted">My Packs</h2>
+            <a href="#" class="flex h-11 items-center gap-2 rounded-md px-2 text-base text-text hover:bg-surface2">
+              <span class="h-2 w-2 shrink-0 rounded-full bg-cCharacter" aria-hidden="true"></span>
+              <span class="min-w-0 flex-1 truncate">Kova’s Pack</span>
+              <span class="font-mono text-xs text-faint">18</span>
+            </a>
+          </div>
+          <div class="px-3 pt-5">
+            <h2 class="mb-2 px-2 font-serif text-sm font-bold uppercase tracking-wider text-muted">Party</h2>
+            <a href="#" aria-current="page" class="flex h-11 items-center gap-2 rounded-md border-l-2 border-cParty bg-surface2 px-2 text-base font-medium text-text">
+              <span class="h-2 w-2 shrink-0 rounded-full bg-cParty" aria-hidden="true"></span>
+              <span class="min-w-0 flex-1 truncate">Party Wagon</span>
+              <span class="font-mono text-xs text-muted">42</span>
+            </a>
+            <a href="#" class="mt-1 flex h-11 items-center gap-2 rounded-md px-2 text-base text-text hover:bg-surface2">
+              <span class="h-2 w-2 shrink-0 rounded-full bg-cParty" aria-hidden="true"></span>
+              <span class="min-w-0 flex-1 truncate">Ravenholt Stash</span>
+              <span class="font-mono text-xs text-faint">7</span>
+            </a>
+          </div>
+          <div class="px-3 pb-4 pt-5">
+            <h2 class="mb-2 px-2 font-serif text-sm font-bold uppercase tracking-wider text-muted">World</h2>
+            <a href="#" class="flex h-11 items-center gap-2 rounded-md px-2 text-base text-text hover:bg-surface2">
+              <span class="h-2 w-2 shrink-0 rounded-full bg-cWorld" aria-hidden="true"></span>
+              <span class="min-w-0 flex-1 truncate">Barrow Chest</span>
+              <span class="font-mono text-xs text-faint">3</span>
+            </a>
+            <span aria-disabled="true" class="mt-1 flex h-11 cursor-not-allowed items-center gap-2 rounded-md px-2 text-base text-faint">
+              <span class="h-2 w-2 shrink-0 rounded-full bg-surface3" aria-hidden="true"></span>
+              <span class="min-w-0 flex-1 truncate">The Sunken Vault</span>
+              <span class="text-xs">GM</span>
+            </span>
+          </div>
+        </nav>
+      </div>
+      <p class="max-w-[340px] text-sm text-muted">Drawer rows are 44px, not 36px — thumb targets below <code class="font-mono text-xs">panel</code>.</p>
+    </figure>
+
+    <!-- Move dialog as a bottom sheet -->
+    <figure class="flex flex-col gap-2">
+      <figcaption class="text-sm text-muted">Move dialog becomes a full sheet</figcaption>
+      <div class="mock-frame relative flex flex-col justify-end bg-bg" style="width:340px;height:520px">
+        <div class="absolute inset-0" style="background-color: rgba(0,0,0,0.6)" aria-hidden="true"></div>
+        <div role="dialog" aria-modal="true" class="relative rounded-t-lg border-t border-border bg-surface">
+          <div class="flex items-start gap-3 border-b border-border p-4">
+            <div class="min-w-0 flex-1">
+              <h2 class="font-serif text-lg font-bold text-text">Move item</h2>
+              <p class="mt-0.5 truncate text-sm text-muted">Rope, hempen (10 m) — 1 of 2</p>
+            </div>
+            <button type="button" class="grid h-8 w-8 shrink-0 place-items-center rounded-md text-muted hover:bg-surface2">
+              <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+              <span class="sr-only">Cancel</span>
+            </button>
+          </div>
+          <ul class="flex flex-col gap-1 p-3">
+            <li>
+              <label class="flex h-11 items-center gap-3 rounded-md border border-primary bg-primaryWeak px-3">
+                <input type="radio" name="d2" checked class="h-4 w-4">
+                <span class="h-2 w-2 rounded-full bg-cCharacter" aria-hidden="true"></span>
+                <span class="min-w-0 flex-1 truncate text-base font-medium text-text">Kova’s Pack</span>
+              </label>
+            </li>
+            <li>
+              <label class="flex h-11 items-center gap-3 rounded-md border border-border px-3">
+                <input type="radio" name="d2" class="h-4 w-4">
+                <span class="h-2 w-2 rounded-full bg-cParty" aria-hidden="true"></span>
+                <span class="min-w-0 flex-1 truncate text-base text-text">Ravenholt Stash</span>
+              </label>
+            </li>
+            <li>
+              <label class="flex h-11 items-center gap-3 rounded-md border border-border px-3">
+                <input type="radio" name="d2" class="h-4 w-4">
+                <span class="h-2 w-2 rounded-full bg-cWorld" aria-hidden="true"></span>
+                <span class="min-w-0 flex-1 truncate text-base text-text">Barrow Chest</span>
+              </label>
+            </li>
+          </ul>
+          <div class="flex gap-2 border-t border-border p-3">
+            <button type="button" class="h-11 flex-1 rounded-md border border-border bg-surface text-sm font-medium text-text">Cancel</button>
+            <button type="button" class="h-11 flex-1 rounded-md bg-primary text-sm font-bold text-invert">Move</button>
+          </div>
+        </div>
+      </div>
+    </figure>
+  </div>
+
+  <p class="text-sm text-muted">
+    Back to <a href="02-workspace.html" class="font-medium text-primary hover:underline">the Workspace</a>.
+  </p>
+</div>
+</body>
+</html>
