@@ -7,3 +7,14 @@ coverage/
 
 .DS_Store
 Thumbs.db
+# next.js
+/.next/
+/out/
+next-env.d.ts
+.vercel
+
+# drizzle
+drizzle/meta/_journal.lock
+
+# typescript build info
+*.tsbuildinfo

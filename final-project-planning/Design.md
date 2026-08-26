@@ -26,8 +26,15 @@ Chosen because it is the only approach that satisfies both constraints at once:
   block becomes a `.tsx` file by copy-paste — no CSS module to port, no
   `styled-components` runtime shipped to a panel that has to stay light.
 
-Where they land: `app/globals.css` (`:root` block) + `tailwind.config.ts`
-(`theme.extend`, all values `var(--token)`).
+Where they land: **all of it in `app/globals.css`**. Tailwind v4 is CSS-first
+and has no `tailwind.config.ts` — canonical tokens are declared on `:root`, and
+an `@theme inline` block maps them onto Tailwind's utility namespaces so
+`--color-surface-2` drives `bg-surface2`. One file, two roles: the tokens a
+designer reads and the theme the compiler reads.
+
+(The static mockups in `mockups/` predate the app and use the Tailwind **v3**
+CDN, so they carry an equivalent `tailwind.config.js`. The token names and every
+utility class match, which is what makes the markup port unchanged.)
 
 ---
 
@@ -205,9 +212,13 @@ scrolling sideways. Where a wide element is genuinely unavoidable it gets its ow
 
 ## What each token becomes in Next.js
 
-| Here | There |
-| --- | --- |
-| `:root` block in `mockups/tokens.css` | `app/globals.css` |
-| `theme.extend` in `mockups/tailwind.config.js` | `tailwind.config.ts` |
-| Each row of Step E | one file in `src/components/<level>/` |
-| Each row of Step F | a Tailwind `panel:` / `md:` / `lg:` prefix |
+| Here | There | Status |
+| --- | --- | --- |
+| `:root` block in `mockups/tokens.css` | `:root` in `app/globals.css` | done |
+| `theme.extend` in `mockups/tailwind.config.js` | `@theme inline` in `app/globals.css` (v4 is CSS-first) | done |
+| Each row of Step E | one file in `src/components/<level>/` | done |
+| Each row of Step F | a Tailwind `panel:` / `md:` / `lg:` prefix | done |
+
+Two layout tokens have no Tailwind namespace in v4 (`--topbar-h`, `--sidebar-w`,
+`--detail-w`) and are used as `h-[var(--topbar-h)]` rather than `h-topbar`. The
+token stays the single source of truth either way.
