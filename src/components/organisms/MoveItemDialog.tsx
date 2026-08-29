@@ -8,6 +8,7 @@ import { Button } from "@/components/atoms/Button";
 import { ContainerDot } from "@/components/atoms/Chip";
 import { Icon } from "@/components/atoms/Icon";
 import { Modal } from "@/components/molecules/Modal";
+import { useOptimisticItems } from "@/components/organisms/OptimisticItems";
 import type { ContainerView, ItemView } from "@/domain/view";
 import { encumbrance, weightPercent } from "@/domain/view";
 
@@ -50,6 +51,7 @@ export function MoveItemDialog({
   const [qty, setQty] = useState(item.qty);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const { remove } = useOptimisticItems();
   const router = useRouter();
 
   const to = targets.find((t) => t.container.id === toId)?.container;
@@ -73,6 +75,11 @@ export function MoveItemDialog({
     data.set("qty", String(qty));
 
     startTransition(async () => {
+      // Inside the transition and BEFORE the await: this is what makes the row
+      // leave the source list and both meters recompute immediately (§8.1
+      // step 4). React reverts it when this transition settles.
+      remove({ itemId: item.id, qty: Math.min(Math.max(1, qty), item.qty) });
+
       const result = await moveItemAction(data);
       if (!result.ok) {
         // The server is authoritative. On rejection the UI says why in the

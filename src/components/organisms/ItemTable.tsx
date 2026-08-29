@@ -1,9 +1,15 @@
+"use client";
+
 import Link from "next/link";
 
 import { Chip } from "@/components/atoms/Chip";
 import { Icon } from "@/components/atoms/Icon";
 import { EmptyState } from "@/components/molecules/EmptyState";
 import { ButtonLink } from "@/components/atoms/Button";
+import {
+  applyPending,
+  useOptimisticItems,
+} from "@/components/organisms/OptimisticItems";
 import {
   type ItemView,
   type Sort,
@@ -24,7 +30,7 @@ import {
  * sideways scrollbar, and there must never be one at 375px.
  */
 export function ItemTable({
-  items,
+  items: serverItems,
   containerId,
   sort,
   selectedId,
@@ -38,6 +44,13 @@ export function ItemTable({
   canEdit: boolean;
   query: string;
 }) {
+  // A move or an archive in flight is reflected here before the server answers
+  // (SCOPE.md §8.1 step 4). If it is rejected, the transition ends, the
+  // optimistic entry is dropped, and the row returns on its own — see
+  // OptimisticItems.tsx for why that revert is the API's job and not ours.
+  const { pending } = useOptimisticItems();
+  const items = applyPending(serverItems, pending);
+
   if (items.length === 0) {
     return query.trim() !== "" ? (
       <EmptyState

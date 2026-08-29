@@ -1,32 +1,44 @@
 import { redirect } from "next/navigation";
 
-import { signInAsAction } from "@/actions/session";
+import {
+  signInAsAction,
+  signInWithDiscordAction,
+  signOutAction,
+} from "@/actions/session";
 import { Avatar } from "@/components/atoms/Status";
 import { Icon } from "@/components/atoms/Icon";
 import { repository, repositoryKind } from "@/db";
-import { currentPrincipal } from "@/lib/session";
+import { authConfigured } from "@/lib/auth";
+import { currentSession } from "@/lib/session";
+import { realtimeKind } from "@/realtime";
 
 /**
  * Sign in — SCOPE.md M1.
  *
- * The real flow is Discord OAuth (§4): the campaign already coordinates on
- * Discord, so there is no new account to create. That is phase 1. Until then
- * this screen picks a seeded member, which is what makes the permission rules
- * testable by hand — sign in as Kova, try to open the vault, watch it refuse.
- *
- * The Discord button is present and disabled rather than absent, so the shape
- * of the finished screen is already settled.
+ * Three states, not two. "Not signed in" and "signed in but not a member of
+ * this campaign" are different situations and get different screens: M1 is
+ * explicit that a non-member sees a "not in this campaign" screen and never a
+ * container list, and offering a stranger the sign-in button again would just
+ * loop them through OAuth to the same place.
  */
 export default async function SignInPage({
   searchParams,
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
-  const principal = await currentPrincipal();
-  if (principal) redirect("/");
+  const state = await currentSession();
+  if (state.kind === "member") redirect("/");
 
   const { error } = await searchParams;
-  const members = await repository().listMembers();
+
+  if (state.kind === "outsider") {
+    return <NotInCampaign {...state.outsider} />;
+  }
+
+  const discord = authConfigured();
+  // Only meaningful for the picker, and querying members on a Discord-only
+  // deployment would list the campaign's roster to anyone who loads the page.
+  const members = discord ? [] : await repository().listMembers();
 
   return (
     <main className="flex min-h-full items-center justify-center p-4">
@@ -58,63 +70,132 @@ export default async function SignInPage({
           </p>
         ) : null}
 
-        <button
-          type="button"
-          disabled
-          title="Discord OAuth lands in phase 1 — see SCOPE.md §4"
-          className="mt-6 flex h-10 w-full cursor-not-allowed items-center justify-center gap-2 rounded-md bg-surface3 text-base font-bold text-faint"
-        >
-          <Icon name="discord" size={16} />
-          Continue with Discord
-        </button>
-        <p className="mt-2 text-center text-sm text-faint">
-          Discord sign-in arrives in phase 1.
-        </p>
+        {discord ? (
+          <form action={signInWithDiscordAction}>
+            <button
+              type="submit"
+              className="mt-6 flex h-10 w-full items-center justify-center gap-2 rounded-md bg-primary text-base font-bold text-invert hover:bg-primary-hover"
+            >
+              <Icon name="discord" size={16} />
+              Continue with Discord
+            </button>
+          </form>
+        ) : (
+          <>
+            <button
+              type="button"
+              disabled
+              title="Set AUTH_DISCORD_ID, AUTH_DISCORD_SECRET and AUTH_SECRET to enable"
+              className="mt-6 flex h-10 w-full cursor-not-allowed items-center justify-center gap-2 rounded-md bg-surface3 text-base font-bold text-faint"
+            >
+              <Icon name="discord" size={16} />
+              Continue with Discord
+            </button>
+            <p className="mt-2 text-center text-sm text-faint">
+              Not configured on this deployment.
+            </p>
 
-        <div className="mt-6 border-t border-border pt-6">
-          <h2 className="mb-1 font-serif text-lg font-bold text-text">
-            Sit at the table as
-          </h2>
-          <p className="mb-3 text-sm text-muted">
-            Each role sees a different set of containers. That is the permission
-            model, not a demo mode.
-          </p>
+            <div className="mt-6 border-t border-border pt-6">
+              <h2 className="mb-1 font-serif text-lg font-bold text-text">
+                Sit at the table as
+              </h2>
+              <p className="mb-3 text-sm text-muted">
+                Each role sees a different set of containers. That is the
+                permission model, not a demo mode.
+              </p>
 
-          <ul className="flex flex-col gap-2">
-            {members.map((member) => (
-              <li key={member.userId}>
-                <form action={signInAsAction}>
-                  <input type="hidden" name="userId" value={member.userId} />
-                  <button
-                    type="submit"
-                    className="flex h-12 w-full items-center gap-3 rounded-md border border-border bg-surface px-3 text-left hover:bg-surface2"
-                  >
-                    <Avatar name={member.displayName} />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-base font-medium text-text">
-                        {member.displayName}
-                      </span>
-                      <span className="block truncate text-sm text-muted">
-                        {member.role === "gm"
-                          ? "Sees and edits everything"
-                          : "Own pack and shared containers only"}
-                      </span>
-                    </span>
-                    <Icon
-                      name="arrow-right"
-                      size={16}
-                      className="shrink-0 text-muted"
-                    />
-                  </button>
-                </form>
-              </li>
-            ))}
-          </ul>
-        </div>
+              <ul className="flex flex-col gap-2">
+                {members.map((member) => (
+                  <li key={member.userId}>
+                    <form action={signInAsAction}>
+                      <input
+                        type="hidden"
+                        name="userId"
+                        value={member.userId}
+                      />
+                      <button
+                        type="submit"
+                        className="flex h-12 w-full items-center gap-3 rounded-md border border-border bg-surface px-3 text-left hover:bg-surface2"
+                      >
+                        <Avatar name={member.displayName} />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-base font-medium text-text">
+                            {member.displayName}
+                          </span>
+                          <span className="block truncate text-sm text-muted">
+                            {member.role === "gm"
+                              ? "Sees and edits everything"
+                              : "Own pack and shared containers only"}
+                          </span>
+                        </span>
+                        <Icon
+                          name="arrow-right"
+                          size={16}
+                          className="shrink-0 text-muted"
+                        />
+                      </button>
+                    </form>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </>
+        )}
 
         <p className="mt-6 text-center font-mono text-xs text-faint">
-          storage: {repositoryKind()}
+          storage: {repositoryKind()} · sync: {realtimeKind()} · auth:{" "}
+          {discord ? "discord" : "picker"}
         </p>
+      </div>
+    </main>
+  );
+}
+
+/**
+ * M1's non-member screen.
+ *
+ * It shows the signed-in Discord id on purpose. Linking an account is one
+ * `UPDATE users SET discord_id = …` by the GM, and the alternative to printing
+ * the id here is the player hunting through Discord's developer mode to find
+ * it — a support conversation per player, for a table of six.
+ */
+function NotInCampaign({
+  discordId,
+  displayName,
+}: {
+  discordId: string;
+  displayName: string;
+}) {
+  return (
+    <main className="flex min-h-full items-center justify-center p-4">
+      <div className="w-full max-w-sm text-center">
+        <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full bg-warning-weak">
+          <Icon name="lock" size={22} className="text-warning" />
+        </div>
+        <h1 className="font-serif text-xl font-bold text-text">
+          Not at this table
+        </h1>
+        <p className="mt-2 text-base text-muted">
+          You are signed in to Discord as{" "}
+          <strong className="text-text">{displayName}</strong>, but that account
+          is not a member of this campaign.
+        </p>
+
+        <div className="mt-5 rounded-md border border-border bg-surface p-3 text-left">
+          <p className="text-sm text-muted">Give your GM this Discord id:</p>
+          <p className="mt-1 select-all break-all font-mono text-base text-text">
+            {discordId}
+          </p>
+        </div>
+
+        <form action={signOutAction}>
+          <button
+            type="submit"
+            className="mt-5 h-10 w-full rounded-md border border-border bg-surface text-base font-medium text-text hover:bg-surface2"
+          >
+            Sign out
+          </button>
+        </form>
       </div>
     </main>
   );

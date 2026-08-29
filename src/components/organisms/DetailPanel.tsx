@@ -5,6 +5,10 @@ import { ContainerDot } from "@/components/atoms/Chip";
 import { Icon } from "@/components/atoms/Icon";
 import { ButtonLink } from "@/components/atoms/Button";
 import { ArchiveItemButton } from "@/components/organisms/ArchiveItemButton";
+import {
+  CommentComposer,
+  ReplyToggle,
+} from "@/components/organisms/CommentComposer";
 import type { CommentView, ContainerView, ItemView } from "@/domain/view";
 import { itemWeight } from "@/domain/view";
 
@@ -29,6 +33,19 @@ export function DetailPanel({
   canEdit: boolean;
   query: string;
 }) {
+  // Threading is one level deep (M12), so the shape is a list of roots plus a
+  // lookup rather than a recursive tree. The repository already guarantees no
+  // grandchildren exist, which is what makes this flat pass sufficient.
+  const roots = comments.filter((c) => c.parentId === null);
+  const repliesByParent = new Map<string, CommentView[]>();
+  for (const comment of comments) {
+    if (!comment.parentId) continue;
+    repliesByParent.set(comment.parentId, [
+      ...(repliesByParent.get(comment.parentId) ?? []),
+      comment,
+    ]);
+  }
+
   const closeHref = `/c/${container.id}${query ? `?q=${encodeURIComponent(query)}` : ""}`;
   const withItem = (extra: Record<string, string>) => {
     const params = new URLSearchParams({ item: item.id, ...extra });
@@ -146,36 +163,67 @@ export function DetailPanel({
         <h3 className="mb-3 font-serif text-sm font-bold uppercase tracking-wider text-muted">
           Comments
         </h3>
-        {comments.length === 0 ? (
+        {roots.length === 0 ? (
           <p className="text-base text-muted">Nothing said about this yet.</p>
         ) : (
           <ul className="flex flex-col gap-3">
-            {comments.map((comment) => (
+            {roots.map((comment) => (
               <li
                 key={comment.id}
-                className={`rounded-md bg-surface2 p-3 ${
-                  comment.parentId
-                    ? "ml-4 border-l-2 border-border"
-                    : "border border-border"
-                }`}
+                className="rounded-md border border-border bg-surface2 p-3"
               >
-                <div className="mb-1 flex flex-wrap items-baseline gap-2">
-                  <span className="text-sm font-bold text-text">
-                    {comment.authorName}
-                  </span>
-                  {comment.authorRole === "gm" ? (
-                    <Chip tone="primary">GM</Chip>
-                  ) : null}
-                  <span className="text-xs text-faint">
-                    {relativeTime(comment.createdAt)}
-                  </span>
-                </div>
-                <p className="text-base text-muted">{comment.content}</p>
+                <CommentBody comment={comment} />
+                <ReplyToggle
+                  containerId={container.id}
+                  parentId={comment.id}
+                  authorName={comment.authorName}
+                />
+
+                {(repliesByParent.get(comment.id) ?? []).length > 0 ? (
+                  <ul className="mt-3 flex flex-col gap-2">
+                    {(repliesByParent.get(comment.id) ?? []).map((reply) => (
+                      <li
+                        key={reply.id}
+                        className="ml-3 border-l-2 border-border bg-surface2 pl-3"
+                      >
+                        <CommentBody comment={reply} />
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
               </li>
             ))}
           </ul>
         )}
+
+        {/* Commenting is gated on READ, not write: a player who can see a
+            revealed world container can discuss it even though they cannot
+            take from it (SCOPE.md M12, and the note on the repository). */}
+        <div className="mt-4 border-t border-border pt-4">
+          <CommentComposer containerId={container.id} />
+        </div>
       </section>
+    </>
+  );
+}
+
+function CommentBody({ comment }: { comment: CommentView }) {
+  return (
+    <>
+      <div className="mb-1 flex flex-wrap items-baseline gap-2">
+        <span className="text-sm font-bold text-text">
+          {comment.authorName}
+        </span>
+        {comment.authorRole === "gm" ? <Chip tone="primary">GM</Chip> : null}
+        <span className="text-xs text-faint">
+          {relativeTime(comment.createdAt)}
+        </span>
+      </div>
+      {/* `whitespace-pre-line` so a player's line breaks survive; the content
+          is still plain text, never markup. */}
+      <p className="whitespace-pre-line text-base text-muted">
+        {comment.content}
+      </p>
     </>
   );
 }

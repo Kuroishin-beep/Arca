@@ -4,16 +4,31 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { repository } from "@/db";
+import {
+  authConfigured,
+  signIn as authSignIn,
+  signOut as authSignOut,
+} from "@/lib/auth";
 import { SESSION_COOKIE } from "@/lib/session";
 
 /**
- * Sign-in stub. SCOPE.md §4 specifies Auth.js with Discord OAuth; phase 1
- * replaces the body of these with a real OAuth callback. The cookie shape and
- * the redirect targets are already what the real implementation will use, so
- * that swap touches this file and `src/lib/session.ts` only.
+ * Sign in and out.
+ *
+ * `signOutAction` has to clear BOTH mechanisms rather than branching on the
+ * current one. A deployment that gains Discord credentials still has member-
+ * picker cookies in people's browsers, and a sign-out that left one behind
+ * would look like it had not worked at all.
  */
 
+export async function signInWithDiscordAction(): Promise<void> {
+  await authSignIn("discord", { redirectTo: "/" });
+}
+
+/** The member picker. Reachable only while Discord is unconfigured — see the
+ *  note in `src/lib/session.ts`. */
 export async function signInAsAction(formData: FormData): Promise<void> {
+  if (authConfigured()) redirect("/signin");
+
   const userId = String(formData.get("userId") ?? "");
   const members = await repository().listMembers();
   const member = members.find((m) => m.userId === userId);
@@ -38,5 +53,11 @@ export async function signInAsAction(formData: FormData): Promise<void> {
 export async function signOutAction(): Promise<void> {
   const jar = await cookies();
   jar.delete(SESSION_COOKIE);
+
+  if (authConfigured()) {
+    // Redirects on its own, so nothing below it runs.
+    await authSignOut({ redirectTo: "/signin" });
+    return;
+  }
   redirect("/signin");
 }

@@ -152,6 +152,25 @@ export const UpdateItemInput = ItemFields.omit({ containerId: true })
 export type UpdateItemInput = z.infer<typeof UpdateItemInput>;
 
 /**
+ * Posting to a container's thread (M12).
+ *
+ * `parentId` is nullable and one level deep only — a reply names a top-level
+ * comment, and a reply to a reply is flattened onto the same parent rather than
+ * nesting. Six people discussing a chest do not need a tree, and an unbounded
+ * one does not fit a 380px panel (SCOPE.md §4.1).
+ */
+export const CreateCommentInput = z.object({
+  containerId: ContainerId,
+  content: z
+    .string()
+    .trim()
+    .min(1, "Say something first.")
+    .max(1000, "Keep it under 1000 characters."),
+  parentId: z.string().nullable().default(null),
+});
+export type CreateCommentInput = z.infer<typeof CreateCommentInput>;
+
+/**
  * The headline operation. `qty` is how much of the stack moves — a partial move
  * splits it, which is the common case at a table, not an edge case.
  */
@@ -220,6 +239,27 @@ export function sortItems(items: readonly ItemView[], sort: Sort): ItemView[] {
     }
     return String(left).localeCompare(String(right)) * factor;
   });
+}
+
+/**
+ * Tag filter chips (M9).
+ *
+ * Selected tags are ANDed, not ORed. "rope" plus "consumable" meaning "items
+ * that are both" is what someone narrowing a list expects; ORing them widens
+ * the list with every chip pressed, which reads as the filter being broken.
+ */
+export function matchesTags(item: ItemView, selected: readonly string[]): boolean {
+  if (selected.length === 0) return true;
+  const owned = new Set(item.tags.map((t) => t.toLowerCase()));
+  return selected.every((tag) => owned.has(tag.toLowerCase()));
+}
+
+/** Every tag present in a set of items, for building the chip row. Sorted so
+ *  the chips do not reorder themselves as items come and go. */
+export function tagsOf(items: readonly ItemView[]): string[] {
+  const all = new Set<string>();
+  for (const item of items) for (const tag of item.tags) all.add(tag);
+  return [...all].sort((a, b) => a.localeCompare(b));
 }
 
 /**

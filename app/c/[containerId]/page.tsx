@@ -4,8 +4,11 @@ import { redirect } from "next/navigation";
 import { ButtonLink } from "@/components/atoms/Button";
 import { Chip, ContainerBadge, ContainerDot } from "@/components/atoms/Chip";
 import { Icon } from "@/components/atoms/Icon";
-import { WeightMeter } from "@/components/molecules/WeightMeter";
 import { DetailPanel } from "@/components/organisms/DetailPanel";
+import {
+  OptimisticItemsProvider,
+  OptimisticWeightMeter,
+} from "@/components/organisms/OptimisticItems";
 import { ItemEditorDialog } from "@/components/organisms/ItemEditorDialog";
 import {
   MoveItemDialog,
@@ -21,7 +24,9 @@ import {
   SortDirection,
   type Sort,
   matchesQuery,
+  matchesTags,
   sortItems,
+  tagsOf,
 } from "@/domain/view";
 import { PermissionError, canWrite, writeDeniedReason } from "@/lib/permissions";
 import { currentPrincipal } from "@/lib/session";
@@ -47,6 +52,9 @@ export default async function WorkspacePage({
   searchParams: Promise<{
     item?: string;
     q?: string;
+    /** Comma-separated tag filter (M9). In the URL like every other piece of
+     *  view state, so a filtered list is a link you can send someone. */
+    tags?: string;
     sort?: string;
     dir?: string;
     dialog?: string;
@@ -84,10 +92,36 @@ export default async function WorkspacePage({
   };
 
   const allItems = await repo.listItems(principal, containerId);
+
+  const selectedTags = (sp.tags ?? "")
+    .split(",")
+    .map((t) => t.trim())
+    .filter((t) => t !== "");
+
+  // Chips are built from what is ACTUALLY in this container, so a tag never
+  // offers itself as a filter that can only ever return nothing.
+  const availableTags = tagsOf(allItems);
+
   const items = sortItems(
-    allItems.filter((item) => matchesQuery(item, query)),
+    allItems.filter(
+      (item) => matchesQuery(item, query) && matchesTags(item, selectedTags),
+    ),
     sort,
   );
+
+  /** Toggling one chip preserves every other piece of view state. */
+  const tagHref = (tag: string) => {
+    const next = selectedTags.includes(tag)
+      ? selectedTags.filter((t) => t !== tag)
+      : [...selectedTags, tag];
+    const params = new URLSearchParams();
+    if (query) params.set("q", query);
+    if (next.length > 0) params.set("tags", next.join(","));
+    if (sp.sort) params.set("sort", sp.sort);
+    if (sp.dir) params.set("dir", sp.dir);
+    const qs = params.toString();
+    return `/c/${containerId}${qs ? `?${qs}` : ""}`;
+  };
 
   const selected = sp.item
     ? (allItems.find((i) => i.id === sp.item) ?? null)
@@ -112,6 +146,10 @@ export default async function WorkspacePage({
   const drawerOpen = sp.nav === "1";
 
   return (
+    // The provider spans the table, the footer meter and the dialogs, because
+    // a move begun in a dialog has to be reflected in the other two before the
+    // server answers (SCOPE.md §8.1 step 4).
+    <OptimisticItemsProvider>
     <div className="flex h-screen flex-col bg-bg">
       <TopBar
         principal={principal}
@@ -193,18 +231,54 @@ export default async function WorkspacePage({
               ) : null}
             </div>
 
-            {query ? (
-              <div className="mt-3 flex items-center gap-2 pb-2">
-                <Chip>
-                  search: {query}
-                  <Link href={`/c/${containerId}`} className="text-muted hover:text-text">
-                    <Icon name="close" size={10} strokeWidth={2} />
-                    <span className="sr-only">Clear search</span>
-                  </Link>
-                </Chip>
-                <span className="text-sm text-muted">
-                  {items.length} of {allItems.length}
-                </span>
+            {/* Filter row: tag chips (M9) plus whatever narrowing is active.
+                Chips are links, not buttons, so a filtered view is a real URL
+                and the whole row works with JavaScript off. */}
+            {availableTags.length > 0 || query || selectedTags.length > 0 ? (
+              <div className="mt-3 flex flex-wrap items-center gap-2 pb-2">
+                {availableTags.map((tag) => {
+                  const active = selectedTags.includes(tag);
+                  return (
+                    <Link
+                      key={tag}
+                      href={tagHref(tag)}
+                      aria-pressed={active}
+                      className={`inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 text-xs ${
+                        active
+                          ? "border-primary bg-primary-weak font-medium text-primary"
+                          : "border-border bg-surface2 text-muted hover:text-text"
+                      }`}
+                    >
+                      {tag}
+                      {active ? (
+                        <Icon name="close" size={10} strokeWidth={2} />
+                      ) : null}
+                    </Link>
+                  );
+                })}
+
+                {query ? (
+                  <Chip>
+                    search: {query}
+                    <Link
+                      href={
+                        selectedTags.length > 0
+                          ? `/c/${containerId}?tags=${encodeURIComponent(selectedTags.join(","))}`
+                          : `/c/${containerId}`
+                      }
+                      className="text-muted hover:text-text"
+                    >
+                      <Icon name="close" size={10} strokeWidth={2} />
+                      <span className="sr-only">Clear search</span>
+                    </Link>
+                  </Chip>
+                ) : null}
+
+                {query || selectedTags.length > 0 ? (
+                  <span className="text-sm text-muted">
+                    {items.length} of {allItems.length}
+                  </span>
+                ) : null}
               </div>
             ) : (
               <div className="pb-3" />
@@ -225,13 +299,10 @@ export default async function WorkspacePage({
           {/* Footer summary. Every number here is derived at read time. */}
           <div className="shrink-0 border-t border-border bg-surface px-3 py-2 md:px-4">
             <div className="flex items-center gap-3">
-              <span className="shrink-0 font-mono text-xs text-muted">
-                {container.itemCount} items
-              </span>
-              <WeightMeter
-                carried={container.carriedWeight}
-                capacity={container.capacity}
-              />
+              {/* Counts the container's FULL contents, not the filtered view —
+                  a tag filter narrows what you are looking at, it does not
+                  make the pack lighter. */}
+              <OptimisticWeightMeter items={allItems} container={container} />
             </div>
           </div>
         </main>
@@ -297,6 +368,7 @@ export default async function WorkspacePage({
         />
       ) : null}
     </div>
+    </OptimisticItemsProvider>
   );
 }
 

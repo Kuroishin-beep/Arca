@@ -9,20 +9,52 @@ import {
   MoveItemInput,
   UpdateItemInput,
 } from "@/domain/view";
+import { campaignId } from "@/lib/campaign";
 import { PermissionError } from "@/lib/permissions";
 import { requirePrincipal } from "@/lib/session";
+import { realtime } from "@/realtime";
 
 /**
  * Server Actions — every mutation in the app.
  *
- * Two rules hold across all of them:
+ * Three rules hold across all of them:
  *
  *   1. The SAME zod schema validates the form and the action. There is no
  *      second, hand-written server-side validator to drift from the first.
  *   2. Permission is checked HERE, server-side, on every call. The dialog
  *      disabling a destination is a courtesy; this is the enforcement
  *      (SCOPE.md §3, M11).
+ *   3. Every successful write is announced on the campaign channel. This is
+ *      the half of M8 that `revalidatePath` cannot do: revalidation refreshes
+ *      the person who acted, and the entire point of live sync is the other
+ *      five people at the table.
  */
+
+/**
+ * Announce a write. Deliberately non-fatal.
+ *
+ * The database transaction has already committed by the time this runs, so a
+ * failure here does not mean the write failed — it means other panels will
+ * notice late, on their next navigation or reconnect. Throwing would turn a
+ * delivered-but-unannounced change into a red error on a move that actually
+ * worked, which is precisely the "the app lost my loot" reading that
+ * `toResult` exists to prevent.
+ */
+async function announce(
+  actorId: string,
+  containerIds: string[],
+): Promise<void> {
+  try {
+    await realtime().publish(campaignId(), {
+      kind: "items-changed",
+      containerIds: containerIds.filter((id, i, all) => all.indexOf(id) === i),
+      actorId,
+      at: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("[arca] realtime publish failed", error);
+  }
+}
 
 export interface ActionResult<T = undefined> {
   ok: boolean;
@@ -96,6 +128,7 @@ export async function createItemAction(
 
     await repository().createItem(principal, parsed.data);
     revalidatePath("/c/[containerId]", "page");
+    await announce(principal.userId, [parsed.data.containerId]);
     return { ok: true };
   } catch (error) {
     return toResult(error);
@@ -126,8 +159,9 @@ export async function updateItemAction(
       };
     }
 
-    await repository().updateItem(principal, parsed.data);
+    const updated = await repository().updateItem(principal, parsed.data);
     revalidatePath("/c/[containerId]", "page");
+    await announce(principal.userId, [updated.containerId]);
     return { ok: true };
   } catch (error) {
     return toResult(error);
@@ -140,8 +174,12 @@ export async function archiveItemAction(
 ): Promise<ActionResult> {
   try {
     const principal = await requirePrincipal();
+    // Read the item BEFORE archiving: afterwards it is filtered out of every
+    // query, and the announcement would have no container to name.
+    const doomed = await repository().getItem(principal, itemId);
     await repository().archiveItem(principal, itemId);
     revalidatePath("/c/[containerId]", "page");
+    if (doomed) await announce(principal.userId, [doomed.containerId]);
     return { ok: true };
   } catch (error) {
     return toResult(error);
@@ -178,6 +216,13 @@ export async function moveItemAction(
       "the destination";
 
     revalidatePath("/c/[containerId]", "page");
+    // BOTH ends. A move is the one operation that invalidates two containers,
+    // and a panel showing only the source would keep displaying an item that
+    // is no longer there.
+    await announce(principal.userId, [
+      outcome.fromContainerId,
+      outcome.toContainerId,
+    ]);
     return {
       ok: true,
       data: {

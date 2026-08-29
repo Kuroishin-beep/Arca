@@ -27,6 +27,7 @@ import {
   type UpdateItemInput,
   carriedWeight,
 } from "@/domain/view";
+import { campaignId } from "@/lib/campaign";
 import {
   assertCanMove,
   assertCanRead,
@@ -41,7 +42,7 @@ import {
   type MoveOutcome,
   NotFoundError,
 } from "./repository";
-import { CAMPAIGN_ID, pluralise } from "./seed-data";
+import { pluralise } from "./seed-data";
 import {
   campaignMembers,
   comments,
@@ -54,10 +55,6 @@ import {
   propertyDefinitions,
   users,
 } from "./schema";
-
-function campaignId(): string {
-  return process.env.ARCA_CAMPAIGN_ID ?? CAMPAIGN_ID;
-}
 
 /* ------------------------------------------------------------------ *
  * Property helpers
@@ -403,6 +400,53 @@ export const postgresRepository: ArcaRepository = {
       .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   },
 
+  async createComment(principal, input) {
+    assertCanRead(principal, await requireContainer(input.containerId));
+
+    // One level of threading: a reply to a reply is re-pointed at that reply's
+    // own parent, so the thread cannot grow a third level regardless of what
+    // the client sends (M12).
+    let parentId = input.parentId;
+    if (parentId) {
+      const parent = await db()
+        .select({ id: comments.id, parentId: comments.parentId })
+        .from(comments)
+        .where(
+          and(eq(comments.id, parentId), eq(comments.containerId, input.containerId)),
+        )
+        .limit(1);
+      // A parent in a different container, or none at all, becomes a top-level
+      // comment rather than an error — the comment is still worth keeping.
+      parentId = parent[0] ? (parent[0].parentId ?? parent[0].id) : null;
+    }
+
+    const inserted = await db()
+      .insert(comments)
+      .values({
+        containerId: input.containerId,
+        authorId: principal.userId,
+        content: input.content,
+        parentId,
+      })
+      .returning({
+        id: comments.id,
+        createdAt: comments.createdAt,
+      });
+
+    const row = inserted[0];
+    if (!row) throw new Error("Insert returned no row.");
+
+    return {
+      id: row.id,
+      containerId: input.containerId as CommentView["containerId"],
+      authorName: principal.displayName,
+      authorRole: principal.role,
+      content: input.content,
+      parentId,
+      createdAt: row.createdAt,
+    };
+  },
+
   async createItem(principal, input: CreateItemInput) {
     assertCanWrite(principal, await requireContainer(input.containerId));
 
@@ -605,5 +649,34 @@ export const postgresRepository: ArcaRepository = {
       displayName: r.displayName,
       role: r.role,
     }));
+  },
+
+  async findMemberByDiscordId(discordId) {
+    // The join is the authorisation: a Discord account with no row in
+    // `campaign_members` for THIS campaign produces no row here, so a stranger
+    // who completes an OAuth round trip is not a principal.
+    const rows = await db()
+      .select({
+        userId: users.id,
+        displayName: users.displayName,
+        role: campaignMembers.role,
+      })
+      .from(users)
+      .innerJoin(campaignMembers, eq(campaignMembers.userId, users.id))
+      .where(
+        and(
+          eq(users.discordId, discordId),
+          eq(campaignMembers.campaignId, campaignId()),
+        ),
+      )
+      .limit(1);
+
+    const row = rows[0];
+    if (!row) return null;
+    return {
+      userId: row.userId as Principal["userId"],
+      displayName: row.displayName,
+      role: row.role,
+    };
   },
 };

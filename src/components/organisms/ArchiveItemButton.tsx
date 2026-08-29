@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { archiveItemAction } from "@/actions/items";
 import { Button } from "@/components/atoms/Button";
+import { useOptimisticItems } from "@/components/organisms/OptimisticItems";
 
 /**
  * Archive, with a confirmation step inline rather than a second dialog.
@@ -23,6 +24,7 @@ export function ArchiveItemButton({
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const { remove } = useOptimisticItems();
   const router = useRouter();
 
   if (!confirming) {
@@ -47,6 +49,10 @@ export function ArchiveItemButton({
           disabled={pending}
           onClick={() =>
             startTransition(async () => {
+              // The whole stack goes; `Infinity` removes it whatever the
+              // quantity, without this component needing to know it.
+              remove({ itemId, qty: Number.POSITIVE_INFINITY });
+
               const result = await archiveItemAction(itemId);
               if (!result.ok) {
                 setError(result.error ?? "Could not archive that.");

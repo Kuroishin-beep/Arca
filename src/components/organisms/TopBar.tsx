@@ -1,7 +1,8 @@
 import Link from "next/link";
 
 import { Icon } from "@/components/atoms/Icon";
-import { SyncPill, UserBadge } from "@/components/atoms/Status";
+import { UserBadge } from "@/components/atoms/Status";
+import { RealtimeSync } from "@/components/organisms/RealtimeSync";
 import { signOutAction } from "@/actions/session";
 import type { Principal } from "@/domain/view";
 
@@ -72,7 +73,10 @@ export function TopBar({
         <div className="ml-auto" />
       )}
 
-      <SyncPill status="idle" className="hidden sm:flex" />
+      {/* The only client component in the bar. It subscribes to the campaign
+          channel and reports what it actually knows, rather than the hardcoded
+          "Synced" that stood in before the channel existed. */}
+      <RealtimeSync userId={principal.userId} className="hidden sm:flex" />
 
       <form action={signOutAction} className="contents">
         <button

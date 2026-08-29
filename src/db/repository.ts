@@ -15,6 +15,7 @@
 import type {
   CommentView,
   ContainerView,
+  CreateCommentInput,
   CreateItemInput,
   ItemView,
   MoveItemInput,
@@ -52,6 +53,20 @@ export interface ArcaRepository {
     containerId: string,
   ): Promise<CommentView[]>;
 
+  /**
+   * Post to a container's thread (M12).
+   *
+   * Gated on READ, not write. A revealed world container is read-only to
+   * players, and "there was a rune on the lid" is exactly the sort of thing a
+   * player needs to be able to say about a chest they cannot open. Commenting
+   * changes no inventory, so the write gate would buy nothing and cost the
+   * feature its point.
+   */
+  createComment(
+    principal: Principal,
+    input: CreateCommentInput,
+  ): Promise<CommentView>;
+
   createItem(principal: Principal, input: CreateItemInput): Promise<ItemView>;
 
   updateItem(principal: Principal, input: UpdateItemInput): Promise<ItemView>;
@@ -64,6 +79,17 @@ export interface ArcaRepository {
 
   /** Everyone at the table, for the sign-in picker and comment attribution. */
   listMembers(): Promise<Principal[]>;
+
+  /**
+   * Maps a Discord identity onto campaign membership (M1).
+   *
+   * `null` is a real, expected answer and not an error: it means "authenticated
+   * with Discord, but not a member of this campaign", which is exactly the case
+   * M1 requires to reach a "not in this campaign" screen rather than a
+   * container list. Identity and authorisation are separate questions and this
+   * is where they meet.
+   */
+  findMemberByDiscordId(discordId: string): Promise<Principal | null>;
 }
 
 /** Raised when an id simply is not there. Distinct from PermissionError, which

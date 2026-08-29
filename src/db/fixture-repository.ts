@@ -187,6 +187,34 @@ export const fixtureRepository: ArcaRepository = {
       .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   },
 
+  async createComment(principal, input) {
+    // Read, not write — see the note on the interface. A player may discuss a
+    // revealed world container they cannot touch.
+    assertCanRead(principal, findContainer(input.containerId));
+
+    // One level, enforced the same way the Postgres backend does it: a reply to
+    // a reply is re-pointed at that reply's parent.
+    let parentId = input.parentId;
+    if (parentId) {
+      const parent = store().comments.find(
+        (c) => c.id === parentId && c.containerId === input.containerId,
+      );
+      parentId = parent ? (parent.parentId ?? parent.id) : null;
+    }
+
+    const comment: CommentView = {
+      id: randomUUID(),
+      containerId: input.containerId,
+      authorName: principal.displayName,
+      authorRole: principal.role,
+      content: input.content,
+      parentId,
+      createdAt: new Date(),
+    };
+    store().comments.push(comment);
+    return comment;
+  },
+
   async createItem(principal, input: CreateItemInput) {
     assertCanWrite(principal, findContainer(input.containerId));
     const item = {
@@ -285,5 +313,19 @@ export const fixtureRepository: ArcaRepository = {
 
   async listMembers() {
     return store().users;
+  },
+
+  /**
+   * Always `null`, and correctly so.
+   *
+   * Membership is a database fact — a row in `campaign_members` that the GM
+   * put there. Fixture mode is the no-database mode, so it has no Discord
+   * links to resolve and cannot invent one without deciding, in code, that
+   * whoever signs in is a member of the campaign. Discord auth therefore
+   * requires DATABASE_URL; without it the app uses the member picker, which
+   * `authConfigured()` in `src/lib/auth.ts` selects between.
+   */
+  async findMemberByDiscordId() {
+    return null;
   },
 };
