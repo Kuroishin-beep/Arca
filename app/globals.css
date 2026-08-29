@@ -1,0 +1,197 @@
+@import "tailwindcss";
+
+/* ============================================================================
+   Arca — design tokens
+   The canonical values, identical to `mockups/tokens.css`. Declared on :root as
+   ordinary custom properties so a theme swap is one block, then mapped into
+   Tailwind's theme below.
+
+   RULE: no gradients. Every fill in this system is a solid colour. Depth comes
+   from three flat surface levels plus a hairline border.
+   ============================================================================ */
+
+:root {
+  /* --- Colour: surfaces ------------------------------------------------- */
+  --color-bg: #14110f;
+  --color-surface: #1f1b18;
+  --color-surface-2: #2a2521;
+  --color-surface-3: #35302b;
+  --color-border: #3a322c;
+  --color-border-strong: #544940;
+
+  /* --- Colour: text ----------------------------------------------------- */
+  --color-text: #ede6da;        /* 15.9:1 on bg */
+  --color-text-muted: #a99c8a;  /*  7.6:1 on bg */
+  --color-text-faint: #7c7062;  /*  3.9:1 — DISABLED STATES ONLY, never body */
+  --color-text-invert: #14110f;
+
+  /* --- Colour: brand ---------------------------------------------------- */
+  --color-primary: #c9a227;
+  --color-primary-hover: #ddb63a;
+  --color-primary-weak: #3a2f13;
+  --color-accent: #4e9a8f;
+  --color-accent-hover: #5fb0a4;
+  --color-accent-weak: #16302d;
+
+  /* --- Colour: semantic ------------------------------------------------- */
+  --color-success: #5fa777;
+  --color-success-weak: #16281c;
+  --color-warning: #d08b3c;
+  --color-warning-weak: #33220f;
+  --color-danger: #c2564b;
+  --color-danger-weak: #331714;
+  --color-info: #6e93c9;
+  --color-info-weak: #162233;
+
+  /* --- Colour: container semantics -------------------------------------- */
+  /* Type is the thing players misread most often, so it carries a fixed hue
+     everywhere — always alongside an icon and a text label, never colour alone. */
+  --color-container-character: #c9a227;
+  --color-container-party: #4e9a8f;
+  --color-container-world: #9b6bc9;
+
+  /* --- Layout ----------------------------------------------------------- */
+  --topbar-h: 48px;
+  --sidebar-w: 248px;
+  --detail-w: 320px;
+  --row-h: 36px;
+}
+
+/* ============================================================================
+   Tailwind theme. `inline` means the generated utilities reference the custom
+   property rather than copying its value, so overriding a token at runtime
+   restyles the app without a rebuild.
+   Utility names here match the class names used in `mockups/` exactly, so
+   mockup markup ports across unchanged.
+   ============================================================================ */
+
+@theme inline {
+  --color-bg: var(--color-bg);
+  --color-surface: var(--color-surface);
+  --color-surface2: var(--color-surface-2);
+  --color-surface3: var(--color-surface-3);
+  --color-border: var(--color-border);
+  --color-border-strong: var(--color-border-strong);
+
+  --color-text: var(--color-text);
+  --color-muted: var(--color-text-muted);
+  --color-faint: var(--color-text-faint);
+  --color-invert: var(--color-text-invert);
+
+  --color-primary: var(--color-primary);
+  --color-primary-hover: var(--color-primary-hover);
+  --color-primary-weak: var(--color-primary-weak);
+  --color-accent: var(--color-accent);
+  --color-accent-hover: var(--color-accent-hover);
+  --color-accent-weak: var(--color-accent-weak);
+
+  --color-success: var(--color-success);
+  --color-success-weak: var(--color-success-weak);
+  --color-warning: var(--color-warning);
+  --color-warning-weak: var(--color-warning-weak);
+  --color-danger: var(--color-danger);
+  --color-danger-weak: var(--color-danger-weak);
+  --color-info: var(--color-info);
+  --color-info-weak: var(--color-info-weak);
+
+  --color-c-character: var(--color-container-character);
+  --color-c-party: var(--color-container-party);
+  --color-c-world: var(--color-container-world);
+}
+
+@theme {
+  /* --- Type ------------------------------------------------------------- */
+  /* No web font: a font request inside TaleSpire's embedded browser is a
+     visible flash every time the panel opens. */
+  --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+  --font-serif: ui-serif, "Iowan Old Style", Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas,
+    monospace;
+
+  /* 14px body, not 16px: the panel is ~380px wide and the primary content is a
+     dense table. 14/20 fits name + qty + weight without truncation. */
+  --text-xs: 11px;
+  --text-xs--line-height: 16px;
+  --text-sm: 12px;
+  --text-sm--line-height: 18px;
+  --text-base: 14px;
+  --text-base--line-height: 20px;
+  --text-lg: 16px;
+  --text-lg--line-height: 24px;
+  --text-xl: 20px;
+  --text-xl--line-height: 28px;
+  --text-2xl: 28px;
+  --text-2xl--line-height: 34px;
+
+  /* --- Spacing: 4px base ------------------------------------------------ */
+  /* 4px rather than 8px so a 36px row and a 48px bar are both on-grid. An 8px
+     grid forces 40px rows and costs ~2 visible items in a docked panel. */
+  --spacing: 4px;
+  --spacing-5: 24px;
+  --spacing-6: 32px;
+  --spacing-8: 48px;
+
+  /* --- Radius: small. Arca is a strongbox, not a consumer app. ----------- */
+  --radius-sm: 3px;
+  --radius-md: 5px;
+  --radius-lg: 8px;
+
+  /* Flat solid shadow, never a colour ramp. */
+  --shadow-modal: 0 8px 24px rgb(0 0 0 / 0.55);
+
+  /* --- Breakpoints ------------------------------------------------------ */
+  /* `panel` is TaleSpire's docked Symbiote width — the PRIMARY target, which is
+     why the layout is authored here first and widened up. */
+  --breakpoint-panel: 380px;
+}
+
+/* ============================================================================
+   Base
+   ============================================================================ */
+
+@layer base {
+  html,
+  body {
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: 20px;
+    -webkit-font-smoothing: antialiased;
+    /* Hard requirement: never scroll sideways at 375px. */
+    overflow-x: hidden;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-serif);
+    font-weight: 700;
+  }
+
+  /* One focus treatment, defined once, never removed. */
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  /* Scrollbars, so panels do not look like a different app. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--color-bg);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-surface-3);
+    border-radius: 999px;
+    border: 2px solid var(--color-bg);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-border-strong);
+  }
+}

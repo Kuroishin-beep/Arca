@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en" class="h-full">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arca — Character sheet (stretch)</title>
+<link rel="stylesheet" href="tokens.css">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="tailwind.config.js"></script>
+</head>
+
+<!--
+  SCREEN 7 — CHARACTER SHEET  ★ STRETCH SCOPE ★  (SCOPE.md §6.2, S1)
+  Route: app/(app)/character/[objectId]/page.tsx
+
+  Not a new subsystem. A character sheet is one Object carrying a `Character`
+  type, whose properties render through the same PropertyDefinition machinery as
+  an item. Equipment is a containment view of the character's own container —
+  the identical component the Workspace uses, at a narrower width.
+
+  Build only after M1–M15 have survived a real session.
+-->
+
+<body class="min-h-full">
+<div class="flex h-screen flex-col bg-bg">
+
+  <!-- Same TopBar organism -->
+  <header class="flex h-topbar shrink-0 items-center gap-3 border-b border-border bg-surface px-3 md:px-4">
+    <a href="index.html" class="flex shrink-0 items-center gap-2 text-primary">
+      <svg viewBox="0 0 16 16" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <rect x="1.5" y="4.5" width="13" height="9" rx="1"/><path d="M1.5 8h13" stroke-linecap="round"/>
+        <rect x="7" y="6.5" width="2" height="3" rx="0.5" fill="currentColor" stroke="none"/>
+      </svg>
+      <span class="font-serif text-lg font-bold tracking-wide">Arca</span>
+    </a>
+    <span class="rounded-sm border border-warning bg-warningWeak px-2 py-0.5 text-xs font-medium text-warning">Stretch scope</span>
+    <div class="ml-auto flex items-center gap-2">
+      <a href="02-workspace.html" class="h-8 rounded-md border border-border bg-surface px-3 text-sm font-medium leading-8 text-text hover:bg-surface2">Inventory</a>
+      <a href="08-dicefinder.html" class="h-8 rounded-md border border-border bg-surface px-3 text-sm font-medium leading-8 text-text hover:bg-surface2">Dice</a>
+    </div>
+  </header>
+
+  <main class="min-h-0 flex-1 overflow-y-auto">
+    <div class="mx-auto flex max-w-5xl flex-col gap-5 p-4 md:p-6">
+
+      <!-- Identity header -->
+      <section class="flex flex-wrap items-start gap-4 rounded-lg border border-border bg-surface p-4">
+        <span class="grid h-14 w-14 shrink-0 place-items-center rounded-lg bg-primaryWeak font-serif text-xl font-bold text-primary">KV</span>
+        <div class="min-w-0 flex-1">
+          <h1 class="font-serif text-xl font-bold text-text">Kova Ashfell</h1>
+          <p class="mt-1 text-base text-muted">Dwarf · Hunter · Age 41</p>
+          <div class="mt-2 flex flex-wrap gap-1">
+            <span class="rounded-sm border border-border bg-surface2 px-1.5 py-0.5 text-xs text-muted">Character</span>
+            <span class="rounded-sm border border-border bg-surface2 px-1.5 py-0.5 text-xs text-muted">Player Character</span>
+          </div>
+        </div>
+        <!-- Vitals: three counters, flat fills only -->
+        <div class="flex gap-3">
+          <div class="w-20 rounded-md border border-border bg-surface2 p-2 text-center">
+            <p class="text-xs uppercase tracking-wider text-muted">HP</p>
+            <p class="font-mono text-xl tabular-nums text-text">14<span class="text-sm text-faint">/16</span></p>
+          </div>
+          <div class="w-20 rounded-md border border-border bg-surface2 p-2 text-center">
+            <p class="text-xs uppercase tracking-wider text-muted">WP</p>
+            <p class="font-mono text-xl tabular-nums text-text">9<span class="text-sm text-faint">/12</span></p>
+          </div>
+          <div class="w-20 rounded-md border border-border bg-surface2 p-2 text-center">
+            <p class="text-xs uppercase tracking-wider text-muted">Move</p>
+            <p class="font-mono text-xl tabular-nums text-text">10</p>
+          </div>
+        </div>
+      </section>
+
+      <div class="grid gap-5 lg:grid-cols-[300px_1fr]">
+
+        <div class="flex flex-col gap-5">
+
+          <!-- Attributes: six number properties on the Character type -->
+          <section class="rounded-lg border border-border bg-surface p-4">
+            <h2 class="mb-3 font-serif text-lg font-bold text-text">Attributes</h2>
+            <ul class="grid grid-cols-3 gap-2">
+              <li class="rounded-md border border-border bg-surface2 p-2 text-center">
+                <p class="text-xs uppercase tracking-wider text-muted">STR</p>
+                <p class="font-mono text-lg tabular-nums text-text">15</p>
+              </li>
+              <li class="rounded-md border border-border bg-surface2 p-2 text-center">
+                <p class="text-xs uppercase tracking-wider text-muted">CON</p>
+                <p class="font-mono text-lg tabular-nums text-text">16</p>
+              </li>
+              <li class="rounded-md border border-border bg-surface2 p-2 text-center">
+                <p class="text-xs uppercase tracking-wider text-muted">AGL</p>
+                <p class="font-mono text-lg tabular-nums text-text">11</p>
+              </li>
+              <li class="rounded-md border border-border bg-surface2 p-2 text-center">
+                <p class="text-xs uppercase tracking-wider text-muted">INT</p>
+                <p class="font-mono text-lg tabular-nums text-text">12</p>
+              </li>
+              <li class="rounded-md border border-border bg-surface2 p-2 text-center">
+                <p class="text-xs uppercase tracking-wider text-muted">WIL</p>
+                <p class="font-mono text-lg tabular-nums text-text">13</p>
+              </li>
+              <li class="rounded-md border border-border bg-surface2 p-2 text-center">
+                <p class="text-xs uppercase tracking-wider text-muted">CHA</p>
+                <p class="font-mono text-lg tabular-nums text-text">9</p>
+              </li>
+            </ul>
+            <!-- Derived, never stored — same rule as encumbrance -->
+            <p class="mt-3 border-t border-border pt-3 text-sm text-muted">
+              Carry capacity <span class="font-mono tabular-nums text-text">12.0 kg</span>
+              <span class="text-faint">(derived from STR)</span>
+            </p>
+          </section>
+
+          <!-- Encumbrance: the SAME WeightMeter molecule as the workspace footer -->
+          <section class="rounded-lg border border-border bg-surface p-4">
+            <h2 class="mb-3 font-serif text-lg font-bold text-text">Encumbrance</h2>
+            <div class="mb-1 flex items-baseline justify-between gap-2">
+              <span class="text-sm text-muted">Carried</span>
+              <span class="font-mono text-sm tabular-nums text-warning">12.0 / 12.0 kg</span>
+            </div>
+            <div class="h-1.5 overflow-hidden rounded-full bg-surface3">
+              <div class="h-full rounded-full bg-warning" style="width:100%"></div>
+            </div>
+            <p class="mt-2 text-sm text-warning">At carry limit.</p>
+          </section>
+        </div>
+
+        <div class="flex min-w-0 flex-col gap-5">
+
+          <!-- Skills: label + number property pairs -->
+          <section class="rounded-lg border border-border bg-surface p-4">
+            <div class="mb-3 flex items-center gap-3">
+              <h2 class="font-serif text-lg font-bold text-text">Skills</h2>
+              <span class="ml-auto text-sm text-muted">Click a value to roll it</span>
+            </div>
+            <ul class="grid gap-1 sm:grid-cols-2">
+              <li><button type="button" class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-surface2">
+                <span class="min-w-0 flex-1 truncate text-base text-text">Bushcraft</span>
+                <span class="font-mono text-base tabular-nums text-primary">14</span>
+              </button></li>
+              <li><button type="button" class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-surface2">
+                <span class="min-w-0 flex-1 truncate text-base text-text">Hunting &amp; Fishing</span>
+                <span class="font-mono text-base tabular-nums text-primary">16</span>
+              </button></li>
+              <li><button type="button" class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-surface2">
+                <span class="min-w-0 flex-1 truncate text-base text-text">Awareness</span>
+                <span class="font-mono text-base tabular-nums text-primary">13</span>
+              </button></li>
+              <li><button type="button" class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-surface2">
+                <span class="min-w-0 flex-1 truncate text-base text-text">Bows</span>
+                <span class="font-mono text-base tabular-nums text-primary">15</span>
+              </button></li>
+              <li><button type="button" class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-surface2">
+                <span class="min-w-0 flex-1 truncate text-base text-text">Sneaking</span>
+                <span class="font-mono text-base tabular-nums text-primary">11</span>
+              </button></li>
+              <li><button type="button" class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-surface2">
+                <span class="min-w-0 flex-1 truncate text-base text-text">Healing</span>
+                <span class="font-mono text-base tabular-nums text-primary">10</span>
+              </button></li>
+            </ul>
+          </section>
+
+          <!-- Equipment: the ItemTable organism, reused verbatim.
+               This is the payoff of the object model — no second inventory. -->
+          <section class="rounded-lg border border-border bg-surface">
+            <div class="flex items-center gap-3 border-b border-border p-4">
+              <h2 class="font-serif text-lg font-bold text-text">Equipment</h2>
+              <span class="rounded-sm border border-border bg-primaryWeak px-1.5 py-0.5 text-xs text-primary">Kova’s Pack</span>
+              <a href="02-workspace.html" class="ml-auto text-sm font-medium text-primary hover:underline">Open in inventory</a>
+            </div>
+            <table class="w-full text-base">
+              <thead>
+                <tr class="border-b border-border text-left">
+                  <th scope="col" class="px-4 py-2 text-sm font-medium text-muted">Item</th>
+                  <th scope="col" class="w-24 px-3 py-2 text-sm font-medium text-muted">Slot</th>
+                  <th scope="col" class="w-14 px-3 py-2 text-right text-sm font-medium text-muted">Qty</th>
+                  <th scope="col" class="w-16 px-3 py-2 text-right text-sm font-medium text-muted">Wt</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="h-row border-b border-border hover:bg-surface2">
+                  <td class="max-w-0 px-4"><span class="block truncate text-text">Longbow</span></td>
+                  <td class="px-3"><span class="rounded-sm border border-border bg-surface2 px-1.5 py-0.5 text-xs text-muted">Main hand</span></td>
+                  <td class="px-3 text-right font-mono tabular-nums text-text">1</td>
+                  <td class="px-3 text-right font-mono tabular-nums text-text">1.0</td>
+                </tr>
+                <tr class="h-row border-b border-border hover:bg-surface2">
+                  <td class="max-w-0 px-4"><span class="block truncate text-text">Leather armour</span></td>
+                  <td class="px-3"><span class="rounded-sm border border-border bg-surface2 px-1.5 py-0.5 text-xs text-muted">Body</span></td>
+                  <td class="px-3 text-right font-mono tabular-nums text-text">1</td>
+                  <td class="px-3 text-right font-mono tabular-nums text-text">2.0</td>
+                </tr>
+                <tr class="h-row border-b border-border hover:bg-surface2">
+                  <td class="max-w-0 px-4"><span class="block truncate text-text">Arrows</span></td>
+                  <td class="px-3"><span class="text-xs text-faint">—</span></td>
+                  <td class="px-3 text-right font-mono tabular-nums text-text">20</td>
+                  <td class="px-3 text-right font-mono tabular-nums text-text">0.5</td>
+                </tr>
+                <tr class="h-row hover:bg-surface2">
+                  <td class="max-w-0 px-4"><span class="block truncate text-text">Hand axe</span></td>
+                  <td class="px-3"><span class="rounded-sm border border-border bg-surface2 px-1.5 py-0.5 text-xs text-muted">Belt</span></td>
+                  <td class="px-3 text-right font-mono tabular-nums text-text">1</td>
+                  <td class="px-3 text-right font-mono tabular-nums text-text">1.0</td>
+                </tr>
+              </tbody>
+            </table>
+            <p class="border-t border-border p-3 text-sm text-faint">
+              “Slot” is metadata on the containment edge, not on the item — the axe is
+              still one object whether it is on a belt or in the wagon.
+            </p>
+          </section>
+
+          <!-- Spells: another type's property set -->
+          <section class="rounded-lg border border-border bg-surface p-4">
+            <h2 class="mb-3 font-serif text-lg font-bold text-text">Spells</h2>
+            <div class="flex flex-col items-center justify-center gap-2 rounded-md border border-border p-6 text-center">
+              <p class="text-base text-muted">Kova is not a caster.</p>
+              <p class="text-sm text-faint">This section renders only when the object carries a <span class="font-mono">Spellcaster</span> type.</p>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

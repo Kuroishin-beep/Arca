@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en" class="h-full">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arca — diceFinder (stretch)</title>
+<link rel="stylesheet" href="tokens.css">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="tailwind.config.js"></script>
+</head>
+
+<!--
+  SCREEN 8 — diceFinder  ★ STRETCH SCOPE ★  (SCOPE.md §6.2, S2)
+  Route: app/(app)/dice/page.tsx
+
+  Parses standard dice notation and fires it into TaleSpire's built-in roller
+  through lib/talespire.ts. Arca never rolls the dice itself — TaleSpire does,
+  on the table, where everyone can see them. That is the whole point: the result
+  is public and physical, not a number in a private panel.
+
+  The parse preview is the important part of this screen. You see exactly what
+  will be thrown BEFORE it is thrown, because an unintended roll cannot be taken
+  back at a real table.
+-->
+
+<body class="min-h-full">
+<div class="flex h-screen flex-col bg-bg">
+
+  <header class="flex h-topbar shrink-0 items-center gap-3 border-b border-border bg-surface px-3 md:px-4">
+    <a href="index.html" class="flex shrink-0 items-center gap-2 text-primary">
+      <svg viewBox="0 0 16 16" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <rect x="1.5" y="4.5" width="13" height="9" rx="1"/><path d="M1.5 8h13" stroke-linecap="round"/>
+        <rect x="7" y="6.5" width="2" height="3" rx="0.5" fill="currentColor" stroke="none"/>
+      </svg>
+      <span class="font-serif text-lg font-bold tracking-wide">Arca</span>
+    </a>
+    <span class="rounded-sm border border-warning bg-warningWeak px-2 py-0.5 text-xs font-medium text-warning">Stretch scope</span>
+    <div class="ml-auto flex items-center gap-2">
+      <a href="02-workspace.html" class="h-8 rounded-md border border-border bg-surface px-3 text-sm font-medium leading-8 text-text hover:bg-surface2">Inventory</a>
+      <a href="07-character-sheet.html" class="h-8 rounded-md border border-border bg-surface px-3 text-sm font-medium leading-8 text-text hover:bg-surface2">Sheet</a>
+    </div>
+  </header>
+
+  <main class="min-h-0 flex-1 overflow-y-auto">
+    <div class="mx-auto flex max-w-2xl flex-col gap-5 p-4 md:p-6">
+
+      <!-- ── Notation bar ─────────────────────────────────────────── -->
+      <section>
+        <label for="notation" class="mb-2 block font-serif text-lg font-bold text-text">Roll</label>
+        <div class="flex gap-2">
+          <input id="notation" type="text" value="2d6+3" spellcheck="false" autocomplete="off"
+                 aria-describedby="parse-preview"
+                 class="h-11 min-w-0 flex-1 rounded-md border border-border bg-surface2 px-3 font-mono text-lg tabular-nums text-text placeholder:text-faint">
+          <button type="button" class="h-11 shrink-0 rounded-md bg-primary px-5 text-base font-bold text-invert hover:bg-primaryHover">
+            Throw
+          </button>
+        </div>
+
+        <!-- Parse preview: what the parser understood, in plain words -->
+        <div id="parse-preview" class="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-border bg-surface p-3">
+          <span class="rounded-sm border border-border bg-surface2 px-2 py-0.5 font-mono text-sm text-text">2d6</span>
+          <span class="text-sm text-muted">two six-sided dice</span>
+          <span class="text-faint" aria-hidden="true">+</span>
+          <span class="rounded-sm border border-border bg-surface2 px-2 py-0.5 font-mono text-sm text-text">3</span>
+          <span class="text-sm text-muted">flat modifier</span>
+          <span class="ml-auto font-mono text-sm tabular-nums text-muted">range 5–15</span>
+        </div>
+
+        <!-- Quick chips -->
+        <div class="mt-3 flex flex-wrap gap-2">
+          <button type="button" class="h-8 rounded-md border border-border bg-surface px-3 font-mono text-sm text-text hover:bg-surface2">d20</button>
+          <button type="button" class="h-8 rounded-md border border-border bg-surface px-3 font-mono text-sm text-text hover:bg-surface2">2d6</button>
+          <button type="button" class="h-8 rounded-md border border-border bg-surface px-3 font-mono text-sm text-text hover:bg-surface2">1d8+2</button>
+          <button type="button" class="h-8 rounded-md border border-border bg-surface px-3 font-mono text-sm text-text hover:bg-surface2">4d6kh3</button>
+          <button type="button" class="h-8 rounded-md border border-border bg-surface px-3 font-mono text-sm text-text hover:bg-surface2">d100</button>
+        </div>
+      </section>
+
+      <!-- ── Parse error state ────────────────────────────────────── -->
+      <section>
+        <p class="mock-label mb-2">Invalid notation — the parser says where, not just that</p>
+        <div class="flex gap-2">
+          <label for="notation-err" class="sr-only">Roll notation</label>
+          <input id="notation-err" type="text" value="2d6++x" spellcheck="false" aria-invalid="true" aria-describedby="notation-err-msg"
+                 class="h-11 min-w-0 flex-1 rounded-md border border-danger bg-surface2 px-3 font-mono text-lg tabular-nums text-text">
+          <button type="button" disabled class="h-11 shrink-0 cursor-not-allowed rounded-md bg-surface3 px-5 text-base font-bold text-faint">Throw</button>
+        </div>
+        <p id="notation-err-msg" role="alert" class="mt-2 flex items-start gap-2 rounded-md border border-danger bg-dangerWeak p-3 text-sm text-text">
+          <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" class="mt-0.5 shrink-0 text-danger" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 5v3.5M8 11v.01"/></svg>
+          <span>
+            Unexpected <code class="font-mono text-danger">+</code> at position 5.
+            Try <code class="font-mono text-primary">2d6+3</code>.
+          </span>
+        </p>
+      </section>
+
+      <!-- ── Rolls found in context ───────────────────────────────── -->
+      <section class="rounded-lg border border-border bg-surface">
+        <div class="flex items-center gap-3 border-b border-border p-4">
+          <h2 class="font-serif text-lg font-bold text-text">Found in your sheet</h2>
+          <span class="ml-auto text-sm text-muted">One tap to throw</span>
+        </div>
+        <ul>
+          <li class="flex items-center gap-3 border-b border-border px-4 py-2 hover:bg-surface2">
+            <span class="min-w-0 flex-1 truncate text-base text-text">Longbow damage</span>
+            <span class="shrink-0 rounded-sm border border-border bg-surface2 px-2 py-0.5 font-mono text-sm tabular-nums text-muted">1d10</span>
+            <button type="button" class="h-8 shrink-0 rounded-md border border-border bg-surface px-3 text-sm font-medium text-primary hover:bg-surface2">Throw</button>
+          </li>
+          <li class="flex items-center gap-3 border-b border-border px-4 py-2 hover:bg-surface2">
+            <span class="min-w-0 flex-1 truncate text-base text-text">Hand axe damage</span>
+            <span class="shrink-0 rounded-sm border border-border bg-surface2 px-2 py-0.5 font-mono text-sm tabular-nums text-muted">1d8</span>
+            <button type="button" class="h-8 shrink-0 rounded-md border border-border bg-surface px-3 text-sm font-medium text-primary hover:bg-surface2">Throw</button>
+          </li>
+          <li class="flex items-center gap-3 px-4 py-2 hover:bg-surface2">
+            <span class="min-w-0 flex-1 truncate text-base text-text">Bows skill check</span>
+            <span class="shrink-0 rounded-sm border border-border bg-surface2 px-2 py-0.5 font-mono text-sm tabular-nums text-muted">d20 ≤ 15</span>
+            <button type="button" class="h-8 shrink-0 rounded-md border border-border bg-surface px-3 text-sm font-medium text-primary hover:bg-surface2">Throw</button>
+          </li>
+        </ul>
+        <p class="border-t border-border p-3 text-sm text-faint">
+          These are read off item and skill properties — the notation lives on the object, not in a separate dice list.
+        </p>
+      </section>
+
+      <!-- ── Roll history ─────────────────────────────────────────── -->
+      <section class="rounded-lg border border-border bg-surface">
+        <div class="flex items-center gap-3 border-b border-border p-4">
+          <h2 class="font-serif text-lg font-bold text-text">History</h2>
+          <span class="ml-auto text-sm text-muted">This session</span>
+        </div>
+        <ul>
+          <li class="flex items-center gap-3 border-b border-border px-4 py-3">
+            <span class="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-primaryWeak font-mono text-sm font-bold text-primary">11</span>
+            <div class="min-w-0 flex-1">
+              <p class="truncate text-base text-text"><span class="font-mono">2d6+3</span> — Kova</p>
+              <p class="truncate text-sm text-muted">rolled 4, 4 · +3</p>
+            </div>
+            <span class="shrink-0 text-xs text-faint">just now</span>
+          </li>
+          <li class="flex items-center gap-3 border-b border-border px-4 py-3">
+            <!-- A natural 20 gets a solid gold fill. Still no gradient. -->
+            <span class="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-primary font-mono text-sm font-bold text-invert">20</span>
+            <div class="min-w-0 flex-1">
+              <p class="truncate text-base text-text"><span class="font-mono">d20</span> — Milo</p>
+              <p class="truncate text-sm text-success">Dragon roll</p>
+            </div>
+            <span class="shrink-0 text-xs text-faint">2m ago</span>
+          </li>
+          <li class="flex items-center gap-3 border-b border-border px-4 py-3">
+            <span class="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-dangerWeak font-mono text-sm font-bold text-danger">1</span>
+            <div class="min-w-0 flex-1">
+              <p class="truncate text-base text-text"><span class="font-mono">d20</span> — Kova</p>
+              <p class="truncate text-sm text-danger">Demon roll</p>
+            </div>
+            <span class="shrink-0 text-xs text-faint">6m ago</span>
+          </li>
+          <li class="flex items-center gap-3 px-4 py-3">
+            <span class="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-surface2 font-mono text-sm font-bold text-text">7</span>
+            <div class="min-w-0 flex-1">
+              <p class="truncate text-base text-text"><span class="font-mono">1d8</span> — Kova</p>
+              <p class="truncate text-sm text-muted">Hand axe damage</p>
+            </div>
+            <span class="shrink-0 text-xs text-faint">9m ago</span>
+          </li>
+        </ul>
+      </section>
+
+      <!-- Integration note -->
+      <p class="flex items-start gap-2 rounded-md border border-border bg-infoWeak p-3 text-sm text-text">
+        <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" class="mt-0.5 shrink-0 text-info" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 7.5v3.5M8 5v.01"/></svg>
+        <span>Results are read back from TaleSpire’s roller. If Arca is open in a plain browser tab rather than as a Symbiote, Throw is disabled with the reason “not connected to TaleSpire”.</span>
+      </p>
+    </div>
+  </main>
+</div>
+</body>
+</html>

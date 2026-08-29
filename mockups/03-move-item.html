@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en" class="h-full">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arca — Move item</title>
+<link rel="stylesheet" href="tokens.css">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="tailwind.config.js"></script>
+</head>
+
+<!--
+  SCREEN 3 — MOVE ITEM  ★ THE HEADLINE FLOW ★
+  Component: src/components/organisms/MoveItemDialog.tsx
+  Props: { item, containers, onConfirm, onCancel }
+  Built on Radix Dialog for focus trap + Esc + aria wiring.
+
+  Design intent, in order of priority:
+    1. The destination is the decision. It gets the most space and the largest targets.
+    2. The consequence is shown BEFORE confirming — both sides' weight after the move.
+    3. Containers the actor cannot write to are DISABLED WITH A REASON, never hidden.
+    4. Partial moves are first-class: splitting a stack is the common case, not an edge case.
+-->
+
+<body class="min-h-full">
+<div class="mx-auto max-w-6xl p-4 md:p-6">
+  <p class="mock-label mb-4">03 · Move item — dialog over the workspace</p>
+
+  <!-- Scrim. Flat black at 60%; a scrim is the one place a solid overlay is allowed. -->
+  <div class="mock-frame relative flex min-h-[640px] items-center justify-center bg-bg p-4"
+       style="background-color: var(--color-bg)">
+    <div class="absolute inset-0" style="background-color: rgba(0,0,0,0.6)" aria-hidden="true"></div>
+
+    <!-- Modal (molecule) -->
+    <div role="dialog" aria-modal="true" aria-labelledby="move-title"
+         data-component="MoveItemDialog"
+         class="relative w-full max-w-md rounded-lg border border-border bg-surface shadow-modal">
+
+      <!-- Header -->
+      <div class="flex items-start gap-3 border-b border-border p-4">
+        <div class="min-w-0 flex-1">
+          <h2 id="move-title" class="font-serif text-xl font-bold text-text">Move item</h2>
+          <p class="mt-1 truncate text-base text-muted">Rope, hempen (10 m)</p>
+        </div>
+        <button type="button" class="grid h-8 w-8 shrink-0 place-items-center rounded-md text-muted hover:bg-surface2 hover:text-text">
+          <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+          <span class="sr-only">Cancel</span>
+        </button>
+      </div>
+
+      <div class="flex flex-col gap-5 p-4">
+
+        <!-- ── Quantity: how much of the stack ───────────────────── -->
+        <div>
+          <label for="move-qty" class="mb-2 block text-sm font-medium text-muted">How many?</label>
+          <div class="flex items-center gap-3">
+            <!-- NumberStepper (atom) -->
+            <div data-component="NumberStepper" class="flex h-10 items-center rounded-md border border-border bg-surface2">
+              <button type="button" class="grid h-full w-10 place-items-center rounded-l-md text-muted hover:bg-surface3 hover:text-text">
+                <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 8h10"/></svg>
+                <span class="sr-only">Decrease quantity</span>
+              </button>
+              <input id="move-qty" type="number" value="1" min="1" max="2"
+                     class="h-full w-12 border-x border-border bg-transparent text-center font-mono text-base tabular-nums text-text">
+              <button type="button" class="grid h-full w-10 place-items-center rounded-r-md text-muted hover:bg-surface3 hover:text-text">
+                <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg>
+                <span class="sr-only">Increase quantity</span>
+              </button>
+            </div>
+            <button type="button" class="h-8 rounded-md border border-border bg-surface px-3 text-sm font-medium text-text hover:bg-surface2">
+              Move all 2
+            </button>
+            <span class="ml-auto font-mono text-xs text-faint">of 2</span>
+          </div>
+          <p class="mt-2 text-sm text-muted">Moving part of a stack splits it. One object stays, one arrives.</p>
+        </div>
+
+        <!-- ── From / To ─────────────────────────────────────────── -->
+        <div class="flex items-center gap-3">
+          <div class="min-w-0 flex-1 rounded-md border border-border bg-surface2 p-3">
+            <p class="mb-1 text-xs font-medium uppercase tracking-wider text-faint">From</p>
+            <div class="flex items-center gap-2">
+              <span class="h-2 w-2 shrink-0 rounded-full bg-cParty" aria-hidden="true"></span>
+              <span class="min-w-0 truncate text-base text-text">Party Wagon</span>
+            </div>
+          </div>
+          <svg viewBox="0 0 16 16" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+               class="shrink-0 text-primary" aria-hidden="true"><path d="M2 8h11M9.5 4.5 13 8l-3.5 3.5"/></svg>
+          <div class="min-w-0 flex-1 rounded-md border border-primary bg-primaryWeak p-3">
+            <p class="mb-1 text-xs font-medium uppercase tracking-wider text-primary">To</p>
+            <div class="flex items-center gap-2">
+              <span class="h-2 w-2 shrink-0 rounded-full bg-cCharacter" aria-hidden="true"></span>
+              <span class="min-w-0 truncate text-base font-medium text-text">Kova’s Pack</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Destination picker ────────────────────────────────── -->
+        <fieldset>
+          <legend class="mb-2 text-sm font-medium text-muted">Destination</legend>
+          <ul class="flex flex-col gap-1">
+
+            <!-- SELECTED destination -->
+            <li>
+              <label class="flex h-11 cursor-pointer items-center gap-3 rounded-md border border-primary bg-primaryWeak px-3">
+                <input type="radio" name="dest" checked class="h-4 w-4 shrink-0 accent-current text-primary">
+                <span class="h-2 w-2 shrink-0 rounded-full bg-cCharacter" aria-hidden="true"></span>
+                <span class="min-w-0 flex-1 truncate text-base font-medium text-text">Kova’s Pack</span>
+                <span class="shrink-0 rounded-sm border border-border bg-surface px-1.5 py-0.5 text-xs text-muted">Yours</span>
+              </label>
+            </li>
+
+            <li>
+              <label class="flex h-11 cursor-pointer items-center gap-3 rounded-md border border-border px-3 hover:bg-surface2">
+                <input type="radio" name="dest" class="h-4 w-4 shrink-0">
+                <span class="h-2 w-2 shrink-0 rounded-full bg-cParty" aria-hidden="true"></span>
+                <span class="min-w-0 flex-1 truncate text-base text-text">Ravenholt Stash</span>
+                <span class="shrink-0 rounded-sm border border-border bg-accentWeak px-1.5 py-0.5 text-xs text-accent">Shared</span>
+              </label>
+            </li>
+
+            <li>
+              <label class="flex h-11 cursor-pointer items-center gap-3 rounded-md border border-border px-3 hover:bg-surface2">
+                <input type="radio" name="dest" class="h-4 w-4 shrink-0">
+                <span class="h-2 w-2 shrink-0 rounded-full bg-cWorld" aria-hidden="true"></span>
+                <span class="min-w-0 flex-1 truncate text-base text-text">Barrow Chest</span>
+                <span class="shrink-0 rounded-sm border border-border bg-surface2 px-1.5 py-0.5 text-xs text-muted">World</span>
+              </label>
+            </li>
+
+            <!-- DISABLED with a stated reason. Not hidden. -->
+            <li>
+              <span aria-disabled="true" title="GM-only container"
+                    class="flex h-11 cursor-not-allowed items-center gap-3 rounded-md border border-border px-3 opacity-70">
+                <input type="radio" name="dest" disabled class="h-4 w-4 shrink-0">
+                <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" class="shrink-0 text-faint" aria-hidden="true">
+                  <rect x="3.5" y="7" width="9" height="6" rx="1"/><path d="M5.5 7V5.2a2.5 2.5 0 0 1 5 0V7"/>
+                </svg>
+                <span class="min-w-0 flex-1 truncate text-base text-faint">The Sunken Vault</span>
+                <span class="shrink-0 text-xs text-faint">GM-only</span>
+              </span>
+            </li>
+          </ul>
+        </fieldset>
+
+        <!-- ── Consequence preview: both sides, before you commit ── -->
+        <div class="rounded-md border border-border bg-surface2 p-3">
+          <p class="mb-3 text-xs font-medium uppercase tracking-wider text-faint">After this move</p>
+          <div class="flex flex-col gap-3">
+            <div>
+              <div class="mb-1 flex items-baseline justify-between gap-2">
+                <span class="truncate text-sm text-muted">Party Wagon</span>
+                <span class="shrink-0 font-mono text-sm tabular-nums text-muted">
+                  34.5 → <span class="text-success">33.5</span> / 40.0 kg
+                </span>
+              </div>
+              <div class="h-1.5 overflow-hidden rounded-full bg-surface3">
+                <div class="h-full rounded-full bg-accent" style="width:84%"></div>
+              </div>
+            </div>
+            <div>
+              <div class="mb-1 flex items-baseline justify-between gap-2">
+                <span class="truncate text-sm text-muted">Kova’s Pack</span>
+                <span class="shrink-0 font-mono text-sm tabular-nums text-muted">
+                  11.0 → <span class="text-warning">12.0</span> / 12.0 kg
+                </span>
+              </div>
+              <div class="h-1.5 overflow-hidden rounded-full bg-surface3">
+                <div class="h-full rounded-full bg-warning" style="width:100%"></div>
+              </div>
+            </div>
+          </div>
+          <!-- Warning, not a block. Encumbrance is the GM's call, not the app's. -->
+          <p class="mt-3 flex items-start gap-2 text-sm text-warning">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" class="mt-0.5 shrink-0" aria-hidden="true">
+              <path d="M8 2.5 14.5 13.5h-13L8 2.5ZM8 6.5v3M8 11.5v.01"/>
+            </svg>
+            This puts Kova at their carry limit. Allowed — just slow.
+          </p>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="flex items-center gap-2 border-t border-border p-4">
+        <p class="mr-auto text-xs text-faint">Applies instantly for everyone at the table.</p>
+        <button type="button" class="h-9 rounded-md border border-border bg-surface px-4 text-sm font-medium text-text hover:bg-surface2">Cancel</button>
+        <button type="button" data-variant="primary" class="h-9 rounded-md bg-primary px-4 text-sm font-bold text-invert hover:bg-primaryHover">Move</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Post-move: the optimistic result and its rollback ──────── -->
+  <p class="mock-label mb-3 mt-6">03b · What the table sees afterwards</p>
+  <div class="grid gap-4 md:grid-cols-2">
+
+    <!-- Success toast -->
+    <div class="mock-frame bg-bg p-4">
+      <p class="mb-3 text-sm text-muted">Actor’s panel — optimistic, already applied</p>
+      <div role="status" class="flex items-start gap-3 rounded-md border border-border bg-surface p-3">
+        <span class="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-successWeak">
+          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-success" aria-hidden="true"><path d="M3.5 8.5 6.5 11.5 12.5 5"/></svg>
+        </span>
+        <div class="min-w-0 flex-1">
+          <p class="text-base text-text">Moved <span class="font-medium">1 × Rope, hempen</span> to Kova’s Pack.</p>
+          <button type="button" class="mt-1 text-sm font-medium text-primary hover:underline">Undo</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rejection / rollback -->
+    <div class="mock-frame bg-bg p-4">
+      <p class="mb-3 text-sm text-muted">Server said no — the client rolls back and says why</p>
+      <div role="alert" class="flex items-start gap-3 rounded-md border border-danger bg-dangerWeak p-3">
+        <span class="mt-0.5 shrink-0 text-danger">
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 5v3.5M8 11v.01"/></svg>
+        </span>
+        <div class="min-w-0 flex-1">
+          <p class="text-base font-medium text-text">Move rejected</p>
+          <p class="mt-1 text-base text-muted">Milo moved that rope to the Barrow Chest a moment before you. Nothing was lost — here is where it is now.</p>
+          <button type="button" class="mt-2 text-sm font-medium text-primary hover:underline">Show me</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="mt-6 text-sm text-muted">
+    Back to <a href="02-workspace.html" class="font-medium text-primary hover:underline">the Workspace</a>.
+  </p>
+</div>
+</body>
+</html>
