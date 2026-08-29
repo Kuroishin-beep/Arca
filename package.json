@@ -1,0 +1,44 @@
+{
+  "name": "arca",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TaleSpire Symbiote for our Dragonbane Westmarch campaign: a GUI database for tracking inventories across containers, with live sync and real-time collaboration. Stretch goal adds character sheets (attributes, skills, equipment, spells) plus diceFinder, parsing dice notation for one-click TaleSpire rolls.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:seed": "tsx --env-file-if-exists=.env.local src/db/seed.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Kuroishin-beep/Arca.git"
+  },
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Kuroishin-beep/Arca/issues"
+  },
+  "homepage": "https://github.com/Kuroishin-beep/Arca#readme",
+  "dependencies": {
+    "drizzle-orm": "^0.45.2",
+    "next": "^16.3.3",
+    "postgres": "^3.4.9",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^26.2.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "drizzle-kit": "^0.31.10",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.12",
+    "typescript": "^5.9.0",
+    "vitest": "^4.1.11"
+  }
+}

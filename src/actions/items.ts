@@ -1,0 +1,190 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+
+import { repository } from "@/db";
+import { ConflictError, NotFoundError } from "@/db/repository";
+import {
+  CreateItemInput,
+  MoveItemInput,
+  UpdateItemInput,
+} from "@/domain/view";
+import { PermissionError } from "@/lib/permissions";
+import { requirePrincipal } from "@/lib/session";
+
+/**
+ * Server Actions — every mutation in the app.
+ *
+ * Two rules hold across all of them:
+ *
+ *   1. The SAME zod schema validates the form and the action. There is no
+ *      second, hand-written server-side validator to drift from the first.
+ *   2. Permission is checked HERE, server-side, on every call. The dialog
+ *      disabling a destination is a courtesy; this is the enforcement
+ *      (SCOPE.md §3, M11).
+ */
+
+export interface ActionResult<T = undefined> {
+  ok: boolean;
+  error?: string;
+  /** Keyed by field name, so an input can render its own message. */
+  fieldErrors?: Record<string, string>;
+  data?: T;
+}
+
+/**
+ * Turns a thrown error into something a player can act on. A raw stack trace at
+ * a table is worse than useless — it reads as "the app lost my loot".
+ */
+function toResult<T = undefined>(error: unknown): ActionResult<T> {
+  if (error instanceof PermissionError) {
+    return { ok: false, error: error.message };
+  }
+  if (error instanceof ConflictError) {
+    return { ok: false, error: error.message };
+  }
+  if (error instanceof NotFoundError) {
+    return { ok: false, error: error.message };
+  }
+  console.error("[arca] action failed", error);
+  return { ok: false, error: "Something went wrong. Nothing was changed." };
+}
+
+function fieldErrorsOf(error: unknown): Record<string, string> {
+  const issues = (error as { issues?: { path: unknown[]; message: string }[] })
+    .issues;
+  if (!Array.isArray(issues)) return {};
+  const out: Record<string, string> = {};
+  for (const issue of issues) {
+    const key = String(issue.path[0] ?? "form");
+    out[key] ??= issue.message;
+  }
+  return out;
+}
+
+/** Tags and types arrive as comma-separated text from the form. */
+function splitList(raw: FormDataEntryValue | null): string[] {
+  return String(raw ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s !== "");
+}
+
+export async function createItemAction(
+  formData: FormData,
+): Promise<ActionResult> {
+  try {
+    const principal = await requirePrincipal();
+    const parsed = CreateItemInput.safeParse({
+      containerId: formData.get("containerId"),
+      name: formData.get("name"),
+      qty: formData.get("qty"),
+      weight: formData.get("weight"),
+      value: formData.get("value") ?? "",
+      tags: splitList(formData.get("tags")),
+      notes: formData.get("notes") ?? "",
+      types: splitList(formData.get("types")),
+    });
+
+    if (!parsed.success) {
+      return {
+        ok: false,
+        error: "Fix the highlighted fields.",
+        fieldErrors: fieldErrorsOf(parsed.error),
+      };
+    }
+
+    await repository().createItem(principal, parsed.data);
+    revalidatePath("/c/[containerId]", "page");
+    return { ok: true };
+  } catch (error) {
+    return toResult(error);
+  }
+}
+
+export async function updateItemAction(
+  formData: FormData,
+): Promise<ActionResult> {
+  try {
+    const principal = await requirePrincipal();
+    const parsed = UpdateItemInput.safeParse({
+      id: formData.get("id"),
+      name: formData.get("name"),
+      qty: formData.get("qty"),
+      weight: formData.get("weight"),
+      value: formData.get("value") ?? "",
+      tags: splitList(formData.get("tags")),
+      notes: formData.get("notes") ?? "",
+      types: splitList(formData.get("types")),
+    });
+
+    if (!parsed.success) {
+      return {
+        ok: false,
+        error: "Fix the highlighted fields.",
+        fieldErrors: fieldErrorsOf(parsed.error),
+      };
+    }
+
+    await repository().updateItem(principal, parsed.data);
+    revalidatePath("/c/[containerId]", "page");
+    return { ok: true };
+  } catch (error) {
+    return toResult(error);
+  }
+}
+
+/** Soft delete. Reversible, because a mis-tap mid-session must be. */
+export async function archiveItemAction(
+  itemId: string,
+): Promise<ActionResult> {
+  try {
+    const principal = await requirePrincipal();
+    await repository().archiveItem(principal, itemId);
+    revalidatePath("/c/[containerId]", "page");
+    return { ok: true };
+  } catch (error) {
+    return toResult(error);
+  }
+}
+
+/**
+ * THE action. Authorises both ends, splits partial stacks, and runs in one
+ * transaction against Postgres.
+ */
+export async function moveItemAction(
+  formData: FormData,
+): Promise<ActionResult<{ message: string }>> {
+  try {
+    const principal = await requirePrincipal();
+    const parsed = MoveItemInput.safeParse({
+      itemId: formData.get("itemId"),
+      toContainerId: formData.get("toContainerId"),
+      qty: formData.get("qty"),
+    });
+
+    if (!parsed.success) {
+      return {
+        ok: false,
+        error: "Pick a destination and a quantity.",
+        fieldErrors: fieldErrorsOf(parsed.error),
+      };
+    }
+
+    const outcome = await repository().moveItem(principal, parsed.data);
+    const containers = await repository().listContainers(principal);
+    const destination =
+      containers.find((c) => c.id === outcome.toContainerId)?.name ??
+      "the destination";
+
+    revalidatePath("/c/[containerId]", "page");
+    return {
+      ok: true,
+      data: {
+        message: `Moved ${outcome.movedQty} × ${outcome.itemName} to ${destination}.`,
+      },
+    };
+  } catch (error) {
+    return toResult(error);
+  }
+}

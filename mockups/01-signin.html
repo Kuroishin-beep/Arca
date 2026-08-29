@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en" class="h-full">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arca — Sign in</title>
+<link rel="stylesheet" href="tokens.css">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="tailwind.config.js"></script>
+</head>
+
+<!--
+  SCREEN 1 — SIGN IN / CAMPAIGN GATE
+  Route: app/(auth)/signin/page.tsx
+  Three states shown side by side. In the real app only one renders at a time.
+-->
+
+<body class="min-h-full">
+<div class="mx-auto flex max-w-6xl flex-col gap-6 p-4 md:p-6">
+
+  <p class="mock-label">01 · Sign in — three states</p>
+
+  <div class="grid gap-4 lg:grid-cols-3">
+
+    <!-- ── State A: signed out ───────────────────────────────────── -->
+    <section class="mock-frame flex min-h-[520px] flex-col items-center justify-center bg-bg p-6 text-center">
+      <div class="w-full max-w-xs">
+        <svg viewBox="0 0 16 16" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.2"
+             class="mx-auto mb-4 text-primary" aria-hidden="true">
+          <rect x="1.5" y="4.5" width="13" height="9" rx="1"/>
+          <path d="M1.5 8h13" stroke-linecap="round"/>
+          <rect x="7" y="6.5" width="2" height="3" rx="0.5" fill="currentColor" stroke="none"/>
+        </svg>
+        <h1 class="font-serif text-2xl font-bold text-text">Arca</h1>
+        <p class="mt-2 text-base text-muted">Shared inventory for the Ravenholt Westmarch. Runs inside TaleSpire.</p>
+
+        <button type="button" data-component="Button" data-variant="primary"
+                class="mt-6 flex h-10 w-full items-center justify-center gap-2 rounded-md bg-primary text-base font-bold text-invert hover:bg-primaryHover">
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true">
+            <path d="M13.2 3.5A11 11 0 0 0 10.5 2.7l-.2.4a10 10 0 0 1 2.3.8c-2.4-1.2-5.3-1.2-7.7 0a10 10 0 0 1 2.3-.8l-.2-.4a11 11 0 0 0-2.7.8C2.3 6 1.8 8.4 2 10.8a11 11 0 0 0 3.4 1.7l.7-1.1a7 7 0 0 1-1.1-.6l.3-.2a7.8 7.8 0 0 0 6.6 0l.3.2a7 7 0 0 1-1.1.6l.7 1.1A11 11 0 0 0 14 10.8c.3-2.8-.4-5.2-.8-7.3ZM6.1 9.5c-.7 0-1.2-.6-1.2-1.4S5.4 6.8 6.1 6.8s1.2.6 1.2 1.3-.5 1.4-1.2 1.4Zm3.8 0c-.7 0-1.2-.6-1.2-1.4s.5-1.3 1.2-1.3 1.2.6 1.2 1.3-.5 1.4-1.2 1.4Z"/>
+          </svg>
+          Continue with Discord
+        </button>
+
+        <p class="mt-4 text-sm text-muted">
+          Arca uses the Discord account you already use for the campaign. No new password.
+        </p>
+      </div>
+    </section>
+
+    <!-- ── State B: signing in ───────────────────────────────────── -->
+    <section class="mock-frame flex min-h-[520px] flex-col items-center justify-center bg-bg p-6 text-center">
+      <div class="w-full max-w-xs">
+        <div class="mx-auto mb-4 h-12 w-12 rounded-full border-2 border-surface3 border-t-primary" aria-hidden="true"></div>
+        <h1 class="font-serif text-lg font-bold text-text">Opening the strongbox…</h1>
+        <p class="mt-2 text-base text-muted">Checking your campaign membership.</p>
+        <!-- Skeleton rows: flat surface blocks, never a shimmer gradient -->
+        <div class="mt-6 flex flex-col gap-2" aria-hidden="true">
+          <div class="h-row rounded-md bg-surface"></div>
+          <div class="h-row rounded-md bg-surface"></div>
+          <div class="h-row rounded-md bg-surface"></div>
+        </div>
+        <p aria-live="polite" class="sr-only">Signing in.</p>
+      </div>
+    </section>
+
+    <!-- ── State C: not a campaign member (the gate) ─────────────── -->
+    <section class="mock-frame flex min-h-[520px] flex-col items-center justify-center bg-bg p-6 text-center">
+      <div class="w-full max-w-xs">
+        <div class="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full bg-dangerWeak">
+          <svg viewBox="0 0 16 16" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" class="text-danger" aria-hidden="true">
+            <rect x="3.5" y="7" width="9" height="6" rx="1"/><path d="M5.5 7V5.2a2.5 2.5 0 0 1 5 0V7"/>
+          </svg>
+        </div>
+        <h1 class="font-serif text-lg font-bold text-text">You are not at this table</h1>
+        <p class="mt-2 text-base text-muted">
+          Signed in as <span class="text-text">kova#2244</span>, but that account is not a member of
+          <span class="text-text">Ravenholt Westmarch</span>.
+        </p>
+        <p class="mt-3 text-sm text-muted">Ask the GM to add you, then sign in again.</p>
+        <button type="button"
+                class="mt-6 h-9 w-full rounded-md border border-border bg-surface text-sm font-medium text-text hover:bg-surface2">
+          Sign out
+        </button>
+      </div>
+    </section>
+  </div>
+
+  <!-- Signed-in destination, for the flow -->
+  <p class="text-sm text-muted">
+    On success the user lands on
+    <a href="02-workspace.html" class="font-medium text-primary hover:underline">the Workspace</a>,
+    with the container list already scoped to what their role may see.
+  </p>
+</div>
+</body>
+</html>

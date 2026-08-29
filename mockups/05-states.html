@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en" class="h-full">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arca — States</title>
+<link rel="stylesheet" href="tokens.css">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="tailwind.config.js"></script>
+</head>
+
+<!--
+  SCREEN 5 — EVERY NON-HAPPY STATE
+  These are the screens that decide whether the app feels trustworthy at a table.
+  Each cell below is one component in a documented state, not a separate page.
+-->
+
+<body class="min-h-full">
+<div class="mx-auto flex max-w-6xl flex-col gap-6 p-4 md:p-6">
+  <p class="mock-label">05 · Empty, loading, error, permission, sync, encumbrance</p>
+
+  <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+
+    <!-- ── 1. Empty container ────────────────────────────────────── -->
+    <section class="mock-frame flex min-h-[300px] flex-col bg-bg">
+      <p class="border-b border-border px-3 py-2 text-sm font-medium text-muted">EmptyState — container has no items</p>
+      <div data-component="EmptyState" class="flex flex-1 flex-col items-center justify-center p-6 text-center">
+        <svg viewBox="0 0 16 16" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.2" class="mb-4 text-faint" aria-hidden="true">
+          <rect x="1.5" y="4.5" width="13" height="9" rx="1"/><path d="M1.5 8h13" stroke-linecap="round"/>
+        </svg>
+        <h3 class="font-serif text-lg font-bold text-text">The wagon is empty</h3>
+        <p class="mt-2 max-w-[32ch] text-base text-muted">Nothing has been stowed here yet. Add an item, or move one in from a pack.</p>
+        <div class="mt-5 flex gap-2">
+          <button type="button" class="h-9 rounded-md bg-primary px-4 text-sm font-bold text-invert hover:bg-primaryHover">Add item</button>
+          <button type="button" class="h-9 rounded-md border border-border bg-surface px-4 text-sm font-medium text-text hover:bg-surface2">Move something in</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 2. Empty search result ────────────────────────────────── -->
+    <section class="mock-frame flex min-h-[300px] flex-col bg-bg">
+      <p class="border-b border-border px-3 py-2 text-sm font-medium text-muted">EmptyState — search found nothing</p>
+      <div class="flex flex-1 flex-col items-center justify-center p-6 text-center">
+        <svg viewBox="0 0 16 16" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.3" class="mb-4 text-faint" aria-hidden="true">
+          <circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14" stroke-linecap="round"/>
+        </svg>
+        <h3 class="font-serif text-lg font-bold text-text">No match for “halberd”</h3>
+        <p class="mt-2 max-w-[34ch] text-base text-muted">Nothing in the Party Wagon matches, including item aliases.</p>
+        <div class="mt-5 flex flex-wrap justify-center gap-2">
+          <button type="button" class="h-8 rounded-md border border-border bg-surface px-3 text-sm font-medium text-text hover:bg-surface2">Clear search</button>
+          <button type="button" class="h-8 rounded-md border border-border bg-surface px-3 text-sm font-medium text-primary hover:bg-surface2">Search all containers</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 3. Loading skeleton ───────────────────────────────────── -->
+    <section class="mock-frame flex min-h-[300px] flex-col bg-bg">
+      <p class="border-b border-border px-3 py-2 text-sm font-medium text-muted">Loading — flat skeleton rows</p>
+      <div class="flex-1 p-3" aria-busy="true" aria-live="polite">
+        <div class="mb-3 h-5 w-40 rounded-sm bg-surface" aria-hidden="true"></div>
+        <ul class="flex flex-col gap-2" aria-hidden="true">
+          <li class="flex h-row items-center gap-3 rounded-md bg-surface px-3">
+            <span class="h-3 flex-1 rounded-sm bg-surface2"></span>
+            <span class="h-3 w-8 rounded-sm bg-surface2"></span>
+            <span class="h-3 w-10 rounded-sm bg-surface2"></span>
+          </li>
+          <li class="flex h-row items-center gap-3 rounded-md bg-surface px-3">
+            <span class="h-3 flex-1 rounded-sm bg-surface2"></span>
+            <span class="h-3 w-8 rounded-sm bg-surface2"></span>
+            <span class="h-3 w-10 rounded-sm bg-surface2"></span>
+          </li>
+          <li class="flex h-row items-center gap-3 rounded-md bg-surface px-3">
+            <span class="h-3 flex-1 rounded-sm bg-surface2"></span>
+            <span class="h-3 w-8 rounded-sm bg-surface2"></span>
+            <span class="h-3 w-10 rounded-sm bg-surface2"></span>
+          </li>
+          <li class="flex h-row items-center gap-3 rounded-md bg-surface px-3">
+            <span class="h-3 w-2/3 rounded-sm bg-surface2"></span>
+            <span class="h-3 w-8 rounded-sm bg-surface2"></span>
+            <span class="h-3 w-10 rounded-sm bg-surface2"></span>
+          </li>
+        </ul>
+        <p class="sr-only">Loading items.</p>
+      </div>
+    </section>
+
+    <!-- ── 4. Permission denied ──────────────────────────────────── -->
+    <section class="mock-frame flex min-h-[300px] flex-col bg-bg">
+      <p class="border-b border-border px-3 py-2 text-sm font-medium text-muted">403 — container is not yours to open</p>
+      <div class="flex flex-1 flex-col items-center justify-center p-6 text-center">
+        <div class="mb-4 grid h-12 w-12 place-items-center rounded-full bg-dangerWeak">
+          <svg viewBox="0 0 16 16" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" class="text-danger" aria-hidden="true">
+            <rect x="3.5" y="7" width="9" height="6" rx="1"/><path d="M5.5 7V5.2a2.5 2.5 0 0 1 5 0V7"/>
+          </svg>
+        </div>
+        <h3 class="font-serif text-lg font-bold text-text">The Sunken Vault is sealed</h3>
+        <p class="mt-2 max-w-[34ch] text-base text-muted">This is a GM-only container. Its contents were never sent to your device.</p>
+        <a href="02-workspace.html" class="mt-5 h-9 rounded-md border border-border bg-surface px-4 text-sm font-medium leading-9 text-text hover:bg-surface2">Back to Party Wagon</a>
+      </div>
+    </section>
+
+    <!-- ── 5. Connection lost ────────────────────────────────────── -->
+    <section class="mock-frame flex min-h-[300px] flex-col bg-bg">
+      <p class="border-b border-border px-3 py-2 text-sm font-medium text-muted">SyncPill status="error" + banner</p>
+      <div class="flex-1 p-3">
+        <!-- The pill, in all three states, for reference -->
+        <div class="mb-4 flex flex-wrap gap-2">
+          <span class="flex items-center gap-2 rounded-sm border border-border bg-successWeak px-2 py-1">
+            <span class="h-2 w-2 rounded-full bg-success" aria-hidden="true"></span>
+            <span class="text-xs font-medium text-success">Synced</span>
+          </span>
+          <span class="flex items-center gap-2 rounded-sm border border-border bg-infoWeak px-2 py-1">
+            <span class="h-2 w-2 rounded-full bg-info" aria-hidden="true"></span>
+            <span class="text-xs font-medium text-info">Syncing…</span>
+          </span>
+          <span class="flex items-center gap-2 rounded-sm border border-danger bg-dangerWeak px-2 py-1">
+            <span class="h-2 w-2 rounded-full bg-danger" aria-hidden="true"></span>
+            <span class="text-xs font-medium text-danger">Offline</span>
+          </span>
+        </div>
+
+        <div role="alert" class="flex items-start gap-3 rounded-md border border-danger bg-dangerWeak p-3">
+          <span class="mt-0.5 shrink-0 text-danger">
+            <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 5v3.5M8 11v.01"/></svg>
+          </span>
+          <div class="min-w-0 flex-1">
+            <p class="text-base font-medium text-text">Lost the table</p>
+            <p class="mt-1 text-base text-muted">You are seeing the inventory as of 2 minutes ago. Edits are paused until the connection returns.</p>
+            <button type="button" class="mt-2 h-8 rounded-md border border-border bg-surface px-3 text-sm font-medium text-text hover:bg-surface2">Retry now</button>
+          </div>
+        </div>
+        <p class="mt-3 text-sm text-faint">Stale data is labelled rather than hidden — a wrong-but-visible list is more dangerous than an old-but-labelled one.</p>
+      </div>
+    </section>
+
+    <!-- ── 6. Over-encumbered ────────────────────────────────────── -->
+    <section class="mock-frame flex min-h-[300px] flex-col bg-bg">
+      <p class="border-b border-border px-3 py-2 text-sm font-medium text-muted">WeightMeter — normal, at limit, over</p>
+      <div class="flex flex-1 flex-col justify-center gap-5 p-4">
+
+        <div>
+          <div class="mb-1 flex items-baseline justify-between gap-2">
+            <span class="text-sm text-muted">Party Wagon</span>
+            <span class="font-mono text-sm tabular-nums text-muted">34.5 / 40.0 kg</span>
+          </div>
+          <div class="h-1.5 overflow-hidden rounded-full bg-surface3">
+            <div class="h-full rounded-full bg-accent" style="width:86%"></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="mb-1 flex items-baseline justify-between gap-2">
+            <span class="text-sm text-muted">Kova’s Pack</span>
+            <span class="font-mono text-sm tabular-nums text-warning">12.0 / 12.0 kg</span>
+          </div>
+          <div class="h-1.5 overflow-hidden rounded-full bg-surface3">
+            <div class="h-full rounded-full bg-warning" style="width:100%"></div>
+          </div>
+          <p class="mt-1 text-sm text-warning">At carry limit.</p>
+        </div>
+
+        <div>
+          <div class="mb-1 flex items-baseline justify-between gap-2">
+            <span class="text-sm text-muted">Milo’s Pack</span>
+            <span class="font-mono text-sm tabular-nums text-danger">15.5 / 12.0 kg</span>
+          </div>
+          <div class="h-1.5 overflow-hidden rounded-full bg-surface3">
+            <div class="h-full rounded-full bg-danger" style="width:100%"></div>
+          </div>
+          <p class="mt-1 text-sm text-danger">Over by 3.5 kg — the GM decides what that costs.</p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <p class="text-sm text-muted">
+    Back to <a href="02-workspace.html" class="font-medium text-primary hover:underline">the Workspace</a>.
+  </p>
+</div>
+</body>
+</html>
