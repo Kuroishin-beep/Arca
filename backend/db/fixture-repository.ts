@@ -21,13 +21,18 @@ import {
   type Principal,
   type UpdateItemInput,
   carriedWeight,
+  ownershipProblem,
 } from "@backend/domain/view";
 import {
+  assertCanEditContainer,
+  assertCanManageContainer,
   assertCanMove,
   assertCanRead,
+  assertCanRetireContainer,
   assertCanWrite,
   visibleContainers,
 } from "@backend/lib/permissions";
+import { clearFailures, hashPin, verifyPin } from "@backend/lib/pin";
 
 import {
   type ArcaRepository,
@@ -43,7 +48,10 @@ import {
 } from "./seed-data";
 
 interface Store {
-  users: Principal[];
+  /** The roster, plus the enrolled PIN hash. `pinHash` is deliberately part of
+   *  the store and NOT of `Member`: it is compared inside this module and is
+   *  never handed to a caller. Null means "has not chosen one yet". */
+  users: (Principal & { pinHash: string | null })[];
   containers: Omit<ContainerView, "itemCount" | "carriedWeight">[];
   items: (ItemView & { archivedAt: Date | null })[];
   comments: CommentView[];
@@ -54,10 +62,15 @@ const STORE_KEY = Symbol.for("arca.fixture.store");
 function freshStore(): Store {
   const now = new Date();
   return {
+    // Seeded unenrolled. Fixture mode is the no-database mode, so a PIN set
+    // here would survive only until the dev server restarts; starting every
+    // member at "choose a PIN" exercises the real first-run flow every time
+    // rather than once.
     users: SEED_USERS.map((u) => ({
       userId: u.id as Principal["userId"],
       displayName: u.displayName,
       role: u.role,
+      pinHash: null,
     })),
     containers: SEED_CONTAINERS.map((c) => ({
       id: c.id as ContainerView["id"],
@@ -161,6 +174,84 @@ export const fixtureRepository: ArcaRepository = {
     const container = hydrate(raw);
     assertCanRead(principal, container);
     return container;
+  },
+
+  async createContainer(principal, input) {
+    assertCanManageContainer(principal, {
+      type: input.type,
+      ownerId: input.ownerId,
+    });
+
+    const container = {
+      id: randomUUID() as ContainerView["id"],
+      name: input.name,
+      type: input.type,
+      ownerId: input.ownerId,
+      // Only a world container has anything to reveal.
+      revealed: input.type === "world" ? input.revealed : true,
+      capacity: input.capacity,
+    };
+    store().containers.push(container);
+    return hydrate(container);
+  },
+
+  async updateContainer(principal, input) {
+    const raw = store().containers.find((c) => c.id === input.id);
+    if (!raw) throw new NotFoundError("No such container.");
+
+    // The merged result, judged before anything is written — same rule and
+    // same order as the Postgres backend.
+    const type = input.type ?? raw.type;
+    const ownerId = input.ownerId !== undefined ? input.ownerId : raw.ownerId;
+
+    // Authorised against BOTH the stored row and the row this patch would
+    // produce, so an edit cannot walk a container from a kind you may touch to
+    // one you may not.
+    assertCanEditContainer(
+      principal,
+      { type: raw.type, ownerId: raw.ownerId },
+      { type, ownerId },
+    );
+
+    const problem = ownershipProblem(type, ownerId);
+    if (problem) throw new ConflictError(problem);
+
+    // `undefined` means leave it alone; `null` on capacity means no limit.
+    // Assigning unconditionally is exactly the data-loss bug UpdateItemInput's
+    // comment warns about, one level up.
+    if (input.name !== undefined) raw.name = input.name;
+    if (input.capacity !== undefined) raw.capacity = input.capacity;
+    raw.type = type;
+    raw.ownerId = ownerId;
+
+    // Converting away from world forces it visible; a lingering invisible
+    // container would have no control left to fix it.
+    if (type !== "world") {
+      raw.revealed = true;
+    } else if (input.revealed !== undefined) {
+      raw.revealed = input.revealed;
+    }
+
+    return hydrate(raw);
+  },
+
+  async archiveContainer(principal, containerId) {
+    assertCanRetireContainer(principal, findContainer(containerId));
+
+    // Same refusal as the Postgres backend: hiding a container that still
+    // holds items would leave them belonging somewhere and appearing nowhere.
+    const held = liveItemsIn(containerId);
+    if (held.length > 0) {
+      throw new ConflictError(
+        `That container still holds ${held.length} ${
+          held.length === 1 ? "item" : "items"
+        }. Move them somewhere else first.`,
+      );
+    }
+
+    const all = store().containers;
+    const at = all.findIndex((c) => c.id === containerId);
+    if (at >= 0) all.splice(at, 1);
   },
 
   async listItems(principal, containerId) {
@@ -312,20 +403,35 @@ export const fixtureRepository: ArcaRepository = {
   },
 
   async listMembers() {
-    return store().users;
+    // Projected, not returned: `pinHash` lives on the store rows and must not
+    // travel with them. Spreading the row and deleting the field would leave
+    // the hash one forgotten `...member` away from a client component.
+    return store().users.map(({ userId, displayName, role, pinHash }) => ({
+      userId,
+      displayName,
+      role,
+      hasPin: pinHash !== null,
+    }));
   },
 
-  /**
-   * Always `null`, and correctly so.
-   *
-   * Membership is a database fact — a row in `campaign_members` that the GM
-   * put there. Fixture mode is the no-database mode, so it has no Discord
-   * links to resolve and cannot invent one without deciding, in code, that
-   * whoever signs in is a member of the campaign. Discord auth therefore
-   * requires DATABASE_URL; without it the app uses the member picker, which
-   * `authConfigured()` in `backend/lib/auth.ts` selects between.
-   */
-  async findMemberByDiscordId() {
-    return null;
+  async authenticateMember(userId, pin) {
+    const member = store().users.find((u) => u.userId === userId);
+    // Same `null` for unknown member, unenrolled member and wrong PIN — see
+    // the note on the interface. Nothing here distinguishes them.
+    if (!member?.pinHash) return null;
+    if (!(await verifyPin(pin, member.pinHash))) return null;
+
+    clearFailures(userId);
+    return { userId: member.userId, displayName: member.displayName, role: member.role };
+  },
+
+  async enrolMemberPin(userId, pin) {
+    const member = store().users.find((u) => u.userId === userId);
+    // Refusing when a PIN already exists is what keeps this a first-run step
+    // rather than a way to overwrite somebody else's.
+    if (!member || member.pinHash !== null) return null;
+
+    member.pinHash = await hashPin(pin);
+    return { userId: member.userId, displayName: member.displayName, role: member.role };
   },
 };

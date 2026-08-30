@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 
 import { Button } from "@frontend/components/atoms/Button";
 import { Icon } from "@frontend/components/atoms/Icon";
@@ -17,6 +17,20 @@ interface HistoryEntry {
 const QUICK = ["d20", "2d6", "1d8+2", "4d6kh3", "d100"];
 
 /**
+ * Whether TaleSpire is on the other side of the glass.
+ *
+ * `isSymbiote()` reads `window`, so the server cannot answer it and the two
+ * renders would disagree. `useSyncExternalStore` is the primitive built for
+ * exactly that: `getServerSnapshot` answers "no" during SSR and hydration,
+ * then the client snapshot takes over. Reading it in an effect and calling
+ * setState would work too, but it is a cascading render to learn something
+ * that never changes afterwards.
+ */
+const neverChanges = () => () => {};
+const symbioteOnClient = () => isSymbiote();
+const symbioteOnServer = () => false;
+
+/**
  * The parse preview is the important part of this screen.
  *
  * At a real table an unintended roll cannot be taken back, so you see exactly
@@ -26,12 +40,13 @@ const QUICK = ["d20", "2d6", "1d8+2", "4d6kh3", "d100"];
  */
 export function DiceFinder() {
   const [notation, setNotation] = useState("2d6+3");
-  const [connected, setConnected] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
 
-  // `isSymbiote()` reads `window`, so it can only be answered after mount —
-  // otherwise the server and client would render different buttons.
-  useEffect(() => setConnected(isSymbiote()), []);
+  const connected = useSyncExternalStore(
+    neverChanges,
+    symbioteOnClient,
+    symbioteOnServer,
+  );
 
   const parsed = useMemo(() => parseDiceNotation(notation), [notation]);
 
@@ -69,7 +84,10 @@ export function DiceFinder() {
           />
           <Button
             variant="primary"
-            onClick={throwDice}
+            // `void`, not a bare async handler: an unhandled rejection from
+            // the Symbiote bridge would otherwise vanish, and a roll that
+            // never reached the table would look like nothing happened.
+            onClick={() => void throwDice()}
             disabled={!parsed.ok || !connected}
             className="h-11 px-5 text-base"
             title={

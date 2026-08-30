@@ -26,14 +26,19 @@ import {
   type Principal,
   type UpdateItemInput,
   carriedWeight,
+  ownershipProblem,
 } from "@backend/domain/view";
 import { campaignId } from "@backend/lib/campaign";
 import {
+  assertCanEditContainer,
+  assertCanManageContainer,
   assertCanMove,
   assertCanRead,
+  assertCanRetireContainer,
   assertCanWrite,
   visibleContainers,
 } from "@backend/lib/permissions";
+import { clearFailures, hashPin, verifyPin } from "@backend/lib/pin";
 
 import { db } from "./client";
 import {
@@ -332,6 +337,145 @@ export const postgresRepository: ArcaRepository = {
     return found;
   },
 
+  async createContainer(principal, input) {
+    assertCanManageContainer(principal, {
+      type: input.type,
+      ownerId: input.ownerId,
+    });
+
+    // Object first, then the container facet: a container IS an object
+    // (SCOPE.md §5.2), and the FK runs container.object_id -> objects.id.
+    // One transaction, because an object with no container row is a ghost that
+    // every query joins away and nothing can ever reach.
+    const objectId = await db().transaction(async (tx) => {
+      const inserted = await tx
+        .insert(objects)
+        .values({ campaignId: campaignId() })
+        .returning({ id: objects.id });
+
+      const created = inserted[0];
+      if (!created) throw new Error("Insert returned no row.");
+
+      await tx.insert(containers).values({
+        objectId: created.id,
+        name: input.name,
+        type: input.type,
+        ownerId: input.ownerId,
+        // A character or party container is never hidden; only a world
+        // container has anything to reveal.
+        revealed: input.type === "world" ? input.revealed : true,
+      });
+
+      return created.id;
+    });
+
+    if (input.capacity !== null) {
+      // Capacity is a property on the object, the same machinery an item's
+      // weight uses — not a column, because most containers do not have one.
+      await setProperties(objectId, { capacity: input.capacity });
+    }
+
+    return requireContainer(objectId);
+  },
+
+  async updateContainer(principal, input) {
+    const existing = await requireContainer(input.id);
+
+    // The merged result, not the patch. A patch carrying only `type` is legal
+    // or illegal depending on the owner already stored, so the invariant can
+    // only be judged here — the one place that knows both.
+    const type = input.type ?? existing.type;
+    const ownerId =
+      input.ownerId !== undefined ? input.ownerId : existing.ownerId;
+
+    // Both ends, for the same reason a move authorises both: an edit that only
+    // checked the result would let a player reshape a container they may touch
+    // into one they may not, and vice versa.
+    assertCanEditContainer(
+      principal,
+      { type: existing.type, ownerId: existing.ownerId },
+      { type, ownerId },
+    );
+
+    const problem = ownershipProblem(type, ownerId);
+    if (problem) throw new ConflictError(problem);
+
+    const fields: {
+      name?: string;
+      type?: ContainerView["type"];
+      ownerId?: string | null;
+      revealed?: boolean;
+    } = {};
+    if (input.name !== undefined) fields.name = input.name;
+    if (input.type !== undefined) fields.type = type;
+    if (input.ownerId !== undefined) fields.ownerId = ownerId;
+
+    // Only a world container is ever hidden. Converting away from world must
+    // force it visible, or a former world container would linger invisible to
+    // every player with no control left to fix it.
+    if (type !== "world") {
+      fields.revealed = true;
+    } else if (input.revealed !== undefined) {
+      fields.revealed = input.revealed;
+    }
+
+    if (Object.keys(fields).length > 0) {
+      await db()
+        .update(containers)
+        .set(fields)
+        .where(eq(containers.objectId, input.id));
+    }
+
+    if (input.capacity !== undefined) {
+      if (input.capacity === null) {
+        // "No limit" is the ABSENCE of the property, not a null stored in it.
+        // `loadContainers` asks whether the value is a positive number, so a
+        // stored null would read the same — but leaving the row behind means
+        // every future reader has to know that null and missing mean the same
+        // thing, which is the kind of ambiguity JSONB columns rot from.
+        const ids = await propertyIdsByName();
+        const capacityId = ids.get("capacity");
+        if (capacityId) {
+          await db()
+            .delete(objectProperties)
+            .where(
+              and(
+                eq(objectProperties.objectId, input.id),
+                eq(objectProperties.propertyDefinitionId, capacityId),
+              ),
+            );
+        }
+      } else {
+        await setProperties(input.id, { capacity: input.capacity });
+      }
+    }
+
+    await db()
+      .update(objects)
+      .set({ updatedAt: new Date() })
+      .where(eq(objects.id, input.id));
+
+    return requireContainer(input.id);
+  },
+
+  async archiveContainer(principal, containerId) {
+    assertCanRetireContainer(principal, await requireContainer(containerId));
+
+    const held = await itemsIn(containerId);
+    if (held.length > 0) {
+      throw new ConflictError(
+        `That container still holds ${held.length} ${
+          held.length === 1 ? "item" : "items"
+        }. Move them somewhere else first.`,
+      );
+    }
+
+    await db()
+      .update(objects)
+      .set({ archivedAt: new Date(), updatedAt: new Date() })
+      .where(eq(objects.id, containerId));
+  },
+
   async listItems(principal, containerId) {
     assertCanRead(principal, await requireContainer(containerId));
     return itemsIn(containerId);
@@ -438,7 +582,7 @@ export const postgresRepository: ArcaRepository = {
 
     return {
       id: row.id,
-      containerId: input.containerId as CommentView["containerId"],
+      containerId: input.containerId,
       authorName: principal.displayName,
       authorRole: principal.role,
       content: input.content,
@@ -639,6 +783,10 @@ export const postgresRepository: ArcaRepository = {
         userId: users.id,
         displayName: users.displayName,
         role: campaignMembers.role,
+        // The presence of a hash, never the hash. Selecting the column and
+        // mapping it away later would put it in scope in a module that renders
+        // to a page.
+        hasPin: sql<boolean>`${users.pinHash} is not null`,
       })
       .from(campaignMembers)
       .innerJoin(users, eq(users.id, campaignMembers.userId))
@@ -648,31 +796,44 @@ export const postgresRepository: ArcaRepository = {
       userId: r.userId as Principal["userId"],
       displayName: r.displayName,
       role: r.role,
+      hasPin: r.hasPin,
     }));
   },
 
-  async findMemberByDiscordId(discordId) {
-    // The join is the authorisation: a Discord account with no row in
-    // `campaign_members` for THIS campaign produces no row here, so a stranger
-    // who completes an OAuth round trip is not a principal.
-    const rows = await db()
-      .select({
-        userId: users.id,
-        displayName: users.displayName,
-        role: campaignMembers.role,
-      })
-      .from(users)
-      .innerJoin(campaignMembers, eq(campaignMembers.userId, users.id))
-      .where(
-        and(
-          eq(users.discordId, discordId),
-          eq(campaignMembers.campaignId, campaignId()),
-        ),
-      )
-      .limit(1);
+  async authenticateMember(userId, pin) {
+    // The join is the authorisation: a user row with no membership in THIS
+    // campaign produces no row here, so a correct PIN on an account that has
+    // been removed from the table is still not a principal.
+    const row = await memberWithPin(userId);
+    if (!row?.pinHash) return null;
+    if (!(await verifyPin(pin, row.pinHash))) return null;
 
-    const row = rows[0];
-    if (!row) return null;
+    clearFailures(userId);
+    return {
+      userId: row.userId as Principal["userId"],
+      displayName: row.displayName,
+      role: row.role,
+    };
+  },
+
+  async enrolMemberPin(userId, pin) {
+    const row = await memberWithPin(userId);
+    if (!row || row.pinHash !== null) return null;
+
+    const hash = await hashPin(pin);
+
+    // `is null` in the WHERE, not just in the check above: two tabs opened on
+    // the same unenrolled name would otherwise both pass the read and the
+    // second would overwrite the first person's PIN. The row's unenrolled
+    // state is the lock.
+    const updated = await db()
+      .update(users)
+      .set({ pinHash: hash })
+      .where(and(eq(users.id, userId), isNull(users.pinHash)))
+      .returning({ id: users.id });
+
+    if (updated.length === 0) return null;
+
     return {
       userId: row.userId as Principal["userId"],
       displayName: row.displayName,
@@ -680,3 +841,31 @@ export const postgresRepository: ArcaRepository = {
     };
   },
 };
+
+/** One member of THIS campaign, with their stored hash. Not exported: the hash
+ *  must not leave this module. */
+async function memberWithPin(userId: string) {
+  // An id that is not a uuid reaches Postgres as a cast error rather than as
+  // "no such member", and the sign-in form takes its value from a URL-shaped
+  // world where that is a normal thing to receive.
+  if (!UUID.test(userId)) return null;
+
+  const rows = await db()
+    .select({
+      userId: users.id,
+      displayName: users.displayName,
+      role: campaignMembers.role,
+      pinHash: users.pinHash,
+    })
+    .from(users)
+    .innerJoin(campaignMembers, eq(campaignMembers.userId, users.id))
+    .where(
+      and(eq(users.id, userId), eq(campaignMembers.campaignId, campaignId())),
+    )
+    .limit(1);
+
+  return rows[0] ?? null;
+}
+
+const UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

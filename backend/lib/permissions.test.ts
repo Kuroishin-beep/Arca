@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { fixtureRepository, resetFixtureStore } from "@backend/db/fixture-repository";
+import { ConflictError } from "@backend/db/repository";
 import { GM_ID, KOVA_ID, MILO_ID, SEED_CONTAINERS } from "@backend/db/seed-data";
+import type { ContainerId } from "@backend/domain/types";
 import type { Principal } from "@backend/domain/view";
 import { PermissionError } from "@backend/lib/permissions";
 
@@ -30,8 +32,10 @@ const milo: Principal = {
   role: "player",
 };
 
-const id = (name: string) =>
-  SEED_CONTAINERS.find((c) => c.name === name)!.id;
+/** Seed ids are plain strings; the branded type is what the domain speaks, and
+ *  asserting it once here beats casting at every call site. */
+const id = (name: string): ContainerId =>
+  SEED_CONTAINERS.find((c) => c.name === name)!.id as ContainerId;
 
 const KOVAS_PACK = id("Kova's Pack");
 const MILOS_PACK = id("Milo's Pack");
@@ -53,6 +57,400 @@ describe("reads", () => {
     const containers = await fixtureRepository.listContainers(kova);
     expect(containers.map((c) => c.id)).toContain(KOVAS_PACK);
     expect(containers.map((c) => c.id)).not.toContain(MILOS_PACK);
+  });
+
+  /**
+   * The same rule from the other side. Kova being unable to read Milo's pack
+   * could be satisfied by a rule that simply favours Milo; only the symmetric
+   * case shows the rule is about ownership rather than about a particular
+   * player. The `milo` principal existed for this and the assertion was never
+   * written — the linter is what surfaced it, as an unused variable.
+   */
+  it("hides a player's pack from the other player, both ways", async () => {
+    const containers = await fixtureRepository.listContainers(milo);
+    expect(containers.map((c) => c.id)).toContain(MILOS_PACK);
+    expect(containers.map((c) => c.id)).not.toContain(KOVAS_PACK);
+
+    await expect(
+      fixtureRepository.getContainer(milo, KOVAS_PACK),
+    ).rejects.toBeInstanceOf(PermissionError);
+  });
+
+  /**
+   * A player may bring into existence the two kinds whose existence is theirs
+   * to decide: their own pack, and a shared container (SCOPE.md §3).
+   */
+  it("lets a player add a shared container", async () => {
+    const created = await fixtureRepository.createContainer(kova, {
+      name: "The mule",
+      type: "party",
+      ownerId: null,
+      capacity: null,
+      revealed: false,
+    });
+
+    // Shared means shared: it has to reach the other player, not just its
+    // author.
+    const forMilo = await fixtureRepository.listContainers(milo);
+    expect(forMilo.map((c) => c.id)).toContain(created.id);
+  });
+
+  it("lets a player add a pack of their own", async () => {
+    const created = await fixtureRepository.createContainer(kova, {
+      name: "Kova's saddlebag",
+      type: "character",
+      ownerId: kova.userId,
+      capacity: null,
+      revealed: false,
+    });
+
+    const forKova = await fixtureRepository.listContainers(kova);
+    expect(forKova.map((c) => c.id)).toContain(created.id);
+
+    // Still a character container, so it is still nobody else's.
+    const forMilo = await fixtureRepository.listContainers(milo);
+    expect(forMilo.map((c) => c.id)).not.toContain(created.id);
+  });
+
+  /**
+   * World containers stay the GM's alone. Reveal only means something if a
+   * player cannot mint a revealed container themselves.
+   */
+  it("refuses a player who tries to add a world container", async () => {
+    await expect(
+      fixtureRepository.createContainer(kova, {
+        name: "A vault of my own",
+        type: "world",
+        ownerId: null,
+        capacity: null,
+        revealed: true,
+      }),
+    ).rejects.toBeInstanceOf(PermissionError);
+  });
+
+  /** Their own, and only their own — otherwise adding a container is a way to
+   *  put one in somebody else's sidebar. */
+  it("refuses a player who tries to add a pack for someone else", async () => {
+    await expect(
+      fixtureRepository.createContainer(milo, {
+        name: "Milo's gift to Kova",
+        type: "character",
+        ownerId: kova.userId,
+        capacity: null,
+        revealed: false,
+      }),
+    ).rejects.toBeInstanceOf(PermissionError);
+  });
+
+  it("lets the GM create one, and it appears in the list", async () => {
+    const created = await fixtureRepository.createContainer(gm, {
+      name: "The Drowned Cellar",
+      type: "world",
+      ownerId: null,
+      capacity: null,
+      revealed: false,
+    });
+    const forGm = await fixtureRepository.listContainers(gm);
+    expect(forGm.map((c) => c.id)).toContain(created.id);
+
+    // Unrevealed, so it must not reach a player at all.
+    const forKova = await fixtureRepository.listContainers(kova);
+    expect(forKova.map((c) => c.id)).not.toContain(created.id);
+  });
+
+  /**
+   * Retiring is narrower than creating, on purpose: a player may add a shared
+   * container for the table, but removing one removes it from everybody.
+   */
+  it("refuses a player who tries to retire a shared container", async () => {
+    await expect(
+      fixtureRepository.archiveContainer(kova, PARTY_WAGON),
+    ).rejects.toBeInstanceOf(PermissionError);
+  });
+
+  it("refuses a player who tries to retire another player's pack", async () => {
+    await expect(
+      fixtureRepository.archiveContainer(milo, KOVAS_PACK),
+    ).rejects.toBeInstanceOf(PermissionError);
+  });
+
+  it("lets a player retire their own empty pack", async () => {
+    const created = await fixtureRepository.createContainer(kova, {
+      name: "Kova's spare sack",
+      type: "character",
+      ownerId: kova.userId,
+      capacity: null,
+      revealed: false,
+    });
+
+    await fixtureRepository.archiveContainer(kova, created.id);
+
+    const after = await fixtureRepository.listContainers(kova);
+    expect(after.map((c) => c.id)).not.toContain(created.id);
+  });
+
+  /** The "must be empty first" rule is about the items, not about the role —
+   *  it applies to a player retiring their own pack exactly as it does to the
+   *  GM. */
+  it("refuses a player retiring their own pack while it holds items", async () => {
+    await expect(
+      fixtureRepository.archiveContainer(kova, KOVAS_PACK),
+    ).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  /**
+   * The guard that matters: hiding a container that still holds items would
+   * leave them belonging somewhere and appearing nowhere.
+   */
+  it("refuses to retire a container that still holds items", async () => {
+    await expect(
+      fixtureRepository.archiveContainer(gm, KOVAS_PACK),
+    ).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it("retires an empty container", async () => {
+    const empty = await fixtureRepository.createContainer(gm, {
+      name: "Empty crate",
+      type: "world",
+      ownerId: null,
+      capacity: null,
+      revealed: true,
+    });
+    await fixtureRepository.archiveContainer(gm, empty.id);
+    const after = await fixtureRepository.listContainers(gm);
+    expect(after.map((c) => c.id)).not.toContain(empty.id);
+  });
+
+  it("lets a player rename their own pack", async () => {
+    const updated = await fixtureRepository.updateContainer(kova, {
+      id: KOVAS_PACK,
+      name: "Kova's much larger pack",
+    });
+    expect(updated.name).toBe("Kova's much larger pack");
+  });
+
+  it("refuses a player who tries to rename another player's pack", async () => {
+    await expect(
+      fixtureRepository.updateContainer(milo, {
+        id: KOVAS_PACK,
+        name: "Milo was here",
+      }),
+    ).rejects.toBeInstanceOf(PermissionError);
+  });
+
+  /**
+   * The loophole this rule exists to close.
+   *
+   * A player may edit the party wagon, and a player may own a pack. Checking
+   * only the result of the patch would therefore let them convert the shared
+   * wagon into their own pack and take the table's entire inventory private in
+   * one save. Reshaping a container is the GM's call; filling one is not.
+   */
+  it("refuses a player who tries to turn the shared wagon into their own pack", async () => {
+    await expect(
+      fixtureRepository.updateContainer(kova, {
+        id: PARTY_WAGON,
+        type: "character",
+        ownerId: kova.userId,
+      }),
+    ).rejects.toBeInstanceOf(PermissionError);
+
+    // And it really is untouched, not merely refused.
+    const wagon = await fixtureRepository.getContainer(milo, PARTY_WAGON);
+    expect(wagon?.type).toBe("party");
+  });
+
+  it("refuses a player who tries to hand their own pack to someone else", async () => {
+    await expect(
+      fixtureRepository.updateContainer(kova, {
+        id: KOVAS_PACK,
+        ownerId: milo.userId,
+      }),
+    ).rejects.toBeInstanceOf(PermissionError);
+  });
+
+  /** Reshaping stays available to the GM — the rule above narrows players,
+   *  not the role the whole feature was built for. */
+  it("lets the GM change what kind of container something is", async () => {
+    const updated = await fixtureRepository.updateContainer(gm, {
+      id: PARTY_WAGON,
+      type: "world",
+      ownerId: null,
+    });
+    expect(updated.type).toBe("world");
+  });
+
+  /**
+   * The point of the whole feature: revealing changes what a PLAYER can see,
+   * not just what a flag says.
+   */
+  it("revealing a world container makes it visible to players", async () => {
+    const before = await fixtureRepository.listContainers(kova);
+    expect(before.map((c) => c.id)).not.toContain(SUNKEN_VAULT);
+
+    await fixtureRepository.updateContainer(gm, {
+      id: SUNKEN_VAULT,
+      revealed: true,
+    });
+
+    const after = await fixtureRepository.listContainers(kova);
+    expect(after.map((c) => c.id)).toContain(SUNKEN_VAULT);
+  });
+
+  it("hiding it again takes it back out of a player's list", async () => {
+    await fixtureRepository.updateContainer(gm, {
+      id: SUNKEN_VAULT,
+      revealed: true,
+    });
+    await fixtureRepository.updateContainer(gm, {
+      id: SUNKEN_VAULT,
+      revealed: false,
+    });
+    const after = await fixtureRepository.listContainers(kova);
+    expect(after.map((c) => c.id)).not.toContain(SUNKEN_VAULT);
+  });
+
+  /**
+   * The data-loss guard, one level up from the item version: revealing a chest
+   * must not also rename it or clear its capacity.
+   */
+  it("leaves untouched fields alone on a patch", async () => {
+    const created = await fixtureRepository.createContainer(gm, {
+      name: "Cellar",
+      type: "world",
+      ownerId: null,
+      capacity: 40,
+      revealed: false,
+    });
+
+    const patched = await fixtureRepository.updateContainer(gm, {
+      id: created.id,
+      revealed: true,
+    });
+
+    expect(patched.revealed).toBe(true);
+    expect(patched.name).toBe("Cellar");
+    expect(patched.capacity).toBe(40);
+  });
+
+  it("clears capacity when told to, distinctly from leaving it alone", async () => {
+    const created = await fixtureRepository.createContainer(gm, {
+      name: "Cart",
+      type: "party",
+      ownerId: null,
+      capacity: 80,
+      revealed: true,
+    });
+
+    const untouched = await fixtureRepository.updateContainer(gm, {
+      id: created.id,
+      name: "Handcart",
+    });
+    expect(untouched.capacity).toBe(80);
+
+    const cleared = await fixtureRepository.updateContainer(gm, {
+      id: created.id,
+      capacity: null,
+    });
+    expect(cleared.capacity).toBeNull();
+    expect(cleared.name).toBe("Handcart");
+  });
+
+  /** A pack is never hidden, so a reveal on one is a no-op rather than a way to
+   *  make a player's own container vanish from their sidebar. */
+  it("ignores revealed on a non-world container", async () => {
+    const patched = await fixtureRepository.updateContainer(gm, {
+      id: KOVAS_PACK,
+      revealed: false,
+    });
+    expect(patched.revealed).toBe(true);
+
+    const forKova = await fixtureRepository.listContainers(kova);
+    expect(forKova.map((c) => c.id)).toContain(KOVAS_PACK);
+  });
+
+  /* ---------------------------------------------------------------- *
+   * Changing kind and owner. The ownership invariant has to hold across
+   * the change, and the change moves the container between permission
+   * rules — so each conversion is asserted by what a PLAYER can see
+   * afterwards, not just by the stored flag.
+   * ---------------------------------------------------------------- */
+
+  it("converts a pack into a shared container, stripping its owner", async () => {
+    const patched = await fixtureRepository.updateContainer(gm, {
+      id: KOVAS_PACK,
+      type: "party",
+      ownerId: null,
+    });
+    expect(patched.type).toBe("party");
+    expect(patched.ownerId).toBeNull();
+
+    // Milo could not see Kova's pack; he can see a shared container.
+    const forMilo = await fixtureRepository.listContainers(milo);
+    expect(forMilo.map((c) => c.id)).toContain(KOVAS_PACK);
+  });
+
+  it("converts a shared container into a pack, giving it an owner", async () => {
+    const patched = await fixtureRepository.updateContainer(gm, {
+      id: PARTY_WAGON,
+      type: "character",
+      ownerId: kova.userId,
+    });
+    expect(patched.type).toBe("character");
+    expect(patched.ownerId).toBe(kova.userId);
+
+    // Milo loses it; Kova keeps it.
+    const forMilo = await fixtureRepository.listContainers(milo);
+    expect(forMilo.map((c) => c.id)).not.toContain(PARTY_WAGON);
+    const forKova = await fixtureRepository.listContainers(kova);
+    expect(forKova.map((c) => c.id)).toContain(PARTY_WAGON);
+  });
+
+  it("refuses a pack with no owner", async () => {
+    await expect(
+      fixtureRepository.updateContainer(gm, {
+        id: PARTY_WAGON,
+        type: "character",
+      }),
+    ).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it("refuses a shared or world container that keeps an owner", async () => {
+    await expect(
+      fixtureRepository.updateContainer(gm, {
+        id: KOVAS_PACK,
+        type: "party",
+      }),
+    ).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  /**
+   * A world container is the only hidden kind. Converting away from it must
+   * force visibility, or the container would linger invisible to every player
+   * with no control left to bring it back.
+   */
+  it("forces visibility when converting away from world", async () => {
+    const patched = await fixtureRepository.updateContainer(gm, {
+      id: SUNKEN_VAULT,
+      type: "party",
+      ownerId: null,
+    });
+    expect(patched.revealed).toBe(true);
+
+    const forKova = await fixtureRepository.listContainers(kova);
+    expect(forKova.map((c) => c.id)).toContain(SUNKEN_VAULT);
+  });
+
+  it("reassigns a pack to another player", async () => {
+    await fixtureRepository.updateContainer(gm, {
+      id: KOVAS_PACK,
+      ownerId: milo.userId,
+    });
+
+    const forKova = await fixtureRepository.listContainers(kova);
+    expect(forKova.map((c) => c.id)).not.toContain(KOVAS_PACK);
+    const forMilo = await fixtureRepository.listContainers(milo);
+    expect(forMilo.map((c) => c.id)).toContain(KOVAS_PACK);
   });
 
   it("hides an unrevealed world container from a player", async () => {
@@ -107,7 +505,7 @@ describe("moveItem — the headline operation", () => {
 
     const outcome = await fixtureRepository.moveItem(kova, {
       itemId: lantern.id,
-      toContainerId: KOVAS_PACK as never,
+      toContainerId: KOVAS_PACK,
       qty: lantern.qty,
     });
 
@@ -126,7 +524,7 @@ describe("moveItem — the headline operation", () => {
 
     const outcome = await fixtureRepository.moveItem(kova, {
       itemId: potions.id,
-      toContainerId: KOVAS_PACK as never,
+      toContainerId: KOVAS_PACK,
       qty: 2,
     });
 
@@ -151,7 +549,7 @@ describe("moveItem — the headline operation", () => {
     await expect(
       fixtureRepository.moveItem(kova, {
         itemId: items[0]!.id,
-        toContainerId: PARTY_WAGON as never,
+        toContainerId: PARTY_WAGON,
         qty: 1,
       }),
     ).rejects.toBeInstanceOf(PermissionError);
@@ -162,7 +560,7 @@ describe("moveItem — the headline operation", () => {
     await expect(
       fixtureRepository.moveItem(kova, {
         itemId: items[0]!.id,
-        toContainerId: BARROW_CHEST as never,
+        toContainerId: BARROW_CHEST,
         qty: 1,
       }),
     ).rejects.toBeInstanceOf(PermissionError);
@@ -174,7 +572,7 @@ describe("moveItem — the headline operation", () => {
     await expect(
       fixtureRepository.moveItem(kova, {
         itemId: lantern.id,
-        toContainerId: KOVAS_PACK as never,
+        toContainerId: KOVAS_PACK,
         qty: lantern.qty + 5,
       }),
     ).rejects.toThrow(/Only/);
@@ -189,7 +587,7 @@ describe("derived values", () => {
 
     await fixtureRepository.moveItem(kova, {
       itemId: lantern.id,
-      toContainerId: KOVAS_PACK as never,
+      toContainerId: KOVAS_PACK,
       qty: 1,
     });
 

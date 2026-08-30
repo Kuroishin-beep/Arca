@@ -73,14 +73,19 @@ export const users = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     displayName: text("display_name").notNull(),
-    /** Discord's user id. The campaign already runs on Discord, so there is no
-     *  new account to create (SCOPE.md §4). */
-    discordId: text("discord_id"),
+    /**
+     * scrypt hash of this member's sign-in PIN — see `backend/lib/pin.ts`.
+     *
+     * Nullable because null is a meaningful state and not a missing value: it
+     * means "has not chosen a PIN yet", which is what puts a member into the
+     * first-run enrolment flow on the sign-in screen. Clearing this column back
+     * to null is also how the GM resets a forgotten PIN.
+     */
+    pinHash: text("pin_hash"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
-  (t) => [uniqueIndex("users_discord_id_key").on(t.discordId)],
 );
 
 export const campaignMembers = pgTable(
