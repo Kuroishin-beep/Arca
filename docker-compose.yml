@@ -1,0 +1,36 @@
+# Local Postgres for development.
+#
+# The app does not need this — with no DATABASE_URL it runs on in-memory
+# fixtures, which is how the UI gets built. This is for the other half: the
+# real object graph, the CHECK constraints, and the LISTEN/NOTIFY channel that
+# carries live sync (SCOPE.md M8). Those cannot be exercised against fixtures.
+#
+#   docker compose up -d
+#   npm run db:migrate && npm run db:seed
+#
+# Credentials are deliberately trivial. This container is bound to localhost
+# and holds nothing but seed data; a real deployment gets its URL from Vercel
+# or Neon, never from here.
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: arca-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: arca
+      POSTGRES_PASSWORD: arca
+      POSTGRES_DB: arca
+    ports:
+      - "5432:5432"
+    volumes:
+      - arca-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # `npm run db:migrate` immediately after `up -d` otherwise races the
+      # first-boot initdb, which fails in a way that reads like a bad password.
+      test: ["CMD-SHELL", "pg_isready -U arca -d arca"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  arca-pgdata:
