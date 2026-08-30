@@ -1,0 +1,339 @@
+@import "tailwindcss";
+
+/* Teach Tailwind's `dark:` variant the same two conditions the tokens below
+   use, so `dark:` utilities and the token swap can never disagree about what
+   "dark" means. Most components need neither — restyling happens through the
+   tokens — but the variant is here for the cases that genuinely differ, such as
+   an image that needs a different opacity on a dark ground. */
+@custom-variant dark {
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *) {
+      @slot;
+    }
+  }
+  &:where(:root[data-theme="dark"], :root[data-theme="dark"] *) {
+    @slot;
+  }
+}
+
+/* ============================================================================
+   Arca — design tokens
+   The canonical values, identical to `mockups/tokens.css`. Declared on :root as
+   ordinary custom properties so a theme swap is one block, then mapped into
+   Tailwind's theme below.
+
+   RULE: no gradients. Every fill in this system is a solid colour. Depth comes
+   from three flat surface levels plus a hairline border.
+   ============================================================================ */
+
+/* ----------------------------------------------------------------------------
+   LIGHT — the default. White surfaces, one blue.
+
+   The palette is deliberately small: white and near-white for every surface,
+   a single blue for anything interactive, and neutral slate for text. Depth is
+   carried by the surface ladder and a hairline border, never by a new hue.
+   ---------------------------------------------------------------------------- */
+
+:root {
+  color-scheme: light;
+
+  /* --- Colour: surfaces ------------------------------------------------- */
+  --color-bg: #ffffff;
+  --color-surface: #f8fafc;
+  --color-surface-2: #f1f5f9;
+  --color-surface-3: #e2e8f0;
+  --color-border: #e2e8f0;
+  --color-border-strong: #cbd5e1;
+
+  /* --- Colour: text ----------------------------------------------------- */
+  --color-text: #0f172a;        /* 17.9:1 on bg */
+  --color-text-muted: #475569;  /*  7.5:1 on bg */
+  --color-text-faint: #94a3b8;  /*  2.8:1 — DISABLED STATES ONLY, never body */
+  --color-text-invert: #ffffff;
+
+  /* --- Colour: brand ---------------------------------------------------- */
+  /* One blue, two weights plus a tint. `primary` is 5.2:1 on white, so it is
+     safe for text as well as for fills. */
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-primary-weak: #eff6ff;
+  --color-accent: #0284c7;
+  --color-accent-hover: #0369a1;
+  --color-accent-weak: #f0f9ff;
+
+  /* --- Colour: semantic ------------------------------------------------- */
+  /* These stay non-blue ON PURPOSE, and they are the only hues that are.
+     "Over capacity" (M10) and "Offline" (M13) are warnings — rendering them in
+     the same blue as everything else would make the app prettier and strictly
+     less informative. They are muted rather than removed. */
+  --color-success: #15803d;
+  --color-success-weak: #f0fdf4;
+  --color-warning: #b45309;
+  --color-warning-weak: #fffbeb;
+  --color-danger: #b91c1c;
+  --color-danger-weak: #fef2f2;
+  --color-info: #2563eb;
+  --color-info-weak: #eff6ff;
+
+  /* --- Colour: container semantics -------------------------------------- */
+  /* Three shades of the one blue rather than three separate hues. Type is
+     never signalled by colour alone — every use sits beside an icon and a text
+     label — so shade is enough to group at a glance. */
+  --color-container-character: #2563eb;
+  --color-container-party: #0284c7;
+  --color-container-world: #64748b;
+
+  /* A soft slate shadow, not black. On white, 55% black reads as a smudge
+     rather than as elevation. Still one flat shadow, never a colour ramp. */
+  --shadow-modal: 0 8px 24px rgb(15 23 42 / 0.12);
+
+  /* --- Layout ----------------------------------------------------------- */
+  --topbar-h: 48px;
+  --sidebar-w: 248px;
+  --detail-w: 320px;
+  --row-h: 36px;
+}
+
+/* ----------------------------------------------------------------------------
+   DARK
+
+   The same token names with different values — which is the whole reason the
+   `@theme inline` mapping below exists. Not one component knows a theme is in
+   play, and adding a third theme later would be another block of this shape.
+
+   Two selectors, and the order matters:
+
+     1. `prefers-color-scheme` — the DEFAULT, applied with no JavaScript at all.
+        Someone whose system is dark gets a dark first paint, because the rule
+        is in the stylesheet rather than applied by a script after hydration.
+        `:not([data-theme="light"])` lets an explicit light choice win over the
+        system preference.
+     2. `[data-theme="dark"]` — an explicit choice from the toggle, which must
+        be able to override the operating system or the button is a lie.
+
+   Doing the default in CSS is what removes the need for a blocking inline
+   script in the document head. The only case that can still flash is a viewer
+   whose saved choice contradicts their system setting, and that costs one
+   frame on first load, not a white page.
+   ---------------------------------------------------------------------------- */
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --color-bg: #0b1220;
+    --color-surface: #111a2b;
+    --color-surface-2: #1a2436;
+    --color-surface-3: #243047;
+    --color-border: #1f2a3d;
+    --color-border-strong: #334155;
+
+    --color-text: #e8eef8;
+    --color-text-muted: #9fb0c9;
+    --color-text-faint: #64748b;
+    --color-text-invert: #0b1220;
+
+    --color-primary: #60a5fa;
+    --color-primary-hover: #93c5fd;
+    --color-primary-weak: #16273f;
+    --color-accent: #38bdf8;
+    --color-accent-hover: #7dd3fc;
+    --color-accent-weak: #0c2a3d;
+
+    --color-success: #4ade80;
+    --color-success-weak: #0f2a1b;
+    --color-warning: #fbbf24;
+    --color-warning-weak: #2e2410;
+    --color-danger: #f87171;
+    --color-danger-weak: #2e1616;
+    --color-info: #60a5fa;
+    --color-info-weak: #16273f;
+
+    --color-container-character: #60a5fa;
+    --color-container-party: #38bdf8;
+    --color-container-world: #94a3b8;
+
+    /* Depth on a dark ground needs real black to register. */
+    --shadow-modal: 0 8px 24px rgb(0 0 0 / 0.55);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --color-bg: #0b1220;
+  --color-surface: #111a2b;
+  --color-surface-2: #1a2436;
+  --color-surface-3: #243047;
+  --color-border: #1f2a3d;
+  --color-border-strong: #334155;
+
+  --color-text: #e8eef8;        /* 15.2:1 on bg */
+  --color-text-muted: #9fb0c9;  /*  7.2:1 on bg */
+  --color-text-faint: #64748b;  /*  DISABLED STATES ONLY */
+  --color-text-invert: #0b1220;
+
+  /* Lifted: #2563eb on a dark ground is too low-contrast to read as the
+     interactive colour, so dark mode uses a lighter step of the same blue. */
+  --color-primary: #60a5fa;
+  --color-primary-hover: #93c5fd;
+  --color-primary-weak: #16273f;
+  --color-accent: #38bdf8;
+  --color-accent-hover: #7dd3fc;
+  --color-accent-weak: #0c2a3d;
+
+  --color-success: #4ade80;
+  --color-success-weak: #0f2a1b;
+  --color-warning: #fbbf24;
+  --color-warning-weak: #2e2410;
+  --color-danger: #f87171;
+  --color-danger-weak: #2e1616;
+  --color-info: #60a5fa;
+  --color-info-weak: #16273f;
+
+  --color-container-character: #60a5fa;
+  --color-container-party: #38bdf8;
+  --color-container-world: #94a3b8;
+
+  --shadow-modal: 0 8px 24px rgb(0 0 0 / 0.55);
+}
+
+/* ============================================================================
+   Tailwind theme. `inline` means the generated utilities reference the custom
+   property rather than copying its value, so overriding a token at runtime
+   restyles the app without a rebuild.
+   Utility names here match the class names used in `mockups/` exactly, so
+   mockup markup ports across unchanged.
+   ============================================================================ */
+
+@theme inline {
+  --color-bg: var(--color-bg);
+  --color-surface: var(--color-surface);
+  --color-surface2: var(--color-surface-2);
+  --color-surface3: var(--color-surface-3);
+  --color-border: var(--color-border);
+  --color-border-strong: var(--color-border-strong);
+
+  --color-text: var(--color-text);
+  --color-muted: var(--color-text-muted);
+  --color-faint: var(--color-text-faint);
+  --color-invert: var(--color-text-invert);
+
+  --color-primary: var(--color-primary);
+  --color-primary-hover: var(--color-primary-hover);
+  --color-primary-weak: var(--color-primary-weak);
+  --color-accent: var(--color-accent);
+  --color-accent-hover: var(--color-accent-hover);
+  --color-accent-weak: var(--color-accent-weak);
+
+  --color-success: var(--color-success);
+  --color-success-weak: var(--color-success-weak);
+  --color-warning: var(--color-warning);
+  --color-warning-weak: var(--color-warning-weak);
+  --color-danger: var(--color-danger);
+  --color-danger-weak: var(--color-danger-weak);
+  --color-info: var(--color-info);
+  --color-info-weak: var(--color-info-weak);
+
+  --color-c-character: var(--color-container-character);
+  --color-c-party: var(--color-container-party);
+  --color-c-world: var(--color-container-world);
+
+  /* Inline too, so the modal's elevation follows the theme like everything
+     else rather than being baked in at build time. */
+  --shadow-modal: var(--shadow-modal);
+}
+
+@theme {
+  /* --- Type ------------------------------------------------------------- */
+  /* No web font: a font request inside TaleSpire's embedded browser is a
+     visible flash every time the panel opens. */
+  --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+  --font-serif: ui-serif, "Iowan Old Style", Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas,
+    monospace;
+
+  /* 14px body, not 16px: the panel is ~380px wide and the primary content is a
+     dense table. 14/20 fits name + qty + weight without truncation. */
+  --text-xs: 11px;
+  --text-xs--line-height: 16px;
+  --text-sm: 12px;
+  --text-sm--line-height: 18px;
+  --text-base: 14px;
+  --text-base--line-height: 20px;
+  --text-lg: 16px;
+  --text-lg--line-height: 24px;
+  --text-xl: 20px;
+  --text-xl--line-height: 28px;
+  --text-2xl: 28px;
+  --text-2xl--line-height: 34px;
+
+  /* --- Spacing: 4px base ------------------------------------------------ */
+  /* 4px rather than 8px so a 36px row and a 48px bar are both on-grid. An 8px
+     grid forces 40px rows and costs ~2 visible items in a docked panel. */
+  --spacing: 4px;
+  --spacing-5: 24px;
+  --spacing-6: 32px;
+  --spacing-8: 48px;
+
+  /* --- Radius: small. Arca is a strongbox, not a consumer app. ----------- */
+  --radius-sm: 3px;
+  --radius-md: 5px;
+  --radius-lg: 8px;
+
+  /* --- Breakpoints ------------------------------------------------------ */
+  /* `panel` is TaleSpire's docked Symbiote width — the PRIMARY target, which is
+     why the layout is authored here first and widened up. */
+  --breakpoint-panel: 380px;
+}
+
+/* ============================================================================
+   Base
+   ============================================================================ */
+
+@layer base {
+  html,
+  body {
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: 20px;
+    -webkit-font-smoothing: antialiased;
+    /* Hard requirement: never scroll sideways at 375px. */
+    overflow-x: hidden;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-serif);
+    font-weight: 700;
+  }
+
+  /* One focus treatment, defined once, never removed. */
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  /* Scrollbars, so panels do not look like a different app. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--color-bg);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-surface-3);
+    border-radius: 999px;
+    border: 2px solid var(--color-bg);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-border-strong);
+  }
+}

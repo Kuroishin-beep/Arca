@@ -18,3 +18,9 @@ drizzle/meta/_journal.lock
 
 # typescript build info
 *.tsbuildinfo
+
+# playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
