@@ -30,7 +30,9 @@ export type IconName =
   | "alert"
   | "info"
   | "trash"
-  | "discord";
+  | "discord"
+  | "sun"
+  | "moon";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   chest: (
@@ -61,6 +63,21 @@ const PATHS: Record<IconName, React.ReactNode> = {
     </>
   ),
   menu: <path d="M2 4h12M2 8h12M2 12h12" strokeLinecap="round" />,
+  sun: (
+    <>
+      <circle cx="8" cy="8" r="3" />
+      <path
+        d="M8 1v1.5M8 13.5V15M15 8h-1.5M2.5 8H1M12.95 3.05l-1.06 1.06M4.11 11.89l-1.06 1.06M12.95 12.95l-1.06-1.06M4.11 4.11 3.05 3.05"
+        strokeLinecap="round"
+      />
+    </>
+  ),
+  moon: (
+    <path
+      d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7Z"
+      strokeLinejoin="round"
+    />
+  ),
   search: (
     <>
       <circle cx="7" cy="7" r="4.5" />

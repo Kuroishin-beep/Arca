@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Icon } from "@frontend/components/atoms/Icon";
+import { ThemeToggle } from "@frontend/components/atoms/ThemeToggle";
 import { UserBadge } from "@frontend/components/atoms/Status";
 import { RealtimeSync } from "@frontend/components/organisms/RealtimeSync";
 import { signOutAction } from "@backend/actions/session";
@@ -77,6 +78,8 @@ export function TopBar({
           channel and reports what it actually knows, rather than the hardcoded
           "Synced" that stood in before the channel existed. */}
       <RealtimeSync userId={principal.userId} className="hidden sm:flex" />
+
+      <ThemeToggle />
 
       <form action={signOutAction} className="contents">
         <button

@@ -7,6 +7,7 @@ import {
 } from "@backend/actions/session";
 import { Avatar } from "@frontend/components/atoms/Status";
 import { Icon } from "@frontend/components/atoms/Icon";
+import { ThemeToggle } from "@frontend/components/atoms/ThemeToggle";
 import { repository, repositoryKind } from "@backend/db";
 import { authConfigured } from "@backend/lib/auth";
 import { currentSession } from "@backend/lib/session";
@@ -41,7 +42,13 @@ export default async function SignInPage({
   const members = discord ? [] : await repository().listMembers();
 
   return (
-    <main className="flex min-h-full items-center justify-center p-4">
+    <main className="relative flex min-h-full items-center justify-center p-4">
+      {/* Reachable before sign-in: someone who needs a dark panel needs it on
+          the first screen, not only once they are inside. */}
+      <div className="absolute right-4 top-4">
+        <ThemeToggle />
+      </div>
+
       <div className="w-full max-w-sm">
         <div className="text-center">
           <Icon
