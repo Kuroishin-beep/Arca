@@ -29,6 +29,7 @@ import {
 } from "@backend/domain/view";
 import { campaignId } from "@backend/lib/campaign";
 import {
+  assertCanManageContainers,
   assertCanMove,
   assertCanRead,
   assertCanWrite,
@@ -330,6 +331,63 @@ export const postgresRepository: ArcaRepository = {
     if (!found) return null;
     assertCanRead(principal, found);
     return found;
+  },
+
+  async createContainer(principal, input) {
+    assertCanManageContainers(principal);
+
+    // Object first, then the container facet: a container IS an object
+    // (SCOPE.md §5.2), and the FK runs container.object_id -> objects.id.
+    // One transaction, because an object with no container row is a ghost that
+    // every query joins away and nothing can ever reach.
+    const objectId = await db().transaction(async (tx) => {
+      const inserted = await tx
+        .insert(objects)
+        .values({ campaignId: campaignId() })
+        .returning({ id: objects.id });
+
+      const created = inserted[0];
+      if (!created) throw new Error("Insert returned no row.");
+
+      await tx.insert(containers).values({
+        objectId: created.id,
+        name: input.name,
+        type: input.type,
+        ownerId: input.ownerId,
+        // A character or party container is never hidden; only a world
+        // container has anything to reveal.
+        revealed: input.type === "world" ? input.revealed : true,
+      });
+
+      return created.id;
+    });
+
+    if (input.capacity !== null) {
+      // Capacity is a property on the object, the same machinery an item's
+      // weight uses — not a column, because most containers do not have one.
+      await setProperties(objectId, { capacity: input.capacity });
+    }
+
+    return requireContainer(objectId);
+  },
+
+  async archiveContainer(principal, containerId) {
+    assertCanManageContainers(principal);
+    await requireContainer(containerId);
+
+    const held = await itemsIn(containerId);
+    if (held.length > 0) {
+      throw new ConflictError(
+        `That container still holds ${held.length} ${
+          held.length === 1 ? "item" : "items"
+        }. Move them somewhere else first.`,
+      );
+    }
+
+    await db()
+      .update(objects)
+      .set({ archivedAt: new Date(), updatedAt: new Date() })
+      .where(eq(objects.id, containerId));
   },
 
   async listItems(principal, containerId) {

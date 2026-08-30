@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { ButtonLink } from "@frontend/components/atoms/Button";
 import { Chip, ContainerBadge, ContainerDot } from "@frontend/components/atoms/Chip";
 import { Icon } from "@frontend/components/atoms/Icon";
+import { ContainerEditorDialog } from "@frontend/components/organisms/ContainerEditorDialog";
 import { DetailPanel } from "@frontend/components/organisms/DetailPanel";
 import {
   OptimisticItemsProvider,
@@ -145,6 +146,17 @@ export default async function WorkspacePage({
 
   const drawerOpen = sp.nav === "1";
 
+  // GM-only, and the Sidebar renders it only for a GM — but the action checks
+  // the principal again server-side, because a link is not a permission.
+  const newContainerHref = `/c/${containerId}?dialog=new-container`;
+  // Only fetched when the dialog is actually open: the owner picker is the one
+  // place the roster is needed, and a GM opening a container list should not
+  // cost a members query every time.
+  const members =
+    sp.dialog === "new-container" && principal.role === "gm"
+      ? await repo.listMembers()
+      : [];
+
   return (
     // The provider spans the table, the footer meter and the dialogs, because
     // a move begun in a dialog has to be reflected in the other two before the
@@ -168,6 +180,7 @@ export default async function WorkspacePage({
             containers={containers}
             principal={principal}
             selectedId={containerId}
+            newContainerHref={newContainerHref}
           />
         </nav>
 
@@ -358,6 +371,13 @@ export default async function WorkspacePage({
 
       {sp.dialog === "add" && editable ? (
         <ItemEditorDialog container={container} closeHref={closeHref} />
+      ) : null}
+
+      {sp.dialog === "new-container" && principal.role === "gm" ? (
+        <ContainerEditorDialog
+          members={members}
+          closeHref={`/c/${containerId}`}
+        />
       ) : null}
 
       {sp.dialog === "edit" && selected && editable ? (

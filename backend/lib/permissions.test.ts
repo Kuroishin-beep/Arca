@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { fixtureRepository, resetFixtureStore } from "@backend/db/fixture-repository";
+import { ConflictError } from "@backend/db/repository";
 import { GM_ID, KOVA_ID, MILO_ID, SEED_CONTAINERS } from "@backend/db/seed-data";
 import type { Principal } from "@backend/domain/view";
 import { PermissionError } from "@backend/lib/permissions";
@@ -70,6 +71,68 @@ describe("reads", () => {
     await expect(
       fixtureRepository.getContainer(milo, KOVAS_PACK),
     ).rejects.toBeInstanceOf(PermissionError);
+  });
+
+  /**
+   * Creating containers is GM-only (SCOPE.md §3), and deliberately not implied
+   * by write access. Kova can write to the party wagon all day; that must not
+   * let her conjure a second one.
+   */
+  it("refuses a player who tries to create a container", async () => {
+    await expect(
+      fixtureRepository.createContainer(kova, {
+        name: "Kova's secret stash",
+        type: "party",
+        ownerId: null,
+        capacity: null,
+        revealed: false,
+      }),
+    ).rejects.toBeInstanceOf(PermissionError);
+  });
+
+  it("lets the GM create one, and it appears in the list", async () => {
+    const created = await fixtureRepository.createContainer(gm, {
+      name: "The Drowned Cellar",
+      type: "world",
+      ownerId: null,
+      capacity: null,
+      revealed: false,
+    });
+    const forGm = await fixtureRepository.listContainers(gm);
+    expect(forGm.map((c) => c.id)).toContain(created.id);
+
+    // Unrevealed, so it must not reach a player at all.
+    const forKova = await fixtureRepository.listContainers(kova);
+    expect(forKova.map((c) => c.id)).not.toContain(created.id);
+  });
+
+  it("refuses a player who tries to retire a container", async () => {
+    await expect(
+      fixtureRepository.archiveContainer(kova, KOVAS_PACK),
+    ).rejects.toBeInstanceOf(PermissionError);
+  });
+
+  /**
+   * The guard that matters: hiding a container that still holds items would
+   * leave them belonging somewhere and appearing nowhere.
+   */
+  it("refuses to retire a container that still holds items", async () => {
+    await expect(
+      fixtureRepository.archiveContainer(gm, KOVAS_PACK),
+    ).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it("retires an empty container", async () => {
+    const empty = await fixtureRepository.createContainer(gm, {
+      name: "Empty crate",
+      type: "world",
+      ownerId: null,
+      capacity: null,
+      revealed: true,
+    });
+    await fixtureRepository.archiveContainer(gm, empty.id);
+    const after = await fixtureRepository.listContainers(gm);
+    expect(after.map((c) => c.id)).not.toContain(empty.id);
   });
 
   it("hides an unrevealed world container from a player", async () => {

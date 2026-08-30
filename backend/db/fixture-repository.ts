@@ -23,6 +23,7 @@ import {
   carriedWeight,
 } from "@backend/domain/view";
 import {
+  assertCanManageContainers,
   assertCanMove,
   assertCanRead,
   assertCanWrite,
@@ -161,6 +162,42 @@ export const fixtureRepository: ArcaRepository = {
     const container = hydrate(raw);
     assertCanRead(principal, container);
     return container;
+  },
+
+  async createContainer(principal, input) {
+    assertCanManageContainers(principal);
+
+    const container = {
+      id: randomUUID() as ContainerView["id"],
+      name: input.name,
+      type: input.type,
+      ownerId: input.ownerId,
+      // Only a world container has anything to reveal.
+      revealed: input.type === "world" ? input.revealed : true,
+      capacity: input.capacity,
+    };
+    store().containers.push(container);
+    return hydrate(container);
+  },
+
+  async archiveContainer(principal, containerId) {
+    assertCanManageContainers(principal);
+    findContainer(containerId);
+
+    // Same refusal as the Postgres backend: hiding a container that still
+    // holds items would leave them belonging somewhere and appearing nowhere.
+    const held = liveItemsIn(containerId);
+    if (held.length > 0) {
+      throw new ConflictError(
+        `That container still holds ${held.length} ${
+          held.length === 1 ? "item" : "items"
+        }. Move them somewhere else first.`,
+      );
+    }
+
+    const all = store().containers;
+    const at = all.findIndex((c) => c.id === containerId);
+    if (at >= 0) all.splice(at, 1);
   },
 
   async listItems(principal, containerId) {

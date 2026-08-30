@@ -152,6 +152,48 @@ export const UpdateItemInput = ItemFields.omit({ containerId: true })
 export type UpdateItemInput = z.infer<typeof UpdateItemInput>;
 
 /**
+ * Creating a container — SCOPE.md §3, GM only.
+ *
+ * The ownership invariant is enforced here rather than only at the database's
+ * CHECK constraint, so the form can render the problem against the right field
+ * instead of surfacing a constraint violation. Both still run: this is the
+ * message, the constraint is the guarantee.
+ */
+export const CreateContainerInput = z
+  .object({
+    name: z.string().trim().min(1, "A name is required.").max(120),
+    type: ContainerType,
+    /** Required for a character container, forbidden for the others. */
+    ownerId: UserId.nullable().default(null),
+    /** `null` means no limit — a wagon is not encumbered, a person is. */
+    capacity: z
+      .number()
+      .positive("Capacity must be more than zero.")
+      .nullable()
+      .default(null),
+    /** World containers start hidden: the GM reveals a chest when the party
+     *  finds it, which is the entire point of the flag. */
+    revealed: z.boolean().default(false),
+  })
+  .superRefine((container, ctx) => {
+    if (container.type === "character" && container.ownerId === null) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["ownerId"],
+        message: "A character container needs an owner.",
+      });
+    }
+    if (container.type !== "character" && container.ownerId !== null) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["ownerId"],
+        message: "Only a character container has an owner.",
+      });
+    }
+  });
+export type CreateContainerInput = z.infer<typeof CreateContainerInput>;
+
+/**
  * Posting to a container's thread (M12).
  *
  * `parentId` is nullable and one level deep only — a reply names a top-level

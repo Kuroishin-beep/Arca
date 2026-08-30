@@ -1,7 +1,14 @@
+import Link from "next/link";
+
 import { ContainerRow } from "@frontend/components/molecules/ContainerRow";
+import { Icon } from "@frontend/components/atoms/Icon";
 import type { ContainerType } from "@backend/domain/types";
 import type { ContainerView, Principal } from "@backend/domain/view";
-import { canRead, writeDeniedReason } from "@backend/lib/permissions";
+import {
+  canManageContainers,
+  canRead,
+  writeDeniedReason,
+} from "@backend/lib/permissions";
 
 /**
  * The container list.
@@ -25,11 +32,15 @@ export function Sidebar({
   /** Containers the principal may not READ at all, shown as locked rows so the
    *  list does not silently change shape between GM and player. */
   lockedContainers = [],
+  /** Where the "New container" link points. Absent on screens with no
+   *  container context to return to. */
+  newContainerHref,
 }: {
   containers: ContainerView[];
   principal: Principal;
   selectedId?: string;
   lockedContainers?: ContainerView[];
+  newContainerHref?: string;
 }) {
   return (
     <>
@@ -73,6 +84,22 @@ export function Sidebar({
           </div>
         );
       })}
+
+      {/* GM only, and last: creating a container is a rare, deliberate act, so
+          it sits below the list rather than competing with it. Rendered from
+          the same predicate the server enforces — a player never receives this
+          markup at all. */}
+      {canManageContainers(principal) && newContainerHref ? (
+        <div className="px-3 pb-4 pt-3">
+          <Link
+            href={newContainerHref}
+            className="flex h-9 w-full items-center justify-center gap-2 rounded-md border border-dashed border-border-strong text-sm font-medium text-muted hover:border-primary hover:text-primary"
+          >
+            <Icon name="plus" size={13} />
+            New container
+          </Link>
+        </div>
+      ) : null}
     </>
   );
 }

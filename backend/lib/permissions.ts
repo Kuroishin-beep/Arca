@@ -121,6 +121,25 @@ export function assertCanMove(
   assertCanWrite(principal, to);
 }
 
+/**
+ * Who may bring a container into existence, or retire one — SCOPE.md §3.
+ *
+ * GM only, and deliberately a separate predicate from `canWrite`. Writing to a
+ * container is about its CONTENTS; this is about the shape of the campaign
+ * itself. A player may write freely to the party wagon without that implying
+ * they can conjure a second wagon, and folding the two together is how the
+ * looser rule quietly grants the stricter one.
+ */
+export function canManageContainers(principal: Principal): boolean {
+  return principal.role === "gm";
+}
+
+export function assertCanManageContainers(principal: Principal): void {
+  if (!canManageContainers(principal)) {
+    throw new PermissionError("Only the GM can add or retire containers.");
+  }
+}
+
 /** The containers this principal may see, in sidebar order. */
 export function visibleContainers(
   principal: Principal,
