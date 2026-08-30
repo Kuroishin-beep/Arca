@@ -26,6 +26,7 @@ import {
   type Principal,
   type UpdateItemInput,
   carriedWeight,
+  ownershipProblem,
 } from "@backend/domain/view";
 import { campaignId } from "@backend/lib/campaign";
 import {
@@ -375,12 +376,32 @@ export const postgresRepository: ArcaRepository = {
     assertCanManageContainers(principal);
     const existing = await requireContainer(input.id);
 
-    const fields: { name?: string; revealed?: boolean } = {};
+    // The merged result, not the patch. A patch carrying only `type` is legal
+    // or illegal depending on the owner already stored, so the invariant can
+    // only be judged here — the one place that knows both.
+    const type = input.type ?? existing.type;
+    const ownerId =
+      input.ownerId !== undefined ? input.ownerId : existing.ownerId;
+
+    const problem = ownershipProblem(type, ownerId);
+    if (problem) throw new ConflictError(problem);
+
+    const fields: {
+      name?: string;
+      type?: ContainerView["type"];
+      ownerId?: string | null;
+      revealed?: boolean;
+    } = {};
     if (input.name !== undefined) fields.name = input.name;
-    // Only a world container is ever hidden, so a reveal on the other two is
-    // silently a no-op rather than an error — the caller asked for a state it
-    // is already in.
-    if (input.revealed !== undefined && existing.type === "world") {
+    if (input.type !== undefined) fields.type = type;
+    if (input.ownerId !== undefined) fields.ownerId = ownerId;
+
+    // Only a world container is ever hidden. Converting away from world must
+    // force it visible, or a former world container would linger invisible to
+    // every player with no control left to fix it.
+    if (type !== "world") {
+      fields.revealed = true;
+    } else if (input.revealed !== undefined) {
       fields.revealed = input.revealed;
     }
 

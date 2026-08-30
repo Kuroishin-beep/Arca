@@ -152,6 +152,31 @@ export const UpdateItemInput = ItemFields.omit({ containerId: true })
 export type UpdateItemInput = z.infer<typeof UpdateItemInput>;
 
 /**
+ * The ownership invariant, in one place — SCOPE.md §3.
+ *
+ * A character container has exactly one owner; a party or world container has
+ * none. Declared as a function rather than inlined into a refinement because
+ * BOTH create and update must enforce it, and update has to check the state a
+ * patch would PRODUCE rather than the fields it happens to carry. Two copies of
+ * this rule is how a container ends up in a shape the database then rejects
+ * with a constraint violation nobody can read.
+ *
+ * Returns the message, or `null` when the pair is legal.
+ */
+export function ownershipProblem(
+  type: ContainerType,
+  ownerId: string | null,
+): string | null {
+  if (type === "character" && ownerId === null) {
+    return "A character container needs an owner.";
+  }
+  if (type !== "character" && ownerId !== null) {
+    return "Only a character container has an owner.";
+  }
+  return null;
+}
+
+/**
  * Creating a container — SCOPE.md §3, GM only.
  *
  * The ownership invariant is enforced here rather than only at the database's
@@ -176,19 +201,9 @@ export const CreateContainerInput = z
     revealed: z.boolean().default(false),
   })
   .superRefine((container, ctx) => {
-    if (container.type === "character" && container.ownerId === null) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["ownerId"],
-        message: "A character container needs an owner.",
-      });
-    }
-    if (container.type !== "character" && container.ownerId !== null) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["ownerId"],
-        message: "Only a character container has an owner.",
-      });
+    const problem = ownershipProblem(container.type, container.ownerId);
+    if (problem) {
+      ctx.addIssue({ code: "custom", path: ["ownerId"], message: problem });
     }
   });
 export type CreateContainerInput = z.infer<typeof CreateContainerInput>;
@@ -206,15 +221,23 @@ export type CreateContainerInput = z.infer<typeof CreateContainerInput>;
  * one. Collapsing null and undefined is how "no limit" silently becomes "do
  * not touch".
  *
- * `type` and `ownerId` are deliberately NOT editable. Retyping a character
- * container into a world one would have to strip its owner to satisfy the
- * ownership invariant, which is a different operation wearing an edit's
- * clothing — and it changes who can see the contents. Retire it and make the
- * one you meant.
+ * `type` and `ownerId` ARE editable, and they are the dangerous pair. The
+ * ownership invariant cannot be checked field-by-field here, because a patch
+ * carrying only `type` is legal or illegal depending on the owner already
+ * stored. So the schema validates shapes and the REPOSITORY validates the
+ * merged result with `ownershipProblem` — the only place that knows both the
+ * patch and the current row.
+ *
+ * Changing the kind also changes who can see the contents: a pack becomes a
+ * world container and its former owner loses it; a world container becomes a
+ * pack and one player gains everything inside. That is the GM's call, but the
+ * dialog says so before saving rather than after.
  */
 export const UpdateContainerInput = z.object({
   id: ContainerId,
   name: z.string().trim().min(1, "A name is required.").max(120).optional(),
+  type: ContainerType.optional(),
+  ownerId: UserId.nullable().optional(),
   capacity: z
     .number()
     .positive("Capacity must be more than zero.")

@@ -236,6 +236,90 @@ describe("reads", () => {
     expect(forKova.map((c) => c.id)).toContain(KOVAS_PACK);
   });
 
+  /* ---------------------------------------------------------------- *
+   * Changing kind and owner. The ownership invariant has to hold across
+   * the change, and the change moves the container between permission
+   * rules — so each conversion is asserted by what a PLAYER can see
+   * afterwards, not just by the stored flag.
+   * ---------------------------------------------------------------- */
+
+  it("converts a pack into a shared container, stripping its owner", async () => {
+    const patched = await fixtureRepository.updateContainer(gm, {
+      id: KOVAS_PACK,
+      type: "party",
+      ownerId: null,
+    });
+    expect(patched.type).toBe("party");
+    expect(patched.ownerId).toBeNull();
+
+    // Milo could not see Kova's pack; he can see a shared container.
+    const forMilo = await fixtureRepository.listContainers(milo);
+    expect(forMilo.map((c) => c.id)).toContain(KOVAS_PACK);
+  });
+
+  it("converts a shared container into a pack, giving it an owner", async () => {
+    const patched = await fixtureRepository.updateContainer(gm, {
+      id: PARTY_WAGON,
+      type: "character",
+      ownerId: kova.userId,
+    });
+    expect(patched.type).toBe("character");
+    expect(patched.ownerId).toBe(kova.userId);
+
+    // Milo loses it; Kova keeps it.
+    const forMilo = await fixtureRepository.listContainers(milo);
+    expect(forMilo.map((c) => c.id)).not.toContain(PARTY_WAGON);
+    const forKova = await fixtureRepository.listContainers(kova);
+    expect(forKova.map((c) => c.id)).toContain(PARTY_WAGON);
+  });
+
+  it("refuses a pack with no owner", async () => {
+    await expect(
+      fixtureRepository.updateContainer(gm, {
+        id: PARTY_WAGON,
+        type: "character",
+      }),
+    ).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it("refuses a shared or world container that keeps an owner", async () => {
+    await expect(
+      fixtureRepository.updateContainer(gm, {
+        id: KOVAS_PACK,
+        type: "party",
+      }),
+    ).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  /**
+   * A world container is the only hidden kind. Converting away from it must
+   * force visibility, or the container would linger invisible to every player
+   * with no control left to bring it back.
+   */
+  it("forces visibility when converting away from world", async () => {
+    const patched = await fixtureRepository.updateContainer(gm, {
+      id: SUNKEN_VAULT,
+      type: "party",
+      ownerId: null,
+    });
+    expect(patched.revealed).toBe(true);
+
+    const forKova = await fixtureRepository.listContainers(kova);
+    expect(forKova.map((c) => c.id)).toContain(SUNKEN_VAULT);
+  });
+
+  it("reassigns a pack to another player", async () => {
+    await fixtureRepository.updateContainer(gm, {
+      id: KOVAS_PACK,
+      ownerId: milo.userId,
+    });
+
+    const forKova = await fixtureRepository.listContainers(kova);
+    expect(forKova.map((c) => c.id)).not.toContain(KOVAS_PACK);
+    const forMilo = await fixtureRepository.listContainers(milo);
+    expect(forMilo.map((c) => c.id)).toContain(KOVAS_PACK);
+  });
+
   it("hides an unrevealed world container from a player", async () => {
     const containers = await fixtureRepository.listContainers(kova);
     expect(containers.map((c) => c.id)).not.toContain(SUNKEN_VAULT);

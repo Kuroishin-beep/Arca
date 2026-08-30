@@ -11,6 +11,7 @@ import { Button } from "@frontend/components/atoms/Button";
 import { FieldShell, TextField } from "@frontend/components/atoms/Field";
 import { Icon } from "@frontend/components/atoms/Icon";
 import { Modal } from "@frontend/components/molecules/Modal";
+import { RetireContainerButton } from "@frontend/components/organisms/RetireContainerButton";
 import type { ContainerType } from "@backend/domain/types";
 import type { ContainerView, Principal } from "@backend/domain/view";
 
@@ -23,6 +24,28 @@ import type { ContainerView, Principal } from "@backend/domain/view";
  * takes one — and the same zod schema still rejects the combination on the
  * server, because a hidden field is a courtesy and not an enforcement.
  */
+/**
+ * What changing the kind will actually do to who can see this.
+ *
+ * Named consequences, not a generic "are you sure": the GM needs to know that a
+ * pack becoming a world container drops out of its owner's sidebar, because
+ * that is the part they cannot see happening from this screen.
+ */
+function kindChangeWarning(from: ContainerType, to: ContainerType): string {
+  if (from === "character") {
+    return to === "party"
+      ? "This pack becomes a shared container. Its owner loses exclusive access and everyone at the table can edit it."
+      : "This pack becomes a world container. Its owner loses it, and no player will see it again until you reveal it.";
+  }
+  if (to === "character") {
+    return "This becomes one player's pack. Only they and you will see it, and everyone else loses access to what is inside.";
+  }
+  if (to === "world") {
+    return "This becomes a world container. Players can no longer edit it, and it stays hidden until you reveal it.";
+  }
+  return "This becomes a shared container. Every player at the table will be able to read and edit it.";
+}
+
 const TYPES: { value: ContainerType; label: string; hint: string }[] = [
   { value: "character", label: "Pack", hint: "One player's own. Only they and the GM may change it." },
   { value: "party", label: "Shared", hint: "Everyone at the table can read and edit it." },
@@ -33,16 +56,40 @@ export function ContainerEditorDialog({
   members,
   container,
   closeHref,
+  retireFallbackHref,
 }: {
   /** For the owner picker on a character container. */
   members: Principal[];
-  /** Absent when creating. Kind and owner are fixed once a container exists —
-   *  see the note on UpdateContainerInput. */
+  /** Absent when creating. */
   container?: ContainerView;
   closeHref: string;
+  /** Where to land after retiring. Absent hides the retire control — there is
+   *  nowhere safe to send the GM afterwards. */
+  retireFallbackHref?: string;
 }) {
   const editing = container !== undefined;
   const [type, setType] = useState<ContainerType>(container?.type ?? "world");
+
+  /**
+   * Visibility is controlled state, not a `defaultChecked`, because it has to
+   * react to the kind changing.
+   *
+   * A pack is stored as `revealed: true` — it is never hidden — so converting
+   * one to a world container would otherwise start with the box ticked and
+   * publish it the moment it was saved, directly contradicting the warning
+   * shown above it. Becoming a world container means becoming hidden, which is
+   * the safe default and the one the GM is being told to expect.
+   */
+  const [revealed, setRevealed] = useState(
+    container?.type === "world" ? container.revealed : false,
+  );
+
+  const pickType = (next: ContainerType) => {
+    setType(next);
+    if (next === "world") {
+      setRevealed(container?.type === "world" ? container.revealed : false);
+    }
+  };
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -134,22 +181,17 @@ export function ContainerEditorDialog({
             error={fieldErrors.name}
           />
 
-          {editing ? (
-            /* Kind and owner are fixed. Retyping a container would have to
-               strip or invent an owner to keep the ownership invariant, and it
-               changes who can see the contents — that is a different operation
-               wearing an edit's clothing. Shown, not offered. */
-            <FieldShell id="kind-fixed" label="Kind">
-              <p className="rounded-md border border-border bg-surface2 px-2 py-2 text-base text-muted">
-                {TYPES.find((t) => t.value === container.type)?.label ??
-                  container.type}
-                <span className="block text-sm text-faint">
-                  Set when the container was made. Retire it and make a new one
-                  to change this.
-                </span>
-              </p>
-            </FieldShell>
-          ) : (
+          {/* Changing the kind moves the container between permission rules,
+              so the consequence is stated BEFORE saving rather than discovered
+              after — a pack turned world container disappears from its former
+              owner's sidebar. */}
+          {editing && type !== container.type ? (
+            <p className="flex items-start gap-2 rounded-md border border-warning bg-warning-weak p-3 text-base text-text">
+              <Icon name="alert" size={14} className="mt-0.5 shrink-0 text-warning" />
+              <span>{kindChangeWarning(container.type, type)}</span>
+            </p>
+          ) : null}
+
           <FieldShell id="type" label="Kind" required>
             <div className="flex flex-col gap-1">
               {TYPES.map((option) => (
@@ -166,7 +208,7 @@ export function ContainerEditorDialog({
                     name="type"
                     value={option.value}
                     checked={type === option.value}
-                    onChange={() => setType(option.value)}
+                    onChange={() => pickType(option.value)}
                     className="mt-0.5"
                   />
                   <span className="min-w-0">
@@ -181,9 +223,8 @@ export function ContainerEditorDialog({
               ))}
             </div>
           </FieldShell>
-          )}
 
-          {!editing && type === "character" ? (
+          {type === "character" ? (
             <FieldShell
               id="ownerId"
               label="Belongs to"
@@ -193,7 +234,7 @@ export function ContainerEditorDialog({
               <select
                 id="ownerId"
                 name="ownerId"
-                defaultValue=""
+                defaultValue={container?.ownerId ?? ""}
                 className="h-9 w-full rounded-md border border-border bg-surface2 px-2 text-base text-text"
               >
                 <option value="">Choose a player…</option>
@@ -204,11 +245,14 @@ export function ContainerEditorDialog({
                 ))}
               </select>
             </FieldShell>
-          ) : !editing ? (
+          ) : (
             /* Submitted empty so the server sees "no owner" explicitly rather
-               than a missing key it has to interpret. */
+               than a missing key it has to interpret. This is also what strips
+               the owner when a pack is converted to a shared or world
+               container — the invariant is satisfied by the same submit that
+               breaks it. */
             <input type="hidden" name="ownerId" value="" />
-          ) : null}
+          )}
 
           <TextField
             id="capacity"
@@ -226,7 +270,8 @@ export function ContainerEditorDialog({
               <input
                 type="checkbox"
                 name="revealed"
-                defaultChecked={container?.revealed ?? false}
+                checked={revealed}
+                onChange={(e) => setRevealed(e.target.checked)}
               />
               <span className="text-base text-text">
                 Visible to players
@@ -240,6 +285,17 @@ export function ContainerEditorDialog({
           ) : null}
         </div>
       </form>
+
+      {/* Outside the form on purpose: it is a separate action with its own
+          confirmation, and nesting it would make Enter in the name field a
+          possible retire. */}
+      {editing && retireFallbackHref ? (
+        <RetireContainerButton
+          containerId={container.id}
+          containerName={container.name}
+          fallbackHref={retireFallbackHref}
+        />
+      ) : null}
     </Modal>
   );
 }

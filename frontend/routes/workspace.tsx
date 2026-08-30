@@ -154,8 +154,17 @@ export default async function WorkspacePage({
   // Only fetched when the dialog is actually open: the owner picker is the one
   // place the roster is needed, and a GM opening a container list should not
   // cost a members query every time.
-  const members =
-    sp.dialog === "new-container" && isGm ? await repo.listMembers() : [];
+  // Needed by BOTH container dialogs now that owner is editable, and still only
+  // fetched when one of them is actually open.
+  const containerDialogOpen =
+    sp.dialog === "new-container" || sp.dialog === "edit-container";
+  const members = containerDialogOpen && isGm ? await repo.listMembers() : [];
+
+  // Somewhere to land after retiring, since the current container will be gone.
+  const retireFallbackHref = (() => {
+    const other = containers.find((c) => c.id !== containerId);
+    return other ? `/c/${other.id}` : undefined;
+  })();
 
   return (
     // The provider spans the table, the footer meter and the dialogs, because
@@ -409,6 +418,7 @@ export default async function WorkspacePage({
           members={members}
           container={container}
           closeHref={`/c/${containerId}`}
+          retireFallbackHref={retireFallbackHref}
         />
       ) : null}
 

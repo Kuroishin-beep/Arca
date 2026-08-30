@@ -21,6 +21,7 @@ import {
   type Principal,
   type UpdateItemInput,
   carriedWeight,
+  ownershipProblem,
 } from "@backend/domain/view";
 import {
   assertCanManageContainers,
@@ -185,12 +186,27 @@ export const fixtureRepository: ArcaRepository = {
     const raw = store().containers.find((c) => c.id === input.id);
     if (!raw) throw new NotFoundError("No such container.");
 
+    // The merged result, judged before anything is written — same rule and
+    // same order as the Postgres backend.
+    const type = input.type ?? raw.type;
+    const ownerId = input.ownerId !== undefined ? input.ownerId : raw.ownerId;
+
+    const problem = ownershipProblem(type, ownerId);
+    if (problem) throw new ConflictError(problem);
+
     // `undefined` means leave it alone; `null` on capacity means no limit.
     // Assigning unconditionally is exactly the data-loss bug UpdateItemInput's
     // comment warns about, one level up.
     if (input.name !== undefined) raw.name = input.name;
     if (input.capacity !== undefined) raw.capacity = input.capacity;
-    if (input.revealed !== undefined && raw.type === "world") {
+    raw.type = type;
+    raw.ownerId = ownerId;
+
+    // Converting away from world forces it visible; a lingering invisible
+    // container would have no control left to fix it.
+    if (type !== "world") {
+      raw.revealed = true;
+    } else if (input.revealed !== undefined) {
       raw.revealed = input.revealed;
     }
 

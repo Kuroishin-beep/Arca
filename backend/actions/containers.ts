@@ -103,9 +103,13 @@ export async function updateContainerAction(
     const principal = await requirePrincipal();
 
     const capacityRaw = text(formData.get("capacity")).trim();
+    const ownerRaw = text(formData.get("ownerId")).trim();
+
     const parsed = UpdateContainerInput.safeParse({
       id: formData.get("id"),
       name: formData.get("name"),
+      type: formData.get("type"),
+      ownerId: ownerRaw === "" ? null : ownerRaw,
       // The form always submits this field, so empty genuinely means "no
       // limit" rather than "not supplied" — the third state (leave alone) is
       // for programmatic callers, not for this dialog.
@@ -121,7 +125,22 @@ export async function updateContainerAction(
       };
     }
 
-    await repository().updateContainer(principal, parsed.data);
+    // The ownership invariant is judged against the merged row inside the
+    // repository, so it arrives as a ConflictError rather than a zod issue.
+    // Render it against the owner field anyway — that is the control the GM
+    // has to change, whichever half of the pair they actually got wrong.
+    try {
+      await repository().updateContainer(principal, parsed.data);
+    } catch (error) {
+      if (error instanceof ConflictError) {
+        return {
+          ok: false,
+          error: "Fix the highlighted fields.",
+          fieldErrors: { ownerId: error.message },
+        };
+      }
+      throw error;
+    }
 
     revalidatePath("/c/[containerId]", "page");
     await announce(principal.userId, parsed.data.id);
