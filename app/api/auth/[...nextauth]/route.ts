@@ -1,5 +1,4 @@
-/** Auth.js callback and session endpoints. All of the behaviour lives in
- *  `src/lib/auth.ts`; this only mounts its handlers. */
-import { handlers } from "@/lib/auth";
+/** Auth.js endpoints. Behaviour lives in backend/lib/auth.ts. */
+import { handlers } from "@backend/lib/auth";
 
 export const { GET, POST } = handlers;

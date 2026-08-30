@@ -7,7 +7,7 @@ import type { Config } from "drizzle-kit";
  * the only way that stays safe.
  */
 export default {
-  schema: "./src/db/schema.ts",
+  schema: "./backend/db/schema.ts",
   out: "./drizzle",
   dialect: "postgresql",
   dbCredentials: {

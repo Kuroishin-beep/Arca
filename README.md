@@ -23,23 +23,55 @@ the page source; sign in as the GM and it is.
 | `npm run build` | production build |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm test` | Vitest — permissions, the move operation, derived weights, the dice parser |
-| `npm run db:generate` | SQL migration from `src/db/schema.ts` |
+| `npm run test:e2e` | Playwright — two browser contexts, one campaign, live sync |
+| `npm run db:generate` | SQL migration from `backend/db/schema.ts` |
 | `npm run db:migrate` | apply migrations |
 | `npm run db:seed` | seed a real database |
 
 ## Attach a database
 
-Copy `.env.example` to `.env.local` and set `DATABASE_URL`. The app switches from
-fixtures to the object-graph schema automatically — the sign-in screen prints
-which one is live. Then:
-
 ```bash
+docker compose up -d          # postgres:17 on localhost:5432
+cp .env.example .env.local    # then set DATABASE_URL
 npm run db:migrate && npm run db:seed
 ```
+
+The app switches from fixtures to the object-graph schema automatically — the
+sign-in screen prints which backend is live, as `storage: … · sync: … · auth: …`.
 
 The app should look **identical** either way. If it does not, the projection
 layer and the fixture repository have drifted, which is exactly what that
 comparison is for.
+
+Two things only exist with a real database: the CHECK constraints behind the
+ownership invariants, and the `LISTEN`/`NOTIFY` channel that carries live sync.
+Fixtures fan out through an in-process emitter instead, which works for one dev
+server and would silently deliver nothing on serverless.
+
+## Backend and frontend
+
+The two halves live in separate directories and are wired by path aliases, not
+by HTTP. It is still one Next.js app and one deployment — SCOPE.md §4.2 rejects
+a second deployable for a table of six people, and nothing here changes that.
+
+```
+backend/     @backend/*   server only — never imported by a client component
+  db/          object-graph schema, both repository implementations, seed
+  domain/      zod domain model and the flat projection the UI renders
+  actions/     Server Actions: create, update, archive, move, comment
+  realtime/    the fan-out boundary: LISTEN/NOTIFY and the in-process fallback
+  api/         the SSE handler
+  lib/         auth, session, permissions, campaign, TaleSpire adapter
+frontend/    @frontend/*  UI
+  routes/      one file per screen — the page implementations
+  components/  atoms / molecules / organisms, per Design.md Step E
+  styles/      globals.css: tokens and the @theme block
+app/         Next's routing layer ONLY — see app/README.md
+```
+
+`app/` is a thin shim because Next discovers routes at `<root>/app` and offers
+no option to point it elsewhere. Each file there maps a URL to an
+implementation and holds nothing else.
 
 ## Where things are
 
@@ -49,11 +81,8 @@ comparison is for.
 | [`final-project-planning/Design.md`](final-project-planning/Design.md) | design system: tokens, type scale, spacing, components, responsive plan |
 | [`docs/research/`](docs/research/superhuman-docs-and-capacities.md) | the Superhuman Docs / Capacities research the model came from |
 | [`mockups/`](mockups/index.html) | static HTML mockups — open `index.html` |
-| `app/` | routes: sign-in, workspace, character sheet, diceFinder |
-| `src/components/` | atoms / molecules / organisms, per Design.md Step E |
-| `src/db/` | object-graph schema, both repository implementations, seed |
-| `src/domain/` | zod domain model and the flat projection the UI renders |
 | `drizzle/` | checked-in SQL migrations |
+| `e2e/` | Playwright: the move flow across two browser contexts |
 
 ## The one thing to understand
 

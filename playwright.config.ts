@@ -16,6 +16,10 @@ import { defineConfig, devices } from "@playwright/test";
  */
 export default defineConfig({
   testDir: "./e2e",
+  // Gives every run the same starting inventory. Against Postgres the data
+  // outlives the run, so without this the suite drifts a little further from
+  // its own assumptions each time it executes.
+  globalSetup: "./e2e/global-setup.ts",
   // The realtime test drives two contexts against ONE shared server whose
   // fixture store is process-global. Running files in parallel would let one
   // test's moves land in another's inventory.
