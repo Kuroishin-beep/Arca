@@ -12,17 +12,27 @@ npm install
 npm run dev
 ```
 
-Open <http://localhost:3000>, then pick a member on the sign-in screen. **Which
-member you pick changes what you can see** — that is the permission model, not a
-demo mode. Sign in as Kova and the sealed vault is not in the sidebar and not in
-the page source; sign in as the GM and it is.
+Open <http://localhost:3000>, pick your name from the roster, and choose a PIN
+the first time. **Which member you pick changes what you can see** — that is the
+permission model, not a demo mode. Sign in as Kova and the sealed vault is not
+in the sidebar and not in the page source; sign in as the GM and it is.
+
+There is no OAuth provider and no accounts to create. The roster is the
+campaign's membership, the PIN is what stops it from being a list of names
+anyone with the link can sit down as, and a forgotten one is a single statement
+for the GM:
+
+```sql
+UPDATE users SET pin_hash = NULL WHERE display_name = 'Kova';
+```
 
 | Script | What it does |
 | --- | --- |
 | `npm run dev` | dev server |
 | `npm run build` | production build |
 | `npm run typecheck` | `tsc --noEmit` |
-| `npm test` | Vitest — permissions, the move operation, derived weights, the dice parser |
+| `npm test` | Vitest — permissions, the move operation, derived weights, PINs, the dice parser |
+| `npm run lint` | ESLint |
 | `npm run test:e2e` | Playwright — two browser contexts, one campaign, live sync |
 | `npm run db:generate` | SQL migration from `backend/db/schema.ts` |
 | `npm run db:migrate` | apply migrations |
@@ -61,7 +71,7 @@ backend/     @backend/*   server only — never imported by a client component
   actions/     Server Actions: create, update, archive, move, comment
   realtime/    the fan-out boundary: LISTEN/NOTIFY and the in-process fallback
   api/         the SSE handler
-  lib/         auth, session, permissions, campaign, TaleSpire adapter
+  lib/         session, PINs, permissions, campaign, TaleSpire adapter
 frontend/    @frontend/*  UI
   routes/      one file per screen — the page implementations
   components/  atoms / molecules / organisms, per Design.md Step E

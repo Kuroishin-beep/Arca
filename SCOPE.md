@@ -94,7 +94,7 @@ principal.
 | **Database** | **PostgreSQL** (Vercel Postgres / Neon) | The schema doc requires JSONB for user-defined property values, plus real foreign keys and CHECK constraints for the ownership invariants. Row Level Security enforces the permission table above at the database, so a bug in a route handler cannot leak another player's pack. |
 | **ORM / query** | **Drizzle ORM** + `drizzle-kit` migrations | SQL-shaped, so the many-to-many containment joins stay legible. Migrations are checked-in SQL files, which matters for a schema that will grow property tables. Types are inferred, so they cannot drift from the columns. |
 | **Validation** | **Zod** (already a dependency) | One definition per entity: the TypeScript type is inferred from the schema, so there is no validator maintained separately from the type. Same schemas validate Server Action inputs. |
-| **Auth** | **Auth.js (NextAuth v5)** with Discord OAuth | The campaign already coordinates on Discord, so there is no new account to create. Discord ids map to campaign membership directly. Session carries `{ userId, role, campaignId }`, which is the principal every query is evaluated against. |
+| **Auth** | **Roster + per-member PIN** (`backend/lib/pin.ts`, scrypt) | No OAuth provider and no accounts to create: the roster IS `campaign_members`, so membership stays a GM decision, and a PIN chosen on first sign-in is what stops the roster being a list of names anyone with the link can sit down as. The cookie carries a user id only; role is re-read from `campaign_members` per request, so a role change takes effect on the next click. |
 | **Realtime** | **Postgres `LISTEN`/`NOTIFY` bridged to SSE**, with **Supabase Realtime as the fallback** | Serverless functions cannot hold a socket, so a Vercel-hosted app needs either a Server-Sent Events route on the Node runtime or a hosted realtime service. SSE is one-directional, which is all Arca needs — writes go through Server Actions, only the fan-out needs a channel. |
 | **State (client)** | **TanStack Query** + `useOptimistic` | A move must feel instant. Optimistic update on the client, reconcile against the SSE broadcast, roll back with a toast on rejection. |
 | **Styling** | **Tailwind CSS v4** over CSS custom properties | See [Design.md](final-project-planning/Design.md) Step A. Tokens in `:root`, theme in an `@theme` block in `app/globals.css` — v4 is CSS-first and has no `tailwind.config.ts`. No gradients anywhere. |
@@ -189,7 +189,7 @@ rule 9 of the schema doc. There is no `total_weight` column to fall out of date.
 
 | # | Feature | Acceptance criteria |
 | --- | --- | --- |
-| M1 | **Discord sign-in and campaign membership** | A user signs in with Discord and lands in their campaign. A non-member sees a "not in this campaign" screen, never a container list. |
+| M1 | **PIN sign-in and campaign membership** | A member picks their name, chooses a PIN on first sign-in, and lands in their campaign. Someone who is not a member never sees their name on the roster, so there is no container list to reach and no screen to bounce off. |
 | M2 | **Container list (sidebar)** | Containers are grouped My Packs / Party / World. Each row shows icon, name, item count. A player never sees an unrevealed world container in the DOM. |
 | M3 | **Item table** | Selecting a container lists its items with name, qty, weight, value, tags. Sorting by any column. Sort state announced via `aria-sort`. |
 | M4 | **Add item** | A modal creates an item in the current container. Name required, qty a positive integer, weight non-negative. Validation errors render against the field. |
@@ -238,7 +238,7 @@ Stated so it is not assumed later:
 
 | # | Screen | Purpose | Mockup |
 | --- | --- | --- | --- |
-| 1 | **Sign in** | Discord OAuth, campaign gate, role display | `mockups/01-signin.html` |
+| 1 | **Sign in** | roster, PIN entry and first-run enrolment, role display | `mockups/01-signin.html` |
 | 2 | **Workspace** | The app. Sidebar + item table + detail panel | `mockups/02-workspace.html` |
 | 3 | **Move item** | The headline flow as a focused dialog | `mockups/03-move-item.html` |
 | 4 | **Item editor** | Add / edit, with validation | `mockups/04-item-editor.html` |
@@ -317,7 +317,6 @@ moved that — here's where it is now" rather than a silent overwrite.
 - The campaign's actual character names and their starting packs
 - The party's container list (wagon, stash, mule)
 - TaleSpire Symbiote API docs: panel sizing, storage, and the dice-roll entry point
-- Discord application credentials for OAuth
 - An Arca logo / wordmark for the top bar
 
 ---
@@ -357,7 +356,7 @@ moved that — here's where it is now" rather than a silent overwrite.
 
 Arca v1 is done when all of the following are true:
 
-1. A GM and three players sign in with Discord and see the same campaign.
+1. A GM and three players sign in with their PINs and see the same campaign.
 2. A player moves a healing potion from their pack to the party wagon; every
    other panel reflects it within 2 seconds without a refresh.
 3. A player attempts to open a GM-only world container by editing the URL and

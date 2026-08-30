@@ -16,7 +16,12 @@ import type { ContainerType } from "@backend/domain/types";
 import type { ContainerView, Principal } from "@backend/domain/view";
 
 /**
- * Create a container — GM only (SCOPE.md §3).
+ * Create or edit a container — SCOPE.md §3.
+ *
+ * Who may do what is decided on the server and arrives here as `allowedTypes`,
+ * `canReshape` and whether `retireFallbackHref` was passed. A player sees a
+ * shorter list of kinds, no owner picker, and a frozen kind on an existing
+ * container; the GM sees all of it.
  *
  * The form is shaped by one rule: a character container has exactly one owner,
  * and the other two have none. Rather than let someone fill in an owner and
@@ -57,18 +62,44 @@ export function ContainerEditorDialog({
   container,
   closeHref,
   retireFallbackHref,
+  allowedTypes,
+  canReshape,
+  selfId,
 }: {
-  /** For the owner picker on a character container. */
+  /** For the owner picker on a character container. Empty for a player, who
+   *  does not get one — see `canReshape`. */
   members: Principal[];
   /** Absent when creating. */
   container?: ContainerView;
   closeHref: string;
-  /** Where to land after retiring. Absent hides the retire control — there is
-   *  nowhere safe to send the GM afterwards. */
+  /** Where to land after retiring. Absent hides the retire control — either
+   *  there is nowhere safe to go afterwards, or this principal may not retire
+   *  this container. */
   retireFallbackHref?: string;
+  /**
+   * The kinds this principal may create, from `creatableContainerTypes`.
+   *
+   * Passed in rather than computed here because this is a client component and
+   * the permission rules are server code. The server checks the submission
+   * again regardless: a narrowed radio list is a courtesy, not the
+   * enforcement.
+   */
+  allowedTypes: ContainerType[];
+  /** Whether this principal may change an existing container's KIND or OWNER
+   *  — the GM alone. Everyone else edits name and capacity only. */
+  canReshape: boolean;
+  /** The signed-in user, used as the implicit owner when a player adds their
+   *  own pack. */
+  selfId: string;
 }) {
   const editing = container !== undefined;
-  const [type, setType] = useState<ContainerType>(container?.type ?? "world");
+
+  // A world container is the GM's usual reason to open this, so it stays their
+  // default; a player who cannot make one starts on their own pack.
+  const [type, setType] = useState<ContainerType>(
+    container?.type ??
+      (allowedTypes.includes("world") ? "world" : (allowedTypes[0] ?? "party")),
+  );
 
   /**
    * Visibility is controlled state, not a `defaultChecked`, because it has to
@@ -192,9 +223,37 @@ export function ContainerEditorDialog({
             </p>
           ) : null}
 
+          {/* Frozen for anyone but the GM once the container exists. Reshaping
+              one is how the shared wagon would quietly become a private pack,
+              so `assertCanEditContainer` refuses it and the form does not
+              offer it. The value is still submitted — omitting it would read
+              as a patch that clears the kind. */}
+          {editing && !canReshape ? (
+            <>
+              <input type="hidden" name="type" value={container.type} />
+              <FieldShell id="type" label="Kind">
+                <div className="rounded-md border border-border bg-surface2 px-2 py-2">
+                  <span className="block text-base text-text">
+                    {TYPES.find((t) => t.value === container.type)?.label ??
+                      container.type}
+                  </span>
+                  <span className="block text-sm text-muted">
+                    Only the GM can change what kind of container this is.
+                  </span>
+                </div>
+              </FieldShell>
+            </>
+          ) : (
           <FieldShell id="type" label="Kind" required>
             <div className="flex flex-col gap-1">
-              {TYPES.map((option) => (
+              {/* The container's own kind stays listed even when this
+                  principal could not create one like it, so editing never
+                  silently rewrites what is already there. */}
+              {TYPES.filter(
+                (option) =>
+                  allowedTypes.includes(option.value) ||
+                  option.value === container?.type,
+              ).map((option) => (
                 <label
                   key={option.value}
                   className={`flex cursor-pointer items-start gap-2 rounded-md border px-2 py-2 ${
@@ -223,8 +282,10 @@ export function ContainerEditorDialog({
               ))}
             </div>
           </FieldShell>
+          )}
 
           {type === "character" ? (
+            canReshape ? (
             <FieldShell
               id="ownerId"
               label="Belongs to"
@@ -245,6 +306,20 @@ export function ContainerEditorDialog({
                 ))}
               </select>
             </FieldShell>
+            ) : (
+              /* A player does not choose an owner, because the rule that lets
+                 them add a pack at all is that the owner is themselves. There
+                 is nothing to pick, so the field states the answer and submits
+                 it. */
+              <>
+                <input type="hidden" name="ownerId" value={selfId} />
+                <FieldShell id="ownerId" label="Belongs to">
+                  <p className="rounded-md border border-border bg-surface2 px-2 py-2 text-base text-text">
+                    You
+                  </p>
+                </FieldShell>
+              </>
+            )
           ) : (
             /* Submitted empty so the server sees "no owner" explicitly rather
                than a missing key it has to interpret. This is also what strips

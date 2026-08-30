@@ -15,6 +15,13 @@
       "when": 1787758506581,
       "tag": "0001_checks_and_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788101367852,
+      "tag": "0002_pin_sign_in",
+      "breakpoints": true
     }
   ]
 }

@@ -5,8 +5,8 @@ import { Icon } from "@frontend/components/atoms/Icon";
 import type { ContainerType } from "@backend/domain/types";
 import type { ContainerView, Principal } from "@backend/domain/view";
 import {
-  canManageContainers,
   canRead,
+  creatableContainerTypes,
   writeDeniedReason,
 } from "@backend/lib/permissions";
 
@@ -85,11 +85,14 @@ export function Sidebar({
         );
       })}
 
-      {/* GM only, and last: creating a container is a rare, deliberate act, so
-          it sits below the list rather than competing with it. Rendered from
-          the same predicate the server enforces — a player never receives this
-          markup at all. */}
-      {canManageContainers(principal) && newContainerHref ? (
+      {/* Last, because creating a container is a rare, deliberate act: it sits
+          below the list rather than competing with it.
+
+          Shown to players too — a player may add their own pack or a shared
+          container, just not a world one (SCOPE.md §3). The kinds they may
+          pick are decided by the same predicate the server enforces, so
+          somebody who may create nothing never receives this markup at all. */}
+      {creatableContainerTypes(principal).length > 0 && newContainerHref ? (
         <div className="px-3 pb-4 pt-3">
           <Link
             href={newContainerHref}

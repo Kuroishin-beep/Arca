@@ -9,13 +9,51 @@ import { test, expect, type Page, type Browser } from "@playwright/test";
  * session and quietly test nothing.
  */
 
-/** Signs in through the member picker, which is the active path whenever
- *  Discord is unconfigured — as it is for this suite. */
+/**
+ * A fixed PIN per member, so the same person signs in the same way from every
+ * test in the suite.
+ *
+ * They have to be stable rather than random because the campaign is seeded
+ * once for the whole run: the FIRST sign-in for a name enrols it, and every
+ * sign-in after that has to present the PIN that enrolment chose.
+ */
+const PINS: Record<string, string> = {
+  Ravna: "4821",
+  Kova: "9037",
+  Milo: "5518",
+};
+
+/**
+ * Signs in through the roster: pick the name, then the PIN.
+ *
+ * Handles both states, because which one a name is in depends on whether an
+ * earlier test in this run already signed in as them — a freshly seeded member
+ * is asked to choose a PIN, and one who has already been through here is asked
+ * for it.
+ */
 async function signInAs(browser: Browser, displayName: string): Promise<Page> {
+  const pin = PINS[displayName];
+  if (!pin) throw new Error(`No PIN fixture for ${displayName}.`);
+
   const context = await browser.newContext();
   const page = await context.newPage();
   await page.goto("/signin");
-  await page.getByRole("button", { name: new RegExp(displayName, "i") }).click();
+  await page.getByRole("link", { name: new RegExp(displayName, "i") }).click();
+
+  // Wait for the form before asking anything about it. `isVisible()` resolves
+  // immediately rather than waiting, so branching on it straight after a click
+  // reads the OLD page and picks the wrong path every time.
+  await page.waitForURL(/member=/);
+  const pinField = page.locator("#pin");
+  await pinField.waitFor();
+  await pinField.fill(pin);
+
+  // Present only while enrolling — a member who already has a PIN is asked for
+  // it once, not twice.
+  const confirmField = page.locator("#confirmPin");
+  if ((await confirmField.count()) > 0) await confirmField.fill(pin);
+
+  await page.getByRole("button", { name: /sign in/i }).click();
   await page.waitForURL(/\/c\//);
   return page;
 }
@@ -102,5 +140,60 @@ test.describe("the move", () => {
     await expect(sealed.or(workspace).first()).toBeVisible();
 
     await player.context().close();
+  });
+
+  /**
+   * A player adds a shared container and the GM sees it — SCOPE.md §3.
+   *
+   * Two contexts again, because "a player may create one" is only half the
+   * claim. The half that matters at a table is that what they created is
+   * genuinely part of the campaign rather than something visible only to its
+   * author, and one browser cannot tell those two apart.
+   */
+  test("a container a player adds shows up for the GM", async ({ browser }) => {
+    const player = await signInAs(browser, "Kova");
+    await openPartyContainer(player);
+
+    const name = `Kova's mule ${Date.now()}`;
+
+    await player.getByRole("link", { name: /new container/i }).click();
+    await expect(player.getByRole("dialog")).toBeVisible();
+    await player.getByLabel("Name").fill(name);
+    // A player gets the two kinds that are theirs to decide. "World" must not
+    // be one of them.
+    await expect(
+      player.getByRole("radio", { name: /world/i }),
+    ).toHaveCount(0);
+    await player.getByRole("radio", { name: /shared/i }).check();
+    await player.getByRole("button", { name: /^create$/i }).click();
+
+    // Lands inside the new container, which is where the next step (putting
+    // something in it) starts.
+    await player.waitForURL(/\/c\//);
+    await expect(
+      player.getByRole("navigation", { name: "Containers" }).first(),
+    ).toContainText(name);
+
+    const gm = await signInAs(browser, "Ravna");
+    await expect(
+      gm.getByRole("navigation", { name: "Containers" }).first(),
+    ).toContainText(name);
+
+    // And they can edit what they made — but only its name and capacity. The
+    // kind is rendered as frozen text rather than radios, because reshaping a
+    // container is the GM's call and the server refuses it either way.
+    const renamed = `${name} (renamed)`;
+    await player.getByRole("link", { name: /^edit$/i }).click();
+    await expect(player.getByRole("dialog")).toBeVisible();
+    await expect(player.getByRole("radio")).toHaveCount(0);
+    await player.getByLabel("Name").fill(renamed);
+    await player.getByRole("button", { name: /^save$/i }).click();
+
+    await expect(
+      player.getByRole("navigation", { name: "Containers" }).first(),
+    ).toContainText(renamed);
+
+    await player.context().close();
+    await gm.context().close();
   });
 });
