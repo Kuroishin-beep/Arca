@@ -29,7 +29,11 @@ export async function signInWithDiscordAction(): Promise<void> {
 export async function signInAsAction(formData: FormData): Promise<void> {
   if (authConfigured()) redirect("/signin");
 
-  const userId = String(formData.get("userId") ?? "");
+  // `string | File`, and a File would stringify to "[object File]" — which
+  // would then be looked up as a member id and simply not match. Treating a
+  // non-string as absent keeps the failure honest.
+  const raw = formData.get("userId");
+  const userId = typeof raw === "string" ? raw : "";
   const members = await repository().listMembers();
   const member = members.find((m) => m.userId === userId);
   if (!member) redirect("/signin?error=unknown-member");

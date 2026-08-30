@@ -438,7 +438,7 @@ export const postgresRepository: ArcaRepository = {
 
     return {
       id: row.id,
-      containerId: input.containerId as CommentView["containerId"],
+      containerId: input.containerId,
       authorName: principal.displayName,
       authorRole: principal.role,
       content: input.content,

@@ -55,6 +55,23 @@ describe("reads", () => {
     expect(containers.map((c) => c.id)).not.toContain(MILOS_PACK);
   });
 
+  /**
+   * The same rule from the other side. Kova being unable to read Milo's pack
+   * could be satisfied by a rule that simply favours Milo; only the symmetric
+   * case shows the rule is about ownership rather than about a particular
+   * player. The `milo` principal existed for this and the assertion was never
+   * written — the linter is what surfaced it, as an unused variable.
+   */
+  it("hides a player's pack from the other player, both ways", async () => {
+    const containers = await fixtureRepository.listContainers(milo);
+    expect(containers.map((c) => c.id)).toContain(MILOS_PACK);
+    expect(containers.map((c) => c.id)).not.toContain(KOVAS_PACK);
+
+    await expect(
+      fixtureRepository.getContainer(milo, KOVAS_PACK),
+    ).rejects.toBeInstanceOf(PermissionError);
+  });
+
   it("hides an unrevealed world container from a player", async () => {
     const containers = await fixtureRepository.listContainers(kova);
     expect(containers.map((c) => c.id)).not.toContain(SUNKEN_VAULT);

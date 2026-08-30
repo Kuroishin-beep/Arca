@@ -13,7 +13,11 @@
 /** The subset of the Symbiote API Arca actually uses. */
 interface TaleSpireBridge {
   dice?: {
-    roll?: (notation: string, label?: string) => Promise<unknown> | unknown;
+    /** `unknown` because the real API may return a promise or nothing at all,
+     *  and `unknown` already covers both — spelling it `Promise<unknown> |
+     *  unknown` says the same thing less clearly. Callers `await` it either
+     *  way, which is valid on a non-promise. */
+    roll?: (notation: string, label?: string) => unknown;
   };
   getName?: () => string | undefined;
 }

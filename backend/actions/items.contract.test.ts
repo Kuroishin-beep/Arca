@@ -35,7 +35,7 @@ const BARROW = id("Barrow Chest");
 
 /** Mirrors the parsing in createItemAction, including the comma-split lists. */
 const splitList = (raw: FormDataEntryValue | null): string[] =>
-  String(raw ?? "")
+  (typeof raw === "string" ? raw : "")
     .split(",")
     .map((s) => s.trim())
     .filter((s) => s !== "");

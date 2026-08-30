@@ -84,7 +84,6 @@ export function realtime(): RealtimeTransport {
     return mod.localTransport;
   }
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const mod =
-    require("./postgres-channel") as typeof import("./postgres-channel");
+  const mod = require("./postgres-channel") as typeof import("./postgres-channel");
   return mod.postgresTransport;
 }
