@@ -16,10 +16,12 @@ import type {
   CommentView,
   ContainerView,
   CreateCommentInput,
+  CreateContainerInput,
   CreateItemInput,
   ItemView,
   MoveItemInput,
   Principal,
+  UpdateContainerInput,
   UpdateItemInput,
 } from "@backend/domain/view";
 
@@ -43,6 +45,41 @@ export interface ArcaRepository {
     principal: Principal,
     containerId: string,
   ): Promise<ContainerView | null>;
+
+  /**
+   * Create a container — GM only (SCOPE.md §3).
+   *
+   * A container IS an object (§5.2), so this inserts into `objects` and
+   * `containers` together; capacity is a property on that object, exactly as
+   * an item's weight is. Nothing here is a special case.
+   */
+  createContainer(
+    principal: Principal,
+    input: CreateContainerInput,
+  ): Promise<ContainerView>;
+
+  /**
+   * Edit a container — GM only. Rename, set or clear capacity, and reveal.
+   *
+   * Revealing is the one that matters at a table: a world container is hidden
+   * until the party finds it, and this is what makes that a click rather than
+   * a hand-written UPDATE. `revealed` is ignored for character and party
+   * containers, which are never hidden in the first place.
+   */
+  updateContainer(
+    principal: Principal,
+    input: UpdateContainerInput,
+  ): Promise<ContainerView>;
+
+  /**
+   * Retire a container — GM only. Soft, like everything else (M6).
+   *
+   * Refuses a container that still holds items. Archiving it would hide the
+   * container from every query while leaving the containment edges intact, so
+   * the items inside would exist, belong somewhere, and appear nowhere — the
+   * closest thing to losing loot that a soft delete can manage.
+   */
+  archiveContainer(principal: Principal, containerId: string): Promise<void>;
 
   listItems(principal: Principal, containerId: string): Promise<ItemView[]>;
 

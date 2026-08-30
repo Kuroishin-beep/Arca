@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { SyncPill, type SyncStatus } from "@frontend/components/atoms/Status";
@@ -35,14 +35,14 @@ export function RealtimeSync({
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | undefined>();
 
   /**
-   * `router` identity is not stable across renders, and refreshing changes the
-   * render — so depending on it directly would tear down and rebuild the
-   * EventSource on every refresh, which is an endless reconnect loop rather
-   * than a subscription. The ref keeps the effect's dependency list empty.
+   * `router` is depended on directly rather than stashed in a ref.
+   *
+   * The ref version mutated `.current` during render, which React forbids —
+   * refs are not render state, and writing one during render is how a
+   * component ends up not updating when it should. App Router's `useRouter`
+   * returns a stable object, so listing it here does not rebuild the
+   * EventSource on every refresh.
    */
-  const refresh = useRef(() => router.refresh());
-  refresh.current = () => router.refresh();
-
   useEffect(() => {
     const source = new EventSource("/api/stream");
     /** Coalesces a burst — a partial move writes both ends — into one render. */
@@ -71,7 +71,7 @@ export function RealtimeSync({
       setStatus("syncing");
       if (pending) clearTimeout(pending);
       pending = setTimeout(() => {
-        refresh.current();
+        router.refresh();
         setStatus("idle");
         setLastSyncedAt(new Date());
       }, 50);
@@ -95,7 +95,7 @@ export function RealtimeSync({
       if (pending) clearTimeout(pending);
       source.close();
     };
-  }, [userId]);
+  }, [userId, router]);
 
   return (
     <SyncPill status={status} lastSyncedAt={lastSyncedAt} className={className} />

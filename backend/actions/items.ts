@@ -88,15 +88,31 @@ function fieldErrorsOf(error: unknown): Record<string, string> {
   if (!Array.isArray(issues)) return {};
   const out: Record<string, string> = {};
   for (const issue of issues) {
-    const key = String(issue.path[0] ?? "form");
+    // A zod path segment is a string or an array index. Anything else has no
+    // field to render against, so it belongs to the form as a whole rather
+    // than being stringified into a key no input will ever match.
+    const segment = issue.path[0];
+    const key =
+      typeof segment === "string" || typeof segment === "number"
+        ? String(segment)
+        : "form";
     out[key] ??= issue.message;
   }
   return out;
 }
 
+/**
+ * A FormData value is `string | File`. A File stringifies to "[object File]",
+ * which would sail through validation as a plausible-looking name — so
+ * anything that is not text is treated as absent rather than coerced.
+ */
+function text(raw: FormDataEntryValue | null): string {
+  return typeof raw === "string" ? raw : "";
+}
+
 /** Tags and types arrive as comma-separated text from the form. */
 function splitList(raw: FormDataEntryValue | null): string[] {
-  return String(raw ?? "")
+  return text(raw)
     .split(",")
     .map((s) => s.trim())
     .filter((s) => s !== "");

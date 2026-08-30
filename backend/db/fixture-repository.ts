@@ -21,8 +21,10 @@ import {
   type Principal,
   type UpdateItemInput,
   carriedWeight,
+  ownershipProblem,
 } from "@backend/domain/view";
 import {
+  assertCanManageContainers,
   assertCanMove,
   assertCanRead,
   assertCanWrite,
@@ -161,6 +163,74 @@ export const fixtureRepository: ArcaRepository = {
     const container = hydrate(raw);
     assertCanRead(principal, container);
     return container;
+  },
+
+  async createContainer(principal, input) {
+    assertCanManageContainers(principal);
+
+    const container = {
+      id: randomUUID() as ContainerView["id"],
+      name: input.name,
+      type: input.type,
+      ownerId: input.ownerId,
+      // Only a world container has anything to reveal.
+      revealed: input.type === "world" ? input.revealed : true,
+      capacity: input.capacity,
+    };
+    store().containers.push(container);
+    return hydrate(container);
+  },
+
+  async updateContainer(principal, input) {
+    assertCanManageContainers(principal);
+    const raw = store().containers.find((c) => c.id === input.id);
+    if (!raw) throw new NotFoundError("No such container.");
+
+    // The merged result, judged before anything is written — same rule and
+    // same order as the Postgres backend.
+    const type = input.type ?? raw.type;
+    const ownerId = input.ownerId !== undefined ? input.ownerId : raw.ownerId;
+
+    const problem = ownershipProblem(type, ownerId);
+    if (problem) throw new ConflictError(problem);
+
+    // `undefined` means leave it alone; `null` on capacity means no limit.
+    // Assigning unconditionally is exactly the data-loss bug UpdateItemInput's
+    // comment warns about, one level up.
+    if (input.name !== undefined) raw.name = input.name;
+    if (input.capacity !== undefined) raw.capacity = input.capacity;
+    raw.type = type;
+    raw.ownerId = ownerId;
+
+    // Converting away from world forces it visible; a lingering invisible
+    // container would have no control left to fix it.
+    if (type !== "world") {
+      raw.revealed = true;
+    } else if (input.revealed !== undefined) {
+      raw.revealed = input.revealed;
+    }
+
+    return hydrate(raw);
+  },
+
+  async archiveContainer(principal, containerId) {
+    assertCanManageContainers(principal);
+    findContainer(containerId);
+
+    // Same refusal as the Postgres backend: hiding a container that still
+    // holds items would leave them belonging somewhere and appearing nowhere.
+    const held = liveItemsIn(containerId);
+    if (held.length > 0) {
+      throw new ConflictError(
+        `That container still holds ${held.length} ${
+          held.length === 1 ? "item" : "items"
+        }. Move them somewhere else first.`,
+      );
+    }
+
+    const all = store().containers;
+    const at = all.findIndex((c) => c.id === containerId);
+    if (at >= 0) all.splice(at, 1);
   },
 
   async listItems(principal, containerId) {

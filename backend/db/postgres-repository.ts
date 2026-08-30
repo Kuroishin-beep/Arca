@@ -26,9 +26,11 @@ import {
   type Principal,
   type UpdateItemInput,
   carriedWeight,
+  ownershipProblem,
 } from "@backend/domain/view";
 import { campaignId } from "@backend/lib/campaign";
 import {
+  assertCanManageContainers,
   assertCanMove,
   assertCanRead,
   assertCanWrite,
@@ -332,6 +334,135 @@ export const postgresRepository: ArcaRepository = {
     return found;
   },
 
+  async createContainer(principal, input) {
+    assertCanManageContainers(principal);
+
+    // Object first, then the container facet: a container IS an object
+    // (SCOPE.md §5.2), and the FK runs container.object_id -> objects.id.
+    // One transaction, because an object with no container row is a ghost that
+    // every query joins away and nothing can ever reach.
+    const objectId = await db().transaction(async (tx) => {
+      const inserted = await tx
+        .insert(objects)
+        .values({ campaignId: campaignId() })
+        .returning({ id: objects.id });
+
+      const created = inserted[0];
+      if (!created) throw new Error("Insert returned no row.");
+
+      await tx.insert(containers).values({
+        objectId: created.id,
+        name: input.name,
+        type: input.type,
+        ownerId: input.ownerId,
+        // A character or party container is never hidden; only a world
+        // container has anything to reveal.
+        revealed: input.type === "world" ? input.revealed : true,
+      });
+
+      return created.id;
+    });
+
+    if (input.capacity !== null) {
+      // Capacity is a property on the object, the same machinery an item's
+      // weight uses — not a column, because most containers do not have one.
+      await setProperties(objectId, { capacity: input.capacity });
+    }
+
+    return requireContainer(objectId);
+  },
+
+  async updateContainer(principal, input) {
+    assertCanManageContainers(principal);
+    const existing = await requireContainer(input.id);
+
+    // The merged result, not the patch. A patch carrying only `type` is legal
+    // or illegal depending on the owner already stored, so the invariant can
+    // only be judged here — the one place that knows both.
+    const type = input.type ?? existing.type;
+    const ownerId =
+      input.ownerId !== undefined ? input.ownerId : existing.ownerId;
+
+    const problem = ownershipProblem(type, ownerId);
+    if (problem) throw new ConflictError(problem);
+
+    const fields: {
+      name?: string;
+      type?: ContainerView["type"];
+      ownerId?: string | null;
+      revealed?: boolean;
+    } = {};
+    if (input.name !== undefined) fields.name = input.name;
+    if (input.type !== undefined) fields.type = type;
+    if (input.ownerId !== undefined) fields.ownerId = ownerId;
+
+    // Only a world container is ever hidden. Converting away from world must
+    // force it visible, or a former world container would linger invisible to
+    // every player with no control left to fix it.
+    if (type !== "world") {
+      fields.revealed = true;
+    } else if (input.revealed !== undefined) {
+      fields.revealed = input.revealed;
+    }
+
+    if (Object.keys(fields).length > 0) {
+      await db()
+        .update(containers)
+        .set(fields)
+        .where(eq(containers.objectId, input.id));
+    }
+
+    if (input.capacity !== undefined) {
+      if (input.capacity === null) {
+        // "No limit" is the ABSENCE of the property, not a null stored in it.
+        // `loadContainers` asks whether the value is a positive number, so a
+        // stored null would read the same — but leaving the row behind means
+        // every future reader has to know that null and missing mean the same
+        // thing, which is the kind of ambiguity JSONB columns rot from.
+        const ids = await propertyIdsByName();
+        const capacityId = ids.get("capacity");
+        if (capacityId) {
+          await db()
+            .delete(objectProperties)
+            .where(
+              and(
+                eq(objectProperties.objectId, input.id),
+                eq(objectProperties.propertyDefinitionId, capacityId),
+              ),
+            );
+        }
+      } else {
+        await setProperties(input.id, { capacity: input.capacity });
+      }
+    }
+
+    await db()
+      .update(objects)
+      .set({ updatedAt: new Date() })
+      .where(eq(objects.id, input.id));
+
+    return requireContainer(input.id);
+  },
+
+  async archiveContainer(principal, containerId) {
+    assertCanManageContainers(principal);
+    await requireContainer(containerId);
+
+    const held = await itemsIn(containerId);
+    if (held.length > 0) {
+      throw new ConflictError(
+        `That container still holds ${held.length} ${
+          held.length === 1 ? "item" : "items"
+        }. Move them somewhere else first.`,
+      );
+    }
+
+    await db()
+      .update(objects)
+      .set({ archivedAt: new Date(), updatedAt: new Date() })
+      .where(eq(objects.id, containerId));
+  },
+
   async listItems(principal, containerId) {
     assertCanRead(principal, await requireContainer(containerId));
     return itemsIn(containerId);
@@ -438,7 +569,7 @@ export const postgresRepository: ArcaRepository = {
 
     return {
       id: row.id,
-      containerId: input.containerId as CommentView["containerId"],
+      containerId: input.containerId,
       authorName: principal.displayName,
       authorRole: principal.role,
       content: input.content,
