@@ -30,7 +30,13 @@ import {
   sortItems,
   tagsOf,
 } from "@backend/domain/view";
-import { PermissionError, canWrite, writeDeniedReason } from "@backend/lib/permissions";
+import {
+  PermissionError,
+  canRetireContainer,
+  canWrite,
+  creatableContainerTypes,
+  writeDeniedReason,
+} from "@backend/lib/permissions";
 import { currentPrincipal } from "@backend/lib/session";
 
 /**
@@ -148,9 +154,16 @@ export default async function WorkspacePage({
   const drawerOpen = sp.nav === "1";
   const isGm = principal.role === "gm";
 
-  // GM-only, and the Sidebar renders it only for a GM — but the action checks
-  // the principal again server-side, because a link is not a permission.
+  // The Sidebar renders this only for someone who may create something — but
+  // the action checks the principal again server-side, because a link is not a
+  // permission.
   const newContainerHref = `/c/${containerId}?dialog=new-container`;
+
+  // The kinds this principal may bring into existence, and whether they may
+  // reshape one that already exists. Computed here, in server code, and passed
+  // down: the dialog is a client component and the rules are not.
+  const allowedTypes = creatableContainerTypes(principal);
+  const canRetireThis = canRetireContainer(principal, container);
   // Only fetched when the dialog is actually open: the owner picker is the one
   // place the roster is needed, and a GM opening a container list should not
   // cost a members query every time.
@@ -158,6 +171,7 @@ export default async function WorkspacePage({
   // fetched when one of them is actually open.
   const containerDialogOpen =
     sp.dialog === "new-container" || sp.dialog === "edit-container";
+  // Only the GM gets an owner picker, so only the GM needs the roster.
   const members = containerDialogOpen && isGm ? await repo.listMembers() : [];
 
   // Somewhere to land after retiring, since the current container will be gone.
@@ -252,7 +266,12 @@ export default async function WorkspacePage({
                   />
                 ) : null}
 
-                {isGm ? (
+                {/* Anyone who may write to this container may also rename it
+                    and set its capacity. What the dialog then offers narrows
+                    again by role: the kind and the owner are the GM's, and the
+                    retire control appears only for someone who may retire this
+                    one. */}
+                {editable ? (
                   <ButtonLink
                     href={`/c/${containerId}?dialog=edit-container`}
                     variant="secondary"
@@ -406,19 +425,29 @@ export default async function WorkspacePage({
         <ItemEditorDialog container={container} closeHref={closeHref} />
       ) : null}
 
-      {sp.dialog === "new-container" && isGm ? (
+      {sp.dialog === "new-container" && allowedTypes.length > 0 ? (
         <ContainerEditorDialog
           members={members}
           closeHref={`/c/${containerId}`}
+          allowedTypes={allowedTypes}
+          canReshape={isGm}
+          selfId={principal.userId}
         />
       ) : null}
 
-      {sp.dialog === "edit-container" && isGm ? (
+      {/* Editing needs write access to the container itself: renaming the
+          Barrow Chest is not something a player does to a revealed world
+          container they cannot even take from. The retire control appears
+          only for someone who may actually retire this one. */}
+      {sp.dialog === "edit-container" && editable ? (
         <ContainerEditorDialog
           members={members}
           container={container}
           closeHref={`/c/${containerId}`}
-          retireFallbackHref={retireFallbackHref}
+          retireFallbackHref={canRetireThis ? retireFallbackHref : undefined}
+          allowedTypes={allowedTypes}
+          canReshape={isGm}
+          selfId={principal.userId}
         />
       ) : null}
 

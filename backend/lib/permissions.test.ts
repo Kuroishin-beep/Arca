@@ -77,16 +77,65 @@ describe("reads", () => {
   });
 
   /**
-   * Creating containers is GM-only (SCOPE.md §3), and deliberately not implied
-   * by write access. Kova can write to the party wagon all day; that must not
-   * let her conjure a second one.
+   * A player may bring into existence the two kinds whose existence is theirs
+   * to decide: their own pack, and a shared container (SCOPE.md §3).
    */
-  it("refuses a player who tries to create a container", async () => {
+  it("lets a player add a shared container", async () => {
+    const created = await fixtureRepository.createContainer(kova, {
+      name: "The mule",
+      type: "party",
+      ownerId: null,
+      capacity: null,
+      revealed: false,
+    });
+
+    // Shared means shared: it has to reach the other player, not just its
+    // author.
+    const forMilo = await fixtureRepository.listContainers(milo);
+    expect(forMilo.map((c) => c.id)).toContain(created.id);
+  });
+
+  it("lets a player add a pack of their own", async () => {
+    const created = await fixtureRepository.createContainer(kova, {
+      name: "Kova's saddlebag",
+      type: "character",
+      ownerId: kova.userId,
+      capacity: null,
+      revealed: false,
+    });
+
+    const forKova = await fixtureRepository.listContainers(kova);
+    expect(forKova.map((c) => c.id)).toContain(created.id);
+
+    // Still a character container, so it is still nobody else's.
+    const forMilo = await fixtureRepository.listContainers(milo);
+    expect(forMilo.map((c) => c.id)).not.toContain(created.id);
+  });
+
+  /**
+   * World containers stay the GM's alone. Reveal only means something if a
+   * player cannot mint a revealed container themselves.
+   */
+  it("refuses a player who tries to add a world container", async () => {
     await expect(
       fixtureRepository.createContainer(kova, {
-        name: "Kova's secret stash",
-        type: "party",
+        name: "A vault of my own",
+        type: "world",
         ownerId: null,
+        capacity: null,
+        revealed: true,
+      }),
+    ).rejects.toBeInstanceOf(PermissionError);
+  });
+
+  /** Their own, and only their own — otherwise adding a container is a way to
+   *  put one in somebody else's sidebar. */
+  it("refuses a player who tries to add a pack for someone else", async () => {
+    await expect(
+      fixtureRepository.createContainer(milo, {
+        name: "Milo's gift to Kova",
+        type: "character",
+        ownerId: kova.userId,
         capacity: null,
         revealed: false,
       }),
@@ -109,10 +158,44 @@ describe("reads", () => {
     expect(forKova.map((c) => c.id)).not.toContain(created.id);
   });
 
-  it("refuses a player who tries to retire a container", async () => {
+  /**
+   * Retiring is narrower than creating, on purpose: a player may add a shared
+   * container for the table, but removing one removes it from everybody.
+   */
+  it("refuses a player who tries to retire a shared container", async () => {
+    await expect(
+      fixtureRepository.archiveContainer(kova, PARTY_WAGON),
+    ).rejects.toBeInstanceOf(PermissionError);
+  });
+
+  it("refuses a player who tries to retire another player's pack", async () => {
+    await expect(
+      fixtureRepository.archiveContainer(milo, KOVAS_PACK),
+    ).rejects.toBeInstanceOf(PermissionError);
+  });
+
+  it("lets a player retire their own empty pack", async () => {
+    const created = await fixtureRepository.createContainer(kova, {
+      name: "Kova's spare sack",
+      type: "character",
+      ownerId: kova.userId,
+      capacity: null,
+      revealed: false,
+    });
+
+    await fixtureRepository.archiveContainer(kova, created.id);
+
+    const after = await fixtureRepository.listContainers(kova);
+    expect(after.map((c) => c.id)).not.toContain(created.id);
+  });
+
+  /** The "must be empty first" rule is about the items, not about the role —
+   *  it applies to a player retiring their own pack exactly as it does to the
+   *  GM. */
+  it("refuses a player retiring their own pack while it holds items", async () => {
     await expect(
       fixtureRepository.archiveContainer(kova, KOVAS_PACK),
-    ).rejects.toBeInstanceOf(PermissionError);
+    ).rejects.toBeInstanceOf(ConflictError);
   });
 
   /**
@@ -138,13 +221,63 @@ describe("reads", () => {
     expect(after.map((c) => c.id)).not.toContain(empty.id);
   });
 
-  it("refuses a player who tries to edit a container", async () => {
+  it("lets a player rename their own pack", async () => {
+    const updated = await fixtureRepository.updateContainer(kova, {
+      id: KOVAS_PACK,
+      name: "Kova's much larger pack",
+    });
+    expect(updated.name).toBe("Kova's much larger pack");
+  });
+
+  it("refuses a player who tries to rename another player's pack", async () => {
+    await expect(
+      fixtureRepository.updateContainer(milo, {
+        id: KOVAS_PACK,
+        name: "Milo was here",
+      }),
+    ).rejects.toBeInstanceOf(PermissionError);
+  });
+
+  /**
+   * The loophole this rule exists to close.
+   *
+   * A player may edit the party wagon, and a player may own a pack. Checking
+   * only the result of the patch would therefore let them convert the shared
+   * wagon into their own pack and take the table's entire inventory private in
+   * one save. Reshaping a container is the GM's call; filling one is not.
+   */
+  it("refuses a player who tries to turn the shared wagon into their own pack", async () => {
+    await expect(
+      fixtureRepository.updateContainer(kova, {
+        id: PARTY_WAGON,
+        type: "character",
+        ownerId: kova.userId,
+      }),
+    ).rejects.toBeInstanceOf(PermissionError);
+
+    // And it really is untouched, not merely refused.
+    const wagon = await fixtureRepository.getContainer(milo, PARTY_WAGON);
+    expect(wagon?.type).toBe("party");
+  });
+
+  it("refuses a player who tries to hand their own pack to someone else", async () => {
     await expect(
       fixtureRepository.updateContainer(kova, {
         id: KOVAS_PACK,
-        name: "Kova's much larger pack",
+        ownerId: milo.userId,
       }),
     ).rejects.toBeInstanceOf(PermissionError);
+  });
+
+  /** Reshaping stays available to the GM — the rule above narrows players,
+   *  not the role the whole feature was built for. */
+  it("lets the GM change what kind of container something is", async () => {
+    const updated = await fixtureRepository.updateContainer(gm, {
+      id: PARTY_WAGON,
+      type: "world",
+      ownerId: null,
+    });
+    expect(updated.type).toBe("world");
   });
 
   /**

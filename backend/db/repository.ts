@@ -35,6 +35,21 @@ export interface MoveOutcome {
   itemName: string;
 }
 
+/**
+ * A member as every screen needs them: the principal, plus whether they have
+ * enrolled a PIN yet.
+ *
+ * `hasPin` is on the roster rather than fetched per member because the sign-in
+ * screen has to decide, for each name in the list, whether it is asking for a
+ * PIN or offering to set one — and doing that with a query per row is a query
+ * per row on the one screen that runs before anyone is authenticated.
+ *
+ * It is a boolean and never the hash. The hash does not leave the repository.
+ */
+export interface Member extends Principal {
+  hasPin: boolean;
+}
+
 export interface ArcaRepository {
   /** Every container this principal may READ, in sidebar order. */
   listContainers(principal: Principal): Promise<ContainerView[]>;
@@ -47,7 +62,10 @@ export interface ArcaRepository {
   ): Promise<ContainerView | null>;
 
   /**
-   * Create a container — GM only (SCOPE.md §3).
+   * Create a container — SCOPE.md §3.
+   *
+   * A player may add their own pack or a shared container; world containers
+   * are the GM's. See `canManageContainer`.
    *
    * A container IS an object (§5.2), so this inserts into `objects` and
    * `containers` together; capacity is a property on that object, exactly as
@@ -59,7 +77,10 @@ export interface ArcaRepository {
   ): Promise<ContainerView>;
 
   /**
-   * Edit a container — GM only. Rename, set or clear capacity, and reveal.
+   * Edit a container. Rename, set or clear capacity, and reveal.
+   *
+   * Renaming and re-capacitating follow the same rule as creating. Changing
+   * the KIND or the OWNER is the GM's alone — see `assertCanEditContainer`.
    *
    * Revealing is the one that matters at a table: a world container is hidden
    * until the party finds it, and this is what makes that a click rather than
@@ -72,7 +93,10 @@ export interface ArcaRepository {
   ): Promise<ContainerView>;
 
   /**
-   * Retire a container — GM only. Soft, like everything else (M6).
+   * Retire a container. Soft, like everything else (M6).
+   *
+   * Narrower than creating: a player may retire their own pack, never a
+   * shared or world container.
    *
    * Refuses a container that still holds items. Archiving it would hide the
    * container from every query while leaving the containment edges intact, so
@@ -114,19 +138,33 @@ export interface ArcaRepository {
   /** THE operation. Authorises both ends, splits partial stacks. */
   moveItem(principal: Principal, input: MoveItemInput): Promise<MoveOutcome>;
 
-  /** Everyone at the table, for the sign-in picker and comment attribution. */
-  listMembers(): Promise<Principal[]>;
+  /** Everyone at the table, for the sign-in picker, the owner picker on a
+   *  pack, and comment attribution. */
+  listMembers(): Promise<Member[]>;
 
   /**
-   * Maps a Discord identity onto campaign membership (M1).
+   * Check a member's PIN and return them if it matches — SCOPE.md §4.
    *
-   * `null` is a real, expected answer and not an error: it means "authenticated
-   * with Discord, but not a member of this campaign", which is exactly the case
-   * M1 requires to reach a "not in this campaign" screen rather than a
-   * container list. Identity and authorisation are separate questions and this
-   * is where they meet.
+   * `null` covers every failure on purpose: unknown member, no PIN enrolled,
+   * wrong PIN. The sign-in screen turns all of them into the same message,
+   * because distinguishing them tells someone probing the roster which half of
+   * the pair they got right.
    */
-  findMemberByDiscordId(discordId: string): Promise<Principal | null>;
+  authenticateMember(userId: string, pin: string): Promise<Principal | null>;
+
+  /**
+   * First sign-in: a member with no PIN yet chooses one.
+   *
+   * Self-enrolment rather than the GM issuing PINs, because the GM handing out
+   * secrets over the group chat is both a chore and the least private channel the
+   * table has. It is safe precisely once — `hasPin` becomes true and this
+   * refuses from then on, so the window is "before that player first signs
+   * in", not "any time".
+   *
+   * Returns `null` when the member is unknown or already enrolled; the caller
+   * must not report which.
+   */
+  enrolMemberPin(userId: string, pin: string): Promise<Principal | null>;
 }
 
 /** Raised when an id simply is not there. Distinct from PermissionError, which

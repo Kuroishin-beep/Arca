@@ -24,12 +24,15 @@ import {
   ownershipProblem,
 } from "@backend/domain/view";
 import {
-  assertCanManageContainers,
+  assertCanEditContainer,
+  assertCanManageContainer,
   assertCanMove,
   assertCanRead,
+  assertCanRetireContainer,
   assertCanWrite,
   visibleContainers,
 } from "@backend/lib/permissions";
+import { clearFailures, hashPin, verifyPin } from "@backend/lib/pin";
 
 import {
   type ArcaRepository,
@@ -45,7 +48,10 @@ import {
 } from "./seed-data";
 
 interface Store {
-  users: Principal[];
+  /** The roster, plus the enrolled PIN hash. `pinHash` is deliberately part of
+   *  the store and NOT of `Member`: it is compared inside this module and is
+   *  never handed to a caller. Null means "has not chosen one yet". */
+  users: (Principal & { pinHash: string | null })[];
   containers: Omit<ContainerView, "itemCount" | "carriedWeight">[];
   items: (ItemView & { archivedAt: Date | null })[];
   comments: CommentView[];
@@ -56,10 +62,15 @@ const STORE_KEY = Symbol.for("arca.fixture.store");
 function freshStore(): Store {
   const now = new Date();
   return {
+    // Seeded unenrolled. Fixture mode is the no-database mode, so a PIN set
+    // here would survive only until the dev server restarts; starting every
+    // member at "choose a PIN" exercises the real first-run flow every time
+    // rather than once.
     users: SEED_USERS.map((u) => ({
       userId: u.id as Principal["userId"],
       displayName: u.displayName,
       role: u.role,
+      pinHash: null,
     })),
     containers: SEED_CONTAINERS.map((c) => ({
       id: c.id as ContainerView["id"],
@@ -166,7 +177,10 @@ export const fixtureRepository: ArcaRepository = {
   },
 
   async createContainer(principal, input) {
-    assertCanManageContainers(principal);
+    assertCanManageContainer(principal, {
+      type: input.type,
+      ownerId: input.ownerId,
+    });
 
     const container = {
       id: randomUUID() as ContainerView["id"],
@@ -182,7 +196,6 @@ export const fixtureRepository: ArcaRepository = {
   },
 
   async updateContainer(principal, input) {
-    assertCanManageContainers(principal);
     const raw = store().containers.find((c) => c.id === input.id);
     if (!raw) throw new NotFoundError("No such container.");
 
@@ -190,6 +203,15 @@ export const fixtureRepository: ArcaRepository = {
     // same order as the Postgres backend.
     const type = input.type ?? raw.type;
     const ownerId = input.ownerId !== undefined ? input.ownerId : raw.ownerId;
+
+    // Authorised against BOTH the stored row and the row this patch would
+    // produce, so an edit cannot walk a container from a kind you may touch to
+    // one you may not.
+    assertCanEditContainer(
+      principal,
+      { type: raw.type, ownerId: raw.ownerId },
+      { type, ownerId },
+    );
 
     const problem = ownershipProblem(type, ownerId);
     if (problem) throw new ConflictError(problem);
@@ -214,8 +236,7 @@ export const fixtureRepository: ArcaRepository = {
   },
 
   async archiveContainer(principal, containerId) {
-    assertCanManageContainers(principal);
-    findContainer(containerId);
+    assertCanRetireContainer(principal, findContainer(containerId));
 
     // Same refusal as the Postgres backend: hiding a container that still
     // holds items would leave them belonging somewhere and appearing nowhere.
@@ -382,20 +403,35 @@ export const fixtureRepository: ArcaRepository = {
   },
 
   async listMembers() {
-    return store().users;
+    // Projected, not returned: `pinHash` lives on the store rows and must not
+    // travel with them. Spreading the row and deleting the field would leave
+    // the hash one forgotten `...member` away from a client component.
+    return store().users.map(({ userId, displayName, role, pinHash }) => ({
+      userId,
+      displayName,
+      role,
+      hasPin: pinHash !== null,
+    }));
   },
 
-  /**
-   * Always `null`, and correctly so.
-   *
-   * Membership is a database fact — a row in `campaign_members` that the GM
-   * put there. Fixture mode is the no-database mode, so it has no Discord
-   * links to resolve and cannot invent one without deciding, in code, that
-   * whoever signs in is a member of the campaign. Discord auth therefore
-   * requires DATABASE_URL; without it the app uses the member picker, which
-   * `authConfigured()` in `backend/lib/auth.ts` selects between.
-   */
-  async findMemberByDiscordId() {
-    return null;
+  async authenticateMember(userId, pin) {
+    const member = store().users.find((u) => u.userId === userId);
+    // Same `null` for unknown member, unenrolled member and wrong PIN — see
+    // the note on the interface. Nothing here distinguishes them.
+    if (!member?.pinHash) return null;
+    if (!(await verifyPin(pin, member.pinHash))) return null;
+
+    clearFailures(userId);
+    return { userId: member.userId, displayName: member.displayName, role: member.role };
+  },
+
+  async enrolMemberPin(userId, pin) {
+    const member = store().users.find((u) => u.userId === userId);
+    // Refusing when a PIN already exists is what keeps this a first-run step
+    // rather than a way to overwrite somebody else's.
+    if (!member || member.pinHash !== null) return null;
+
+    member.pinHash = await hashPin(pin);
+    return { userId: member.userId, displayName: member.displayName, role: member.role };
   },
 };

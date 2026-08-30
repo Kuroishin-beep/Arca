@@ -14,4 +14,4 @@ export function repository(): ArcaRepository {
 }
 
 export { repositoryKind } from "./repository";
-export type { ArcaRepository, MoveOutcome } from "./repository";
+export type { ArcaRepository, Member, MoveOutcome } from "./repository";
