@@ -6,6 +6,7 @@ import { Chip, ContainerBadge, ContainerDot } from "@frontend/components/atoms/C
 import { Icon } from "@frontend/components/atoms/Icon";
 import { ContainerEditorDialog } from "@frontend/components/organisms/ContainerEditorDialog";
 import { DetailPanel } from "@frontend/components/organisms/DetailPanel";
+import { RevealToggle } from "@frontend/components/organisms/RevealToggle";
 import {
   OptimisticItemsProvider,
   OptimisticWeightMeter,
@@ -145,6 +146,7 @@ export default async function WorkspacePage({
     }));
 
   const drawerOpen = sp.nav === "1";
+  const isGm = principal.role === "gm";
 
   // GM-only, and the Sidebar renders it only for a GM — but the action checks
   // the principal again server-side, because a link is not a permission.
@@ -153,9 +155,7 @@ export default async function WorkspacePage({
   // place the roster is needed, and a GM opening a container list should not
   // cost a members query every time.
   const members =
-    sp.dialog === "new-container" && principal.role === "gm"
-      ? await repo.listMembers()
-      : [];
+    sp.dialog === "new-container" && isGm ? await repo.listMembers() : [];
 
   return (
     // The provider spans the table, the footer meter and the dialogs, because
@@ -228,10 +228,34 @@ export default async function WorkspacePage({
                 </h1>
                 <ContainerBadge type={container.type} />
                 {!editable ? <Chip tone="neutral">Read only</Chip> : null}
+                {/* A GM looking at an unrevealed container should be able to
+                    tell at a glance, without opening anything. */}
+                {isGm && container.type === "world" && !container.revealed ? (
+                  <Chip tone="warning">Hidden</Chip>
+                ) : null}
+              </div>
+
+              <div className="ml-auto flex items-center gap-2">
+                {isGm && container.type === "world" ? (
+                  <RevealToggle
+                    containerId={container.id}
+                    revealed={container.revealed}
+                  />
+                ) : null}
+
+                {isGm ? (
+                  <ButtonLink
+                    href={`/c/${containerId}?dialog=edit-container`}
+                    variant="secondary"
+                    size="sm"
+                  >
+                    Edit
+                  </ButtonLink>
+                ) : null}
               </div>
 
               {editable ? (
-                <div className="ml-auto flex items-center gap-2">
+                <div className="flex items-center gap-2">
                   <ButtonLink
                     href={`/c/${containerId}?dialog=add`}
                     variant="primary"
@@ -373,9 +397,17 @@ export default async function WorkspacePage({
         <ItemEditorDialog container={container} closeHref={closeHref} />
       ) : null}
 
-      {sp.dialog === "new-container" && principal.role === "gm" ? (
+      {sp.dialog === "new-container" && isGm ? (
         <ContainerEditorDialog
           members={members}
+          closeHref={`/c/${containerId}`}
+        />
+      ) : null}
+
+      {sp.dialog === "edit-container" && isGm ? (
+        <ContainerEditorDialog
+          members={members}
+          container={container}
           closeHref={`/c/${containerId}`}
         />
       ) : null}

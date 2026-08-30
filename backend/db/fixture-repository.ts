@@ -180,6 +180,23 @@ export const fixtureRepository: ArcaRepository = {
     return hydrate(container);
   },
 
+  async updateContainer(principal, input) {
+    assertCanManageContainers(principal);
+    const raw = store().containers.find((c) => c.id === input.id);
+    if (!raw) throw new NotFoundError("No such container.");
+
+    // `undefined` means leave it alone; `null` on capacity means no limit.
+    // Assigning unconditionally is exactly the data-loss bug UpdateItemInput's
+    // comment warns about, one level up.
+    if (input.name !== undefined) raw.name = input.name;
+    if (input.capacity !== undefined) raw.capacity = input.capacity;
+    if (input.revealed !== undefined && raw.type === "world") {
+      raw.revealed = input.revealed;
+    }
+
+    return hydrate(raw);
+  },
+
   async archiveContainer(principal, containerId) {
     assertCanManageContainers(principal);
     findContainer(containerId);

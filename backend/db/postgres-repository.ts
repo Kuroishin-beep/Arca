@@ -371,6 +371,58 @@ export const postgresRepository: ArcaRepository = {
     return requireContainer(objectId);
   },
 
+  async updateContainer(principal, input) {
+    assertCanManageContainers(principal);
+    const existing = await requireContainer(input.id);
+
+    const fields: { name?: string; revealed?: boolean } = {};
+    if (input.name !== undefined) fields.name = input.name;
+    // Only a world container is ever hidden, so a reveal on the other two is
+    // silently a no-op rather than an error — the caller asked for a state it
+    // is already in.
+    if (input.revealed !== undefined && existing.type === "world") {
+      fields.revealed = input.revealed;
+    }
+
+    if (Object.keys(fields).length > 0) {
+      await db()
+        .update(containers)
+        .set(fields)
+        .where(eq(containers.objectId, input.id));
+    }
+
+    if (input.capacity !== undefined) {
+      if (input.capacity === null) {
+        // "No limit" is the ABSENCE of the property, not a null stored in it.
+        // `loadContainers` asks whether the value is a positive number, so a
+        // stored null would read the same — but leaving the row behind means
+        // every future reader has to know that null and missing mean the same
+        // thing, which is the kind of ambiguity JSONB columns rot from.
+        const ids = await propertyIdsByName();
+        const capacityId = ids.get("capacity");
+        if (capacityId) {
+          await db()
+            .delete(objectProperties)
+            .where(
+              and(
+                eq(objectProperties.objectId, input.id),
+                eq(objectProperties.propertyDefinitionId, capacityId),
+              ),
+            );
+        }
+      } else {
+        await setProperties(input.id, { capacity: input.capacity });
+      }
+    }
+
+    await db()
+      .update(objects)
+      .set({ updatedAt: new Date() })
+      .where(eq(objects.id, input.id));
+
+    return requireContainer(input.id);
+  },
+
   async archiveContainer(principal, containerId) {
     assertCanManageContainers(principal);
     await requireContainer(containerId);

@@ -194,6 +194,37 @@ export const CreateContainerInput = z
 export type CreateContainerInput = z.infer<typeof CreateContainerInput>;
 
 /**
+ * Editing a container — GM only.
+ *
+ * A true patch, and for the same reason `UpdateItemInput` is one: every field
+ * optional with NO defaults, so `undefined` reaches the repository meaning
+ * "leave this alone". A default here would turn "reveal the chest" into "reveal
+ * the chest and clear its capacity".
+ *
+ * `capacity` is `.nullable().optional()` because it has three states that must
+ * stay distinct: absent means leave it, `null` means no limit, a number sets
+ * one. Collapsing null and undefined is how "no limit" silently becomes "do
+ * not touch".
+ *
+ * `type` and `ownerId` are deliberately NOT editable. Retyping a character
+ * container into a world one would have to strip its owner to satisfy the
+ * ownership invariant, which is a different operation wearing an edit's
+ * clothing — and it changes who can see the contents. Retire it and make the
+ * one you meant.
+ */
+export const UpdateContainerInput = z.object({
+  id: ContainerId,
+  name: z.string().trim().min(1, "A name is required.").max(120).optional(),
+  capacity: z
+    .number()
+    .positive("Capacity must be more than zero.")
+    .nullable()
+    .optional(),
+  revealed: z.boolean().optional(),
+});
+export type UpdateContainerInput = z.infer<typeof UpdateContainerInput>;
+
+/**
  * Posting to a container's thread (M12).
  *
  * `parentId` is nullable and one level deep only — a reply names a top-level

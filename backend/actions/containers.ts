@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { repository } from "@backend/db";
 import { ConflictError, NotFoundError } from "@backend/db/repository";
-import { CreateContainerInput } from "@backend/domain/view";
+import { CreateContainerInput, UpdateContainerInput } from "@backend/domain/view";
 import { campaignId } from "@backend/lib/campaign";
 import { PermissionError } from "@backend/lib/permissions";
 import { requirePrincipal } from "@backend/lib/session";
@@ -93,6 +93,71 @@ export async function createContainerAction(
     return { ok: true, data: { containerId: created.id } };
   } catch (error) {
     return toResult(error, "Could not create that container.");
+  }
+}
+
+export async function updateContainerAction(
+  formData: FormData,
+): Promise<ActionResult> {
+  try {
+    const principal = await requirePrincipal();
+
+    const capacityRaw = text(formData.get("capacity")).trim();
+    const parsed = UpdateContainerInput.safeParse({
+      id: formData.get("id"),
+      name: formData.get("name"),
+      // The form always submits this field, so empty genuinely means "no
+      // limit" rather than "not supplied" — the third state (leave alone) is
+      // for programmatic callers, not for this dialog.
+      capacity: capacityRaw === "" ? null : Number(capacityRaw),
+      revealed: formData.get("revealed") === "on",
+    });
+
+    if (!parsed.success) {
+      return {
+        ok: false,
+        error: "Fix the highlighted fields.",
+        fieldErrors: fieldErrorsOf(parsed.error),
+      };
+    }
+
+    await repository().updateContainer(principal, parsed.data);
+
+    revalidatePath("/c/[containerId]", "page");
+    await announce(principal.userId, parsed.data.id);
+
+    return { ok: true };
+  } catch (error) {
+    return toResult(error, "Could not save that container.");
+  }
+}
+
+/**
+ * The one-click reveal — the flow this whole feature exists for.
+ *
+ * Separate from `updateContainerAction` because it is a different act: the GM
+ * is not editing a record, they are telling the table that a chest is now
+ * there. Routing it through the full form would mean reading and resubmitting
+ * name and capacity to change one boolean, and any drift between what the form
+ * held and what the database holds would be written back as a silent edit.
+ */
+export async function setContainerRevealedAction(
+  containerId: string,
+  revealed: boolean,
+): Promise<ActionResult> {
+  try {
+    const principal = await requirePrincipal();
+    await repository().updateContainer(principal, {
+      id: containerId as UpdateContainerInput["id"],
+      revealed,
+    });
+
+    revalidatePath("/c/[containerId]", "page");
+    await announce(principal.userId, containerId);
+
+    return { ok: true };
+  } catch (error) {
+    return toResult(error, "Could not change that.");
   }
 }
 

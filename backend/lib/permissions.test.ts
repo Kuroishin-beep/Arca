@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { fixtureRepository, resetFixtureStore } from "@backend/db/fixture-repository";
 import { ConflictError } from "@backend/db/repository";
 import { GM_ID, KOVA_ID, MILO_ID, SEED_CONTAINERS } from "@backend/db/seed-data";
+import type { ContainerId } from "@backend/domain/types";
 import type { Principal } from "@backend/domain/view";
 import { PermissionError } from "@backend/lib/permissions";
 
@@ -31,8 +32,10 @@ const milo: Principal = {
   role: "player",
 };
 
-const id = (name: string) =>
-  SEED_CONTAINERS.find((c) => c.name === name)!.id;
+/** Seed ids are plain strings; the branded type is what the domain speaks, and
+ *  asserting it once here beats casting at every call site. */
+const id = (name: string): ContainerId =>
+  SEED_CONTAINERS.find((c) => c.name === name)!.id as ContainerId;
 
 const KOVAS_PACK = id("Kova's Pack");
 const MILOS_PACK = id("Milo's Pack");
@@ -135,6 +138,104 @@ describe("reads", () => {
     expect(after.map((c) => c.id)).not.toContain(empty.id);
   });
 
+  it("refuses a player who tries to edit a container", async () => {
+    await expect(
+      fixtureRepository.updateContainer(kova, {
+        id: KOVAS_PACK,
+        name: "Kova's much larger pack",
+      }),
+    ).rejects.toBeInstanceOf(PermissionError);
+  });
+
+  /**
+   * The point of the whole feature: revealing changes what a PLAYER can see,
+   * not just what a flag says.
+   */
+  it("revealing a world container makes it visible to players", async () => {
+    const before = await fixtureRepository.listContainers(kova);
+    expect(before.map((c) => c.id)).not.toContain(SUNKEN_VAULT);
+
+    await fixtureRepository.updateContainer(gm, {
+      id: SUNKEN_VAULT,
+      revealed: true,
+    });
+
+    const after = await fixtureRepository.listContainers(kova);
+    expect(after.map((c) => c.id)).toContain(SUNKEN_VAULT);
+  });
+
+  it("hiding it again takes it back out of a player's list", async () => {
+    await fixtureRepository.updateContainer(gm, {
+      id: SUNKEN_VAULT,
+      revealed: true,
+    });
+    await fixtureRepository.updateContainer(gm, {
+      id: SUNKEN_VAULT,
+      revealed: false,
+    });
+    const after = await fixtureRepository.listContainers(kova);
+    expect(after.map((c) => c.id)).not.toContain(SUNKEN_VAULT);
+  });
+
+  /**
+   * The data-loss guard, one level up from the item version: revealing a chest
+   * must not also rename it or clear its capacity.
+   */
+  it("leaves untouched fields alone on a patch", async () => {
+    const created = await fixtureRepository.createContainer(gm, {
+      name: "Cellar",
+      type: "world",
+      ownerId: null,
+      capacity: 40,
+      revealed: false,
+    });
+
+    const patched = await fixtureRepository.updateContainer(gm, {
+      id: created.id,
+      revealed: true,
+    });
+
+    expect(patched.revealed).toBe(true);
+    expect(patched.name).toBe("Cellar");
+    expect(patched.capacity).toBe(40);
+  });
+
+  it("clears capacity when told to, distinctly from leaving it alone", async () => {
+    const created = await fixtureRepository.createContainer(gm, {
+      name: "Cart",
+      type: "party",
+      ownerId: null,
+      capacity: 80,
+      revealed: true,
+    });
+
+    const untouched = await fixtureRepository.updateContainer(gm, {
+      id: created.id,
+      name: "Handcart",
+    });
+    expect(untouched.capacity).toBe(80);
+
+    const cleared = await fixtureRepository.updateContainer(gm, {
+      id: created.id,
+      capacity: null,
+    });
+    expect(cleared.capacity).toBeNull();
+    expect(cleared.name).toBe("Handcart");
+  });
+
+  /** A pack is never hidden, so a reveal on one is a no-op rather than a way to
+   *  make a player's own container vanish from their sidebar. */
+  it("ignores revealed on a non-world container", async () => {
+    const patched = await fixtureRepository.updateContainer(gm, {
+      id: KOVAS_PACK,
+      revealed: false,
+    });
+    expect(patched.revealed).toBe(true);
+
+    const forKova = await fixtureRepository.listContainers(kova);
+    expect(forKova.map((c) => c.id)).toContain(KOVAS_PACK);
+  });
+
   it("hides an unrevealed world container from a player", async () => {
     const containers = await fixtureRepository.listContainers(kova);
     expect(containers.map((c) => c.id)).not.toContain(SUNKEN_VAULT);
@@ -187,7 +288,7 @@ describe("moveItem — the headline operation", () => {
 
     const outcome = await fixtureRepository.moveItem(kova, {
       itemId: lantern.id,
-      toContainerId: KOVAS_PACK as never,
+      toContainerId: KOVAS_PACK,
       qty: lantern.qty,
     });
 
@@ -206,7 +307,7 @@ describe("moveItem — the headline operation", () => {
 
     const outcome = await fixtureRepository.moveItem(kova, {
       itemId: potions.id,
-      toContainerId: KOVAS_PACK as never,
+      toContainerId: KOVAS_PACK,
       qty: 2,
     });
 
@@ -231,7 +332,7 @@ describe("moveItem — the headline operation", () => {
     await expect(
       fixtureRepository.moveItem(kova, {
         itemId: items[0]!.id,
-        toContainerId: PARTY_WAGON as never,
+        toContainerId: PARTY_WAGON,
         qty: 1,
       }),
     ).rejects.toBeInstanceOf(PermissionError);
@@ -242,7 +343,7 @@ describe("moveItem — the headline operation", () => {
     await expect(
       fixtureRepository.moveItem(kova, {
         itemId: items[0]!.id,
-        toContainerId: BARROW_CHEST as never,
+        toContainerId: BARROW_CHEST,
         qty: 1,
       }),
     ).rejects.toBeInstanceOf(PermissionError);
@@ -254,7 +355,7 @@ describe("moveItem — the headline operation", () => {
     await expect(
       fixtureRepository.moveItem(kova, {
         itemId: lantern.id,
-        toContainerId: KOVAS_PACK as never,
+        toContainerId: KOVAS_PACK,
         qty: lantern.qty + 5,
       }),
     ).rejects.toThrow(/Only/);
@@ -269,7 +370,7 @@ describe("derived values", () => {
 
     await fixtureRepository.moveItem(kova, {
       itemId: lantern.id,
-      toContainerId: KOVAS_PACK as never,
+      toContainerId: KOVAS_PACK,
       qty: 1,
     });
 

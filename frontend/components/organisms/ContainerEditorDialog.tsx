@@ -3,13 +3,16 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
-import { createContainerAction } from "@backend/actions/containers";
+import {
+  createContainerAction,
+  updateContainerAction,
+} from "@backend/actions/containers";
 import { Button } from "@frontend/components/atoms/Button";
 import { FieldShell, TextField } from "@frontend/components/atoms/Field";
 import { Icon } from "@frontend/components/atoms/Icon";
 import { Modal } from "@frontend/components/molecules/Modal";
 import type { ContainerType } from "@backend/domain/types";
-import type { Principal } from "@backend/domain/view";
+import type { ContainerView, Principal } from "@backend/domain/view";
 
 /**
  * Create a container — GM only (SCOPE.md §3).
@@ -28,13 +31,18 @@ const TYPES: { value: ContainerType; label: string; hint: string }[] = [
 
 export function ContainerEditorDialog({
   members,
+  container,
   closeHref,
 }: {
   /** For the owner picker on a character container. */
   members: Principal[];
+  /** Absent when creating. Kind and owner are fixed once a container exists —
+   *  see the note on UpdateContainerInput. */
+  container?: ContainerView;
   closeHref: string;
 }) {
-  const [type, setType] = useState<ContainerType>("world");
+  const editing = container !== undefined;
+  const [type, setType] = useState<ContainerType>(container?.type ?? "world");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -44,22 +52,35 @@ export function ContainerEditorDialog({
     setFormError(null);
     setFieldErrors({});
     startTransition(async () => {
-      const result = await createContainerAction(formData);
+      const result = editing
+        ? await updateContainerAction(formData)
+        : await createContainerAction(formData);
+
       if (!result.ok) {
         setFieldErrors(result.fieldErrors ?? {});
-        setFormError(result.error ?? "Could not create that container.");
+        setFormError(
+          result.error ??
+            (editing ? "Could not save that." : "Could not create that."),
+        );
         return;
       }
-      // Straight into the thing just made — an empty container is exactly where
-      // you want to be, because the next step is always putting something in it.
-      router.push(`/c/${result.data!.containerId}`);
+
+      if (editing) {
+        router.push(closeHref);
+      } else {
+        // Straight into the thing just made — an empty container is exactly
+        // where you want to be, because the next step is putting something in
+        // it.
+        router.push(`/c/${result.data!.containerId}`);
+      }
       router.refresh();
     });
   };
 
   return (
     <Modal
-      title="New container"
+      title={editing ? "Edit container" : "New container"}
+      subtitle={editing ? container.name : undefined}
       closeHref={closeHref}
       footer={
         <>
@@ -76,12 +97,20 @@ export function ContainerEditorDialog({
             variant="primary"
             disabled={pending}
           >
-            {pending ? "Creating…" : "Create"}
+            {pending
+              ? editing
+                ? "Saving…"
+                : "Creating…"
+              : editing
+                ? "Save"
+                : "Create"}
           </Button>
         </>
       }
     >
       <form action={onSubmit} id="container-form">
+        {editing ? <input type="hidden" name="id" value={container.id} /> : null}
+
         <div className="flex flex-col gap-4 p-4">
           {formError ? (
             <p
@@ -101,9 +130,26 @@ export function ContainerEditorDialog({
             autoFocus
             maxLength={120}
             placeholder="The Barrow Chest"
+            defaultValue={container?.name}
             error={fieldErrors.name}
           />
 
+          {editing ? (
+            /* Kind and owner are fixed. Retyping a container would have to
+               strip or invent an owner to keep the ownership invariant, and it
+               changes who can see the contents — that is a different operation
+               wearing an edit's clothing. Shown, not offered. */
+            <FieldShell id="kind-fixed" label="Kind">
+              <p className="rounded-md border border-border bg-surface2 px-2 py-2 text-base text-muted">
+                {TYPES.find((t) => t.value === container.type)?.label ??
+                  container.type}
+                <span className="block text-sm text-faint">
+                  Set when the container was made. Retire it and make a new one
+                  to change this.
+                </span>
+              </p>
+            </FieldShell>
+          ) : (
           <FieldShell id="type" label="Kind" required>
             <div className="flex flex-col gap-1">
               {TYPES.map((option) => (
@@ -135,8 +181,9 @@ export function ContainerEditorDialog({
               ))}
             </div>
           </FieldShell>
+          )}
 
-          {type === "character" ? (
+          {!editing && type === "character" ? (
             <FieldShell
               id="ownerId"
               label="Belongs to"
@@ -157,11 +204,11 @@ export function ContainerEditorDialog({
                 ))}
               </select>
             </FieldShell>
-          ) : (
+          ) : !editing ? (
             /* Submitted empty so the server sees "no owner" explicitly rather
                than a missing key it has to interpret. */
             <input type="hidden" name="ownerId" value="" />
-          )}
+          ) : null}
 
           <TextField
             id="capacity"
@@ -170,17 +217,23 @@ export function ContainerEditorDialog({
             numeric
             hint="Leave empty for no limit — a wagon is not encumbered, a person is."
             placeholder=""
+            defaultValue={container?.capacity != null ? String(container.capacity) : ""}
             error={fieldErrors.capacity}
           />
 
           {type === "world" ? (
             <label className="flex items-center gap-2 rounded-md border border-border bg-surface px-2 py-2">
-              <input type="checkbox" name="revealed" />
+              <input
+                type="checkbox"
+                name="revealed"
+                defaultChecked={container?.revealed ?? false}
+              />
               <span className="text-base text-text">
-                Reveal to players now
+                Visible to players
                 <span className="block text-sm text-muted">
-                  Off by default. Players cannot see it, or its contents, until
-                  you turn this on.
+                  {editing
+                    ? "Off means players cannot see it, or its contents, at all."
+                    : "Off by default. Players cannot see it, or its contents, until you turn this on."}
                 </span>
               </span>
             </label>

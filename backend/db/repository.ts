@@ -21,6 +21,7 @@ import type {
   ItemView,
   MoveItemInput,
   Principal,
+  UpdateContainerInput,
   UpdateItemInput,
 } from "@backend/domain/view";
 
@@ -55,6 +56,19 @@ export interface ArcaRepository {
   createContainer(
     principal: Principal,
     input: CreateContainerInput,
+  ): Promise<ContainerView>;
+
+  /**
+   * Edit a container — GM only. Rename, set or clear capacity, and reveal.
+   *
+   * Revealing is the one that matters at a table: a world container is hidden
+   * until the party finds it, and this is what makes that a click rather than
+   * a hand-written UPDATE. `revealed` is ignored for character and party
+   * containers, which are never hidden in the first place.
+   */
+  updateContainer(
+    principal: Principal,
+    input: UpdateContainerInput,
   ): Promise<ContainerView>;
 
   /**
