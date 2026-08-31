@@ -30,6 +30,7 @@ export type IconName =
   | "alert"
   | "info"
   | "trash"
+  | "sign-out"
   | "sun"
   | "moon";
 
@@ -117,6 +118,22 @@ const PATHS: Record<IconName, React.ReactNode> = {
       d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5 5 13h6l.5-8.5"
       strokeLinecap="round"
     />
+  ),
+  /* A door being left, with the arrow pointing out of it. The arrow is the
+     half people actually read, so it gets the longer stroke. */
+  "sign-out": (
+    <>
+      <path
+        d="M9.5 3.5H4a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h5.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M7.5 8h6M11.5 5.75 13.75 8l-2.25 2.25"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </>
   ),
 };
 

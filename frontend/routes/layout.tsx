@@ -17,8 +17,8 @@ export const viewport: Viewport = {
   // Two values so the browser chrome matches the page in both themes — a white
   // page under a near-black title bar is the tell that a theme was bolted on.
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#0b1220" },
+    { media: "(prefers-color-scheme: light)", color: "#faf9f6" },
+    { media: "(prefers-color-scheme: dark)", color: "#1b1b1b" },
   ],
 };
 

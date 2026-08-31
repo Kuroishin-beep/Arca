@@ -197,3 +197,32 @@ test.describe("the move", () => {
     await gm.context().close();
   });
 });
+
+test.describe("the session", () => {
+  /**
+   * Signing out has to actually end the session, not just navigate.
+   *
+   * The second half is the half worth testing: going back to a container URL
+   * afterwards must land on the sign-in screen. A sign-out that only redirects
+   * while leaving the cookie in place looks identical from the button and is
+   * wrong in the way that matters on a shared machine.
+   */
+  test("signing out ends the session", async ({ browser }) => {
+    const player = await signInAs(browser, "Kova");
+    const containerPath = new URL(player.url()).pathname;
+
+    // The badge beside it is inert identity — the labelled control is what
+    // signs you out, and this asserts they are genuinely two elements.
+    await player.getByRole("button", { name: /sign out/i }).click();
+    await player.waitForURL(/\/signin/);
+    await expect(
+      player.getByRole("heading", { name: /sit at the table as/i }),
+    ).toBeVisible();
+
+    // The cookie is gone, so the container is no longer reachable.
+    await player.goto(containerPath);
+    await expect(player).toHaveURL(/\/signin/);
+
+    await player.context().close();
+  });
+});
