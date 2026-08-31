@@ -3,8 +3,17 @@
 The filled-in version of [03-design-system.md](03-design-system.md). This is the
 reference you open every time you build a component. Machine-readable copies of
 everything here live in [`mockups/tokens.css`](../mockups/tokens.css) and
-[`mockups/tailwind.config.js`](../mockups/tailwind.config.js) — those two files
-are the source of truth; this document explains *why* each value is what it is.
+[`mockups/tailwind.config.js`](../mockups/tailwind.config.js) for the static
+mockups, and in [`frontend/styles/globals.css`](../frontend/styles/globals.css)
+for the app. All three carry the same values; this document explains *why* each
+value is what it is.
+
+The five colour anchors are not decided here — they are decided in
+[03-design-system.md](03-design-system.md) Step B, which is the submitted
+worksheet and therefore the palette of record. Everything below either quotes
+that worksheet or derives from it in the same family, because a five-colour
+worksheet cannot describe a three-level surface ladder or four semantic
+states.
 
 > **Hard rule for this project: no gradients.** Every fill is a solid colour.
 > Depth comes from three flat surface levels plus a hairline border, never from
@@ -26,11 +35,11 @@ Chosen because it is the only approach that satisfies both constraints at once:
   block becomes a `.tsx` file by copy-paste — no CSS module to port, no
   `styled-components` runtime shipped to a panel that has to stay light.
 
-Where they land: **all of it in `app/globals.css`**. Tailwind v4 is CSS-first
-and has no `tailwind.config.ts` — canonical tokens are declared on `:root`, and
-an `@theme inline` block maps them onto Tailwind's utility namespaces so
-`--color-surface-2` drives `bg-surface2`. One file, two roles: the tokens a
-designer reads and the theme the compiler reads.
+Where they land: **all of it in `frontend/styles/globals.css`**. Tailwind v4 is
+CSS-first and has no `tailwind.config.ts` — canonical tokens are declared on
+`:root`, and an `@theme inline` block maps them onto Tailwind's utility
+namespaces so `--color-surface-2` drives `bg-surface2`. One file, two roles:
+the tokens a designer reads and the theme the compiler reads.
 
 (The static mockups in `mockups/` predate the app and use the Tailwind **v3**
 CDN, so they carry an equivalent `tailwind.config.js`. The token names and every
@@ -44,20 +53,25 @@ Five core roles, plus semantics. Deliberately small.
 
 | Token | Role | Hex |
 | --- | --- | --- |
-| `--color-primary` | links, active nav, primary buttons | `#C9A227` |
-| `--color-accent` | secondary action, party-owned things | `#4E9A8F` |
-| `--color-bg` | app background | `#14110F` |
-| `--color-surface` | cards, sidebar, panels | `#1F1B18` |
-| `--color-text` | body text | `#EDE6DA` |
+| `--color-primary` | links, active nav, primary buttons | `#D2C088` |
+| `--color-accent` | secondary action, party-owned things | `#6DB8A6` |
+| `--color-bg` | app background | `#1B1B1B` |
+| `--color-surface` | cards, sidebar, panels | `#212121` |
+| `--color-text` | body text | `#F2F2F2` |
 
-Supporting: `--color-surface-2` `#2A2521` (hover/selected/inputs),
-`--color-surface-3` `#35302B` (menus), `--color-border` `#3A322C`,
-`--color-text-muted` `#A99C8A`.
+All five are the worksheet's own values, unchanged.
 
-Semantic: success `#5FA777`, warning `#D08B3C`, danger `#C2564B`, info `#6E93C9`.
-Each has a `-weak` solid tint (e.g. `--color-danger-weak: #331714`) used as a
-chip background — a **flat tint, not an opacity layer**, so chips render
-identically over any surface level.
+Supporting: `--color-surface-2` `#2A2A2A` (hover/selected/inputs),
+`--color-surface-3` `#343434` (menus), `--color-border` `#333333`,
+`--color-border-strong` `#6B6B6B`, `--color-text-muted` `#A8A8A8`.
+
+Semantic: success `#6BBF7B`, warning `#D9A441`, danger `#DC6F66`, info `#7FA8D9`.
+These are the only hues that sit off-palette, and they do so on purpose: "over
+capacity" and "offline" are warnings, and rendering them in the same gold as
+everything else would make the app prettier and strictly less informative. Each
+has a `-weak` solid tint (e.g. `--color-danger-weak: #2E1A18`) used as a chip
+background — a **flat tint, not an opacity layer**, so chips render identically
+over any surface level.
 
 ### Container-type hues
 
@@ -68,9 +82,9 @@ detail-panel header, move-dialog target:
 
 | Type | Token | Hex | Means |
 | --- | --- | --- | --- |
-| `character` | `--color-container-character` | `#C9A227` gold | your own pack |
-| `party` | `--color-container-party` | `#4E9A8F` teal | the shared wagon/stash |
-| `world` | `--color-container-world` | `#9B6BC9` violet | dungeon chest, GM-owned |
+| `character` | `--color-container-character` | `#D2C088` gold | your own pack |
+| `party` | `--color-container-party` | `#6DB8A6` teal | the shared wagon/stash |
+| `world` | `--color-container-world` | `#A98CD0` violet | dungeon chest, GM-owned |
 
 Colour is never the *only* signal — every container row also carries a distinct
 icon and a text label, so this survives colour-blindness and greyscale.
@@ -79,17 +93,31 @@ icon and a text label, so this survives colour-blindness and greyscale.
 
 | Pair | Ratio | Verdict |
 | --- | --- | --- |
-| `--color-text` on `--color-bg` | 15.9 : 1 | AAA |
-| `--color-text` on `--color-surface` | 14.2 : 1 | AAA |
-| `--color-text-muted` on `--color-bg` | 7.6 : 1 | AAA |
-| `--color-text-muted` on `--color-surface-2` | 5.9 : 1 | AA |
-| `--color-primary` on `--color-bg` | 8.4 : 1 | AAA |
-| `--color-text-invert` on `--color-primary` | 9.1 : 1 | AAA (gold button) |
-| `--color-accent` on `--color-surface` | 5.4 : 1 | AA |
-| `--color-danger` on `--color-surface` | 4.6 : 1 | AA |
+| `--color-text` on `--color-bg` | 15.4 : 1 | AAA |
+| `--color-text` on `--color-surface` | 14.4 : 1 | AAA |
+| `--color-text-muted` on `--color-bg` | 7.2 : 1 | AAA |
+| `--color-text-muted` on `--color-surface-2` | 6.0 : 1 | AAA |
+| `--color-primary` on `--color-bg` | 9.5 : 1 | AAA |
+| `--color-text-invert` on `--color-primary` | 9.5 : 1 | AAA (gold button) |
+| `--color-accent` on `--color-surface` | 6.9 : 1 | AAA |
+| `--color-danger` on `--color-surface` | 5.0 : 1 | AA |
 
-`--color-text-faint` `#7C7062` (3.9:1) is **disabled-state only** and never
+`--color-text-faint` `#6E6E6E` (3.4:1) is **disabled-state only** and never
 carries information — it fails AA for body copy on purpose, as a guardrail.
+
+### The light variant
+
+The worksheet names one palette and it is the dark one, so dark is `:root` and
+light is an addition rather than a second reading of the design system. It is
+labelled as one in `globals.css`, and it exists because the theme toggle
+shipped — deleting a working control to satisfy a document that never ruled on
+it would be a downgrade, not compliance.
+
+Light is the **same two hues, deepened until they carry text on paper**, not two
+substituted hues. `#D2C088` is 1.7:1 on white and cannot be an interactive
+colour there, so light mode uses a darker step of the same gold: `#7A6420`
+(5.4:1 on `#FAF9F6`), with teal `#2F6F62` (5.6:1). Every pair in the light block
+clears 4.5:1 by the same rule as the table above.
 
 ---
 
@@ -143,7 +171,7 @@ modals). Kept small — Arca is a strongbox, not a consumer app.
 ## Step E — Reusable components
 
 Everything that appears on more than one screen, sorted by atomic level. The
-`Level` column is also the folder under `src/components/`.
+`Level` column is also the folder under `frontend/components/`.
 
 | Component | Level | Appears on | Props |
 | --- | --- | --- | --- |
@@ -199,7 +227,7 @@ scrolling sideways. Where a wide element is genuinely unavoidable it gets its ow
 
 - [x] Every text-on-background pair reaches 4.5 : 1 (table above; `--color-text-faint` is disabled-only by design)
 - [x] Real semantic elements — `<header>`, `<nav>`, `<main>`, `<aside>`, `<table>`, `<button>`; no `<div onClick>`
-- [x] Every icon-only control has a `.sr-only` label that becomes `aria-label` in JSX
+- [x] Every icon-only control carries a name — either a `.sr-only` span beside the glyph, or the required `label` prop on `IconButton`, which becomes both the `aria-label` and the `title` so the two cannot drift apart
 - [x] Every input has a `<label for>` / `htmlFor` pair
 - [x] One visible focus treatment defined once in `tokens.css` and never removed
 - [x] Container type is signalled by icon + text + colour, never colour alone
@@ -214,9 +242,9 @@ scrolling sideways. Where a wide element is genuinely unavoidable it gets its ow
 
 | Here | There | Status |
 | --- | --- | --- |
-| `:root` block in `mockups/tokens.css` | `:root` in `app/globals.css` | done |
-| `theme.extend` in `mockups/tailwind.config.js` | `@theme inline` in `app/globals.css` (v4 is CSS-first) | done |
-| Each row of Step E | one file in `src/components/<level>/` | done |
+| `:root` block in `mockups/tokens.css` | `:root` in `frontend/styles/globals.css` | done |
+| `theme.extend` in `mockups/tailwind.config.js` | `@theme inline` in `frontend/styles/globals.css` (v4 is CSS-first) | done |
+| Each row of Step E | one file in `frontend/components/<level>/` | done |
 | Each row of Step F | a Tailwind `panel:` / `md:` / `lg:` prefix | done |
 
 Two layout tokens have no Tailwind namespace in v4 (`--topbar-h`, `--sidebar-w`,

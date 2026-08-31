@@ -6,7 +6,7 @@
    tokens — but the variant is here for the cases that genuinely differ, such as
    an image that needs a different opacity on a dark ground. */
 @custom-variant dark {
-  @media (prefers-color-scheme: dark) {
+  @media not (prefers-color-scheme: light) {
     &:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *) {
       @slot;
     }
@@ -18,74 +18,94 @@
 
 /* ============================================================================
    Arca — design tokens
-   The canonical values, identical to `mockups/tokens.css`. Declared on :root as
-   ordinary custom properties so a theme swap is one block, then mapped into
-   Tailwind's theme below.
+   The five colour anchors come from `final-project-planning/03-design-system.md`
+   Step B, which is the design system of record; `mockups/tokens.css` carries the
+   same values for the static mockups. Declared on :root as ordinary custom
+   properties so a theme swap is one block, then mapped into Tailwind's theme
+   below.
 
    RULE: no gradients. Every fill in this system is a solid colour. Depth comes
    from three flat surface levels plus a hairline border.
    ============================================================================ */
 
 /* ----------------------------------------------------------------------------
-   LIGHT — the default. White surfaces, one blue.
+   DARK — the default, and the palette the design system actually specifies.
 
-   The palette is deliberately small: white and near-white for every surface,
-   a single blue for anything interactive, and neutral slate for text. Depth is
-   carried by the surface ladder and a hairline border, never by a new hue.
+   The five anchors below are taken verbatim from
+   `final-project-planning/03-design-system.md` Step B (branch
+   `docs/design-system`), which is the design system of record for this
+   project:
+
+       --color-primary  #d2c088   --color-bg       #1b1b1b
+       --color-accent   #6db8a6   --color-surface  #212121
+                                  --color-text     #f2f2f2
+
+   Everything else in this block is scaffolding that worksheet does not define
+   — a five-colour worksheet cannot describe a three-level surface ladder, four
+   semantic states and their chip tints — so the rest is derived IN THAT FAMILY
+   and every pair is checked against the worksheet's own 4.5:1 rule. The
+   measured ratios are in the comments; nothing here was eyeballed.
+
+   Dark is `:root` rather than a media query because the design system names
+   one palette and it is this one. Light, below, is the variant.
    ---------------------------------------------------------------------------- */
 
 :root {
-  color-scheme: light;
+  color-scheme: dark;
 
   /* --- Colour: surfaces ------------------------------------------------- */
-  --color-bg: #ffffff;
-  --color-surface: #f8fafc;
-  --color-surface-2: #f1f5f9;
-  --color-surface-3: #e2e8f0;
-  --color-border: #e2e8f0;
-  --color-border-strong: #cbd5e1;
+  --color-bg: #1b1b1b;            /* worksheet */
+  --color-surface: #212121;       /* worksheet */
+  --color-surface-2: #2a2a2a;     /* hover, selected, inputs */
+  --color-surface-3: #343434;     /* menus, raised chrome */
+  --color-border: #333333;
+  --color-border-strong: #6b6b6b; /* 3.2:1 on bg — control boundaries */
 
   /* --- Colour: text ----------------------------------------------------- */
-  --color-text: #0f172a;        /* 17.9:1 on bg */
-  --color-text-muted: #475569;  /*  7.5:1 on bg */
-  --color-text-faint: #94a3b8;  /*  2.8:1 — DISABLED STATES ONLY, never body */
-  --color-text-invert: #ffffff;
+  --color-text: #f2f2f2;        /* worksheet — 15.4:1 on bg */
+  --color-text-muted: #a8a8a8;  /*  7.2:1 on bg, 6.0:1 on surface-2 */
+  --color-text-faint: #6e6e6e;  /*  DISABLED STATES ONLY, never body */
+  --color-text-invert: #1b1b1b; /*  9.5:1 on primary — dark ink on gold */
 
   /* --- Colour: brand ---------------------------------------------------- */
-  /* One blue, two weights plus a tint. `primary` is 5.2:1 on white, so it is
-     safe for text as well as for fills. */
-  --color-primary: #2563eb;
-  --color-primary-hover: #1d4ed8;
-  --color-primary-weak: #eff6ff;
-  --color-accent: #0284c7;
-  --color-accent-hover: #0369a1;
-  --color-accent-weak: #f0f9ff;
+  /* Gold carries interaction, teal the secondary action. Both are light-on-dark
+     here, so both are legible as TEXT and not only as fills: gold 9.5:1 on bg,
+     teal 7.4:1. */
+  --color-primary: #d2c088;       /* worksheet */
+  --color-primary-hover: #e0d3a4; /* 11.5:1 — lifts, never dims */
+  --color-primary-weak: #2b2618;  /* flat tint, not an opacity layer */
+  --color-accent: #6db8a6;        /* worksheet */
+  --color-accent-hover: #8ccdbd;
+  --color-accent-weak: #172b27;
 
   /* --- Colour: semantic ------------------------------------------------- */
-  /* These stay non-blue ON PURPOSE, and they are the only hues that are.
+  /* These stay off-palette ON PURPOSE, and they are the only hues that are.
      "Over capacity" (M10) and "Offline" (M13) are warnings — rendering them in
-     the same blue as everything else would make the app prettier and strictly
-     less informative. They are muted rather than removed. */
-  --color-success: #15803d;
-  --color-success-weak: #f0fdf4;
-  --color-warning: #b45309;
-  --color-warning-weak: #fffbeb;
-  --color-danger: #b91c1c;
-  --color-danger-weak: #fef2f2;
-  --color-info: #2563eb;
-  --color-info-weak: #eff6ff;
+     the same gold as everything else would make the app prettier and strictly
+     less informative. Each `-weak` is a solid tint so a chip renders
+     identically over any surface level. */
+  --color-success: #6bbf7b;      /* 7.2:1 on surface */
+  --color-success-weak: #16261a;
+  --color-warning: #d9a441;      /* 7.2:1 */
+  --color-warning-weak: #2b2314;
+  --color-danger: #dc6f66;       /* 5.0:1 */
+  --color-danger-weak: #2e1a18;
+  --color-info: #7fa8d9;         /* 6.5:1 */
+  --color-info-weak: #1a2230;
 
   /* --- Colour: container semantics -------------------------------------- */
-  /* Three shades of the one blue rather than three separate hues. Type is
-     never signalled by colour alone — every use sits beside an icon and a text
-     label — so shade is enough to group at a glance. */
-  --color-container-character: #2563eb;
-  --color-container-party: #0284c7;
-  --color-container-world: #64748b;
+  /* The one piece of colour that carries meaning rather than decoration.
+     Character takes the primary gold, party the accent teal, and world a third
+     hue so the GM-owned kind is never mistaken for either. Type is never
+     signalled by colour ALONE — every use sits beside an icon and a text
+     label — so this survives greyscale and colour-blindness. */
+  --color-container-character: #d2c088;
+  --color-container-party: #6db8a6;
+  --color-container-world: #a98cd0; /* 6.0:1 on bg */
 
-  /* A soft slate shadow, not black. On white, 55% black reads as a smudge
-     rather than as elevation. Still one flat shadow, never a colour ramp. */
-  --shadow-modal: 0 8px 24px rgb(15 23 42 / 0.12);
+  /* Depth on a dark ground needs real black to register. Still one flat
+     shadow, never a colour ramp. */
+  --shadow-modal: 0 8px 24px rgb(0 0 0 / 0.55);
 
   /* --- Layout ----------------------------------------------------------- */
   --topbar-h: 48px;
@@ -95,107 +115,108 @@
 }
 
 /* ----------------------------------------------------------------------------
-   DARK
+   LIGHT — the variant.
 
-   The same token names with different values — which is the whole reason the
-   `@theme inline` mapping below exists. Not one component knows a theme is in
-   play, and adding a third theme later would be another block of this shape.
+   The design system defines no light mode, so this is an ADDITION rather than
+   a second reading of it, and it is labelled as one. It exists because the
+   toggle already shipped, and deleting a working control to satisfy a document
+   that never ruled on it would be a downgrade, not compliance.
+
+   It is the same two hues, deepened until they carry text on paper. #d2c088 is
+   1.7:1 on white and cannot be an interactive colour there, so light mode uses
+   a darker step of the SAME gold rather than substituting a different hue —
+   that is the one honest way to carry a palette across two grounds.
 
    Two selectors, and the order matters:
 
-     1. `prefers-color-scheme` — the DEFAULT, applied with no JavaScript at all.
-        Someone whose system is dark gets a dark first paint, because the rule
-        is in the stylesheet rather than applied by a script after hydration.
-        `:not([data-theme="light"])` lets an explicit light choice win over the
-        system preference.
-     2. `[data-theme="dark"]` — an explicit choice from the toggle, which must
+     1. `prefers-color-scheme: light` — applied with no JavaScript at all, so
+        someone whose system is light gets a light first paint from the
+        stylesheet rather than from a script after hydration.
+        `:not([data-theme="dark"])` lets an explicit dark choice win over it.
+     2. `[data-theme="light"]` — an explicit choice from the toggle, which must
         be able to override the operating system or the button is a lie.
-
-   Doing the default in CSS is what removes the need for a blocking inline
-   script in the document head. The only case that can still flash is a viewer
-   whose saved choice contradicts their system setting, and that costs one
-   frame on first load, not a white page.
    ---------------------------------------------------------------------------- */
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    color-scheme: dark;
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
 
-    --color-bg: #0b1220;
-    --color-surface: #111a2b;
-    --color-surface-2: #1a2436;
-    --color-surface-3: #243047;
-    --color-border: #1f2a3d;
-    --color-border-strong: #334155;
+    --color-bg: #faf9f6;
+    --color-surface: #f2efe8;
+    --color-surface-2: #e8e4da;
+    --color-surface-3: #dcd7c9;
+    --color-border: #dcd7c9;
+    --color-border-strong: #948d7c;
 
-    --color-text: #e8eef8;
-    --color-text-muted: #9fb0c9;
-    --color-text-faint: #64748b;
-    --color-text-invert: #0b1220;
+    --color-text: #1b1b1b;
+    --color-text-muted: #56524a;
+    --color-text-faint: #99948a;
+    --color-text-invert: #ffffff;
 
-    --color-primary: #60a5fa;
-    --color-primary-hover: #93c5fd;
-    --color-primary-weak: #16273f;
-    --color-accent: #38bdf8;
-    --color-accent-hover: #7dd3fc;
-    --color-accent-weak: #0c2a3d;
+    --color-primary: #7a6420;
+    --color-primary-hover: #5f4d18;
+    --color-primary-weak: #f5efdc;
+    --color-accent: #2f6f62;
+    --color-accent-hover: #245549;
+    --color-accent-weak: #e4f1ed;
 
-    --color-success: #4ade80;
-    --color-success-weak: #0f2a1b;
-    --color-warning: #fbbf24;
-    --color-warning-weak: #2e2410;
-    --color-danger: #f87171;
-    --color-danger-weak: #2e1616;
-    --color-info: #60a5fa;
-    --color-info-weak: #16273f;
+    --color-success: #2a7040;
+    --color-success-weak: #e8f3ea;
+    --color-warning: #8a5915;
+    --color-warning-weak: #f7eeda;
+    --color-danger: #a63a31;
+    --color-danger-weak: #f9e9e7;
+    --color-info: #2f5c99;
+    --color-info-weak: #e7eef8;
 
-    --color-container-character: #60a5fa;
-    --color-container-party: #38bdf8;
-    --color-container-world: #94a3b8;
+    --color-container-character: #7a6420;
+    --color-container-party: #2f6f62;
+    --color-container-world: #6b4f96;
 
-    /* Depth on a dark ground needs real black to register. */
-    --shadow-modal: 0 8px 24px rgb(0 0 0 / 0.55);
+    /* A warm shadow, not black. On paper, 55% black reads as a smudge rather
+       than as elevation. */
+    --shadow-modal: 0 8px 24px rgb(60 50 30 / 0.14);
   }
 }
 
-:root[data-theme="dark"] {
-  color-scheme: dark;
+:root[data-theme="light"] {
+  color-scheme: light;
 
-  --color-bg: #0b1220;
-  --color-surface: #111a2b;
-  --color-surface-2: #1a2436;
-  --color-surface-3: #243047;
-  --color-border: #1f2a3d;
-  --color-border-strong: #334155;
+  --color-bg: #faf9f6;
+  --color-surface: #f2efe8;
+  --color-surface-2: #e8e4da;
+  --color-surface-3: #dcd7c9;
+  --color-border: #dcd7c9;
+  --color-border-strong: #948d7c; /* 3.1:1 on bg */
 
-  --color-text: #e8eef8;        /* 15.2:1 on bg */
-  --color-text-muted: #9fb0c9;  /*  7.2:1 on bg */
-  --color-text-faint: #64748b;  /*  DISABLED STATES ONLY */
-  --color-text-invert: #0b1220;
+  --color-text: #1b1b1b;        /* 16.4:1 on bg */
+  --color-text-muted: #56524a;  /*  7.4:1 on bg, 6.1:1 on surface-2 */
+  --color-text-faint: #99948a;  /*  DISABLED STATES ONLY */
+  --color-text-invert: #ffffff; /*  5.7:1 on primary */
 
-  /* Lifted: #2563eb on a dark ground is too low-contrast to read as the
-     interactive colour, so dark mode uses a lighter step of the same blue. */
-  --color-primary: #60a5fa;
-  --color-primary-hover: #93c5fd;
-  --color-primary-weak: #16273f;
-  --color-accent: #38bdf8;
-  --color-accent-hover: #7dd3fc;
-  --color-accent-weak: #0c2a3d;
+  /* Deepened: the worksheet gold is 1.7:1 on paper and cannot be the
+     interactive colour there, so this is a darker step of it — 5.4:1 on bg. */
+  --color-primary: #7a6420;
+  --color-primary-hover: #5f4d18;
+  --color-primary-weak: #f5efdc;
+  --color-accent: #2f6f62;      /* 5.6:1 */
+  --color-accent-hover: #245549;
+  --color-accent-weak: #e4f1ed;
 
-  --color-success: #4ade80;
-  --color-success-weak: #0f2a1b;
-  --color-warning: #fbbf24;
-  --color-warning-weak: #2e2410;
-  --color-danger: #f87171;
-  --color-danger-weak: #2e1616;
-  --color-info: #60a5fa;
-  --color-info-weak: #16273f;
+  --color-success: #2a7040;     /* 5.2:1 on surface */
+  --color-success-weak: #e8f3ea;
+  --color-warning: #8a5915;     /* 5.2:1 */
+  --color-warning-weak: #f7eeda;
+  --color-danger: #a63a31;      /* 5.5:1 */
+  --color-danger-weak: #f9e9e7;
+  --color-info: #2f5c99;        /* 5.9:1 */
+  --color-info-weak: #e7eef8;
 
-  --color-container-character: #60a5fa;
-  --color-container-party: #38bdf8;
-  --color-container-world: #94a3b8;
+  --color-container-character: #7a6420;
+  --color-container-party: #2f6f62;
+  --color-container-world: #6b4f96;
 
-  --shadow-modal: 0 8px 24px rgb(0 0 0 / 0.55);
+  --shadow-modal: 0 8px 24px rgb(60 50 30 / 0.14);
 }
 
 /* ============================================================================

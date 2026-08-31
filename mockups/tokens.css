@@ -1,45 +1,52 @@
 /* ============================================================
    Arca — Design Tokens
    Single source of truth for colour, type, spacing, radius.
-   Port to Next.js: paste this file into `app/globals.css`.
+   Port to Next.js: these tokens live in `frontend/styles/globals.css`.
    RULE: no gradients. Every fill in this system is a solid colour.
    ============================================================ */
 
 :root {
   /* --- Colour: surfaces ----------------------------------- */
-  --color-bg:          #14110F; /* app background — warm near-black */
-  --color-surface:     #1F1B18; /* cards, sidebar, panels          */
-  --color-surface-2:   #2A2521; /* raised: hover, selected, inputs  */
-  --color-surface-3:   #35302B; /* highest: menus, tooltips         */
-  --color-border:      #3A322C; /* hairlines, dividers, input edge  */
-  --color-border-strong:#544940;/* focus ring track, table outline  */
+  /* The five anchors come from `final-project-planning/03-design-system.md`
+     Step B, which is the worksheet this project submitted and therefore the
+     palette of record. Everything else below is derived IN THAT FAMILY and
+     checked against the worksheet's own 4.5:1 rule. */
+  --color-bg:          #1b1b1b; /* worksheet — app background       */
+  --color-surface:     #212121; /* worksheet — cards, sidebar       */
+  --color-surface-2:   #2a2a2a; /* raised: hover, selected, inputs  */
+  --color-surface-3:   #343434; /* highest: menus, tooltips         */
+  --color-border:      #333333; /* hairlines, dividers, input edge  */
+  --color-border-strong:#6b6b6b;/* 3.2:1 on bg — control boundaries */
 
   /* --- Colour: text --------------------------------------- */
-  --color-text:        #EDE6DA; /* body            15.9:1 on bg     */
-  --color-text-muted:  #A99C8A; /* labels, meta     7.6:1 on bg     */
-  --color-text-faint:  #7C7062; /* disabled only — never body copy  */
-  --color-text-invert: #14110F; /* text ON primary/accent fills     */
+  --color-text:        #f2f2f2; /* worksheet      15.4:1 on bg      */
+  --color-text-muted:  #a8a8a8; /* labels, meta    7.2:1 on bg      */
+  --color-text-faint:  #6e6e6e; /* disabled only — never body copy  */
+  --color-text-invert: #1b1b1b; /* 9.5:1 on primary — ink on gold   */
 
   /* --- Colour: brand -------------------------------------- */
-  --color-primary:     #C9A227; /* arcane gold: links, active, CTA  */
-  --color-primary-hover:#DDB63A;
-  --color-primary-weak:#3A2F13; /* solid tint for gold-on-dark chips*/
-  --color-accent:      #4E9A8F; /* teal: secondary action, party    */
-  --color-accent-hover:#5FB0A4;
-  --color-accent-weak: #16302D;
+  --color-primary:     #d2c088; /* worksheet gold: links, active    */
+  --color-primary-hover:#e0d3a4;/* 11.5:1 — lifts, never dims       */
+  --color-primary-weak:#2b2618; /* solid tint for gold-on-dark chips*/
+  --color-accent:      #6db8a6; /* worksheet teal: secondary, party */
+  --color-accent-hover:#8ccdbd;
+  --color-accent-weak: #172b27;
 
   /* --- Colour: semantic ----------------------------------- */
-  --color-success:     #5FA777;  --color-success-weak: #16281C;
-  --color-warning:     #D08B3C;  --color-warning-weak: #33220F;
-  --color-danger:      #C2564B;  --color-danger-weak:  #331714;
-  --color-info:        #6E93C9;  --color-info-weak:    #162233;
+  /* Off-palette ON PURPOSE, and the only hues that are: "over capacity" and
+     "offline" are warnings, and rendering them in the same gold as everything
+     else would be prettier and strictly less informative. */
+  --color-success:     #6bbf7b;  --color-success-weak: #16261a;
+  --color-warning:     #d9a441;  --color-warning-weak: #2b2314;
+  --color-danger:      #dc6f66;  --color-danger-weak:  #2e1a18;
+  --color-info:        #7fa8d9;  --color-info-weak:    #1a2230;
 
   /* --- Colour: container semantics ------------------------ */
   /* Each container type carries one fixed hue so a player can tell
      "mine" from "ours" from "the world's" at a glance. */
-  --color-container-character: #C9A227; /* gold  — your own pack    */
-  --color-container-party:     #4E9A8F; /* teal  — shared wagon     */
-  --color-container-world:     #9B6BC9; /* violet— GM-only, world   */
+  --color-container-character: #d2c088; /* gold  — your own pack    */
+  --color-container-party:     #6db8a6; /* teal  — shared wagon     */
+  --color-container-world:     #a98cd0; /* violet— GM-only, world   */
 
   /* --- Type ----------------------------------------------- */
   --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;

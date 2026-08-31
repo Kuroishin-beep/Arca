@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Icon } from "@frontend/components/atoms/Icon";
+import { IconButton } from "@frontend/components/atoms/IconButton";
 import { ThemeToggle } from "@frontend/components/atoms/ThemeToggle";
 import { UserBadge } from "@frontend/components/atoms/Status";
 import { RealtimeSync } from "@frontend/components/organisms/RealtimeSync";
@@ -81,15 +82,23 @@ export function TopBar({
 
       <ThemeToggle />
 
-      <form action={signOutAction} className="contents">
-        <button
+      {/* Who you are, and leaving — two things, two controls.
+          They used to be one: the badge WAS the sign-out button, with the only
+          hint an `sr-only` span. So the single most destructive control in the
+          bar was also the one element people click to check which character
+          they are signed in as, and it looked like a label. Signing out is
+          cheap to undo but it costs a PIN, and nothing about an avatar says
+          "this ends your session".
+          The badge is now inert identity, and leaving is a labelled control
+          next to it. */}
+      <UserBadge principal={principal} />
+
+      <form action={signOutAction}>
+        <IconButton
           type="submit"
-          className="rounded-md"
-          title="Sign out"
-        >
-          <UserBadge principal={principal} />
-          <span className="sr-only">Sign out</span>
-        </button>
+          icon="sign-out"
+          label="Sign out"
+        />
       </form>
     </header>
   );

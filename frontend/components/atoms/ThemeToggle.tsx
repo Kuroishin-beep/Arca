@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 
-import { Icon } from "@frontend/components/atoms/Icon";
+import { IconButton } from "@frontend/components/atoms/IconButton";
 
 /**
  * Light / dark switch.
@@ -31,7 +31,7 @@ const STORAGE_KEY = "arca-theme";
 const CHANGED = "arca-theme-changed";
 
 function subscribe(onChange: () => void): () => void {
-  const media = window.matchMedia("(prefers-color-scheme: dark)");
+  const media = window.matchMedia("(prefers-color-scheme: light)");
   media.addEventListener("change", onChange);
   window.addEventListener("storage", onChange);
   window.addEventListener(CHANGED, onChange);
@@ -51,15 +51,23 @@ function readTheme(): Theme {
     // (SCOPE.md §4.1). Fall through to the system preference — a theme that is
     // not remembered still beats a theme that throws.
   }
-  return window.matchMedia("(prefers-color-scheme: dark)").matches
-    ? "dark"
-    : "light";
+  // Mirrors globals.css exactly, which is the whole point: dark is the
+  // default and light is the opt-in, so the question asked here has to be
+  // "does this system ask for LIGHT?" and not "does it ask for dark?".
+  //
+  // The two are NOT complements. A system reporting `no-preference` matches
+  // neither query, so asking the dark question would answer "light" while the
+  // stylesheet painted dark — and the toggle would offer to switch you to the
+  // theme you were already looking at.
+  return window.matchMedia("(prefers-color-scheme: light)").matches
+    ? "light"
+    : "dark";
 }
 
 /** The server cannot know either input, and neither can the first hydration
  *  pass. It must be a stable value or React re-renders forever. */
 function serverTheme(): Theme {
-  return "light";
+  return "dark";
 }
 
 export function ThemeToggle({ className = "" }: { className?: string }) {
@@ -77,18 +85,17 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
   };
 
   return (
-    <button
-      type="button"
+    // The glyph shows what you would switch TO, which is the convention people
+    // already read correctly on this control.
+    //
+    // Not `aria-pressed`: this is not a control that is on or off, it is one
+    // that switches between two named states. The label says which.
+    <IconButton
       onClick={apply}
-      // Not `aria-pressed`: this is not a control that is on or off, it is one
-      // that switches between two named states. The label says which.
-      aria-label={`Switch to ${next} theme`}
-      title={`Switch to ${next} theme`}
-      className={`grid h-8 w-8 shrink-0 place-items-center rounded-md border border-border bg-surface text-muted hover:bg-surface2 hover:text-text ${className}`}
-    >
-      {/* The glyph shows what you would switch TO, which is the convention
-          people already read correctly on this control. */}
-      <Icon name={next === "dark" ? "moon" : "sun"} size={15} />
-    </button>
+      icon={next === "dark" ? "moon" : "sun"}
+      label={`Switch to ${next} theme`}
+      size={15}
+      className={className}
+    />
   );
 }
