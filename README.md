@@ -34,6 +34,55 @@ if you would rather not sign in as the GM at all:
 UPDATE users SET password_hash = NULL WHERE email = 'kova@ravenholt.example';
 ```
 
+## Does anything you do persist?
+
+**Only if `DATABASE_URL` is set and that database is running.** There are two
+storage modes and the sign-in screen tells you which one you are in
+(`storage: fixtures` or `storage: postgres`).
+
+| Mode | When | Survives a restart? |
+| --- | --- | --- |
+| **fixtures** | no `DATABASE_URL` | **No.** An in-memory store, rebuilt from `backend/db/seed-data.ts` every time the server starts. Accounts you create, items you move and containers you add are all gone. |
+| **postgres** | `DATABASE_URL` set | **Yes.** The real object graph. |
+
+Fixtures are the default so the UI can be developed with no database at all,
+and every member starts unenrolled there so the first-run flow is exercised
+every time rather than once.
+
+To get real persistence:
+
+```bash
+docker compose up -d     # start Postgres
+npm run db:migrate       # create the tables
+npm run db:seed          # the campaign, its members and their inventory
+```
+
+Setting `DATABASE_URL` is a commitment, not a preference: the app does **not**
+fall back to fixtures when the database is unreachable. Falling back would mean
+a running app quietly serving different data than it was configured for, and a
+sign-in that appeared to work against a store that forgets everything on
+restart. Instead the sign-in and sign-up screens say the database is down and
+what to do about it.
+
+## Mail
+
+There is none, and that is a deliberate limitation rather than a missing
+feature. Arca sends **no confirmation email on sign-up and no password-reset
+link**, because sending either needs an SMTP provider and credentials the app
+does not carry.
+
+The consequences, stated plainly:
+
+- An address is never proved to belong to whoever typed it. At a table of six
+  people who know each other, the address is a username more than it is a
+  contact.
+- Recovery is a person asking a person: the GM clears a password from
+  `/members`, and that member chooses a new one on their next sign-in.
+
+Adding confirmation later means a provider, an API key, a `verified_at` column,
+and a decision about what an unverified account may do in the meantime. None of
+that is stubbed out.
+
 | Script | What it does |
 | --- | --- |
 | `npm run dev` | dev server |

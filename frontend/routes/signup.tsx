@@ -5,6 +5,7 @@ import { signUpAction } from "@backend/actions/session";
 import { Icon } from "@frontend/components/atoms/Icon";
 import { PasswordField } from "@frontend/components/atoms/PasswordField";
 import { ThemeToggle } from "@frontend/components/atoms/ThemeToggle";
+import { storageProblem } from "@backend/db";
 import { currentSession } from "@backend/lib/session";
 
 /**
@@ -47,6 +48,7 @@ export default async function SignUpPage({
 
   const { error, email, name } = await searchParams;
   const message = error ? MESSAGES[error] : undefined;
+  const problem = await storageProblem();
 
   return (
     <main className="relative flex min-h-full items-center justify-center p-4">
@@ -77,6 +79,21 @@ export default async function SignUpPage({
             <span>{message}</span>
           </p>
         ) : null}
+
+        {problem ? (
+          <p
+            role="alert"
+            className="mt-4 flex items-start gap-2 rounded-md border border-warning bg-warning-weak p-3 text-base text-text"
+          >
+            <Icon name="alert" size={14} className="mt-0.5 shrink-0 text-warning" />
+            {/* Rendered BEFORE the form is used rather than after it fails.
+                Submitting into an unreachable database produced a 500 whose
+                only content was the generated SQL — on the one screen where
+                somebody meets this app for the first time. */}
+            <span>{problem}</span>
+          </p>
+        ) : null}
+
 
         <div className="mt-6">
           <h2 className="mb-1 font-serif text-lg font-bold text-text">
