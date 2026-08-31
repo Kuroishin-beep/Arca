@@ -1,7 +1,9 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { signInAsAction } from "@backend/actions/session";
 import { Icon } from "@frontend/components/atoms/Icon";
+import { PasswordField } from "@frontend/components/atoms/PasswordField";
 import { ThemeToggle } from "@frontend/components/atoms/ThemeToggle";
 import { repositoryKind } from "@backend/db";
 import { currentSession } from "@backend/lib/session";
@@ -10,9 +12,10 @@ import { realtimeKind } from "@backend/realtime";
 /**
  * Sign in — SCOPE.md M1.
  *
- * Type the address the GM has for you, and your password. Membership is still
- * the campaign's roster: an address works because the GM put a row in
- * `campaign_members`, so there is no sign-up and no invite to accept.
+ * Type your address and your password. Two doors lead here: the GM adds you on
+ * `/members`, or you create your own account on `/signup` — which joins this
+ * campaign as a player. Either way membership is a `campaign_members` row, and
+ * this screen never has to know which door you came through.
  *
  * What changed when this stopped being a name picker: the roster is no longer
  * on the page. Listing six names to anyone holding the link was always the
@@ -139,45 +142,23 @@ function SignInForm({ email }: { email: string }) {
         />
       </div>
 
-      <div>
-        <label
-          htmlFor="password"
-          className="mb-1 block text-sm font-medium text-text"
-        >
-          Password
-        </label>
-        <input
-          id="password"
-          name="password"
-          type="password"
-          required
-          autoFocus={email !== ""}
-          autoComplete="current-password"
-          minLength={8}
-          maxLength={200}
-          className="h-10 w-full rounded-md border border-border bg-surface2 px-2 text-base text-text"
-        />
-      </div>
+      <PasswordField
+        id="password"
+        name="password"
+        label="Password"
+        required
+        autoFocus={email !== ""}
+        autoComplete="current-password"
+        minLength={8}
+      />
 
-      <div>
-        <label
-          htmlFor="confirmPassword"
-          className="mb-1 block text-sm font-medium text-text"
-        >
-          Confirm password
-        </label>
-        <input
-          id="confirmPassword"
-          name="confirmPassword"
-          type="password"
-          autoComplete="new-password"
-          maxLength={200}
-          className="h-10 w-full rounded-md border border-border bg-surface2 px-2 text-base text-text"
-        />
-        <p className="mt-1 text-sm text-muted">
-          Only the first time you sign in. Leave it empty after that.
-        </p>
-      </div>
+      <PasswordField
+        id="confirmPassword"
+        name="confirmPassword"
+        label="Confirm password"
+        hint="Only the first time you sign in. Leave it empty after that."
+        autoComplete="new-password"
+      />
 
       <button
         type="submit"
@@ -185,6 +166,13 @@ function SignInForm({ email }: { email: string }) {
       >
         Sign in
       </button>
+
+      <p className="text-center text-sm text-muted">
+        New here?{" "}
+        <Link href="/signup" className="font-medium text-primary hover:underline">
+          Create an account
+        </Link>
+      </p>
 
       <p className="text-center text-sm text-muted">
         Forgot it? There is no reset mail to send — ask the GM to clear your

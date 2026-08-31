@@ -35,6 +35,9 @@ export type IconName =
   | "panel"
   | "share"
   | "pin"
+  | "users"
+  | "eye"
+  | "eye-off"
   | "sun"
   | "moon";
 
@@ -161,6 +164,34 @@ const PATHS: Record<IconName, React.ReactNode> = {
         strokeLinejoin="round"
       />
       <path d="M8 8.2V14" strokeLinecap="round" />
+    </>
+  ),
+  /* Two people, the front one whole and the back one implied by a shoulder.
+     Drawn at two sizes so it reads as "several" rather than as one figure with
+     a smudge behind it. */
+  users: (
+    <>
+      <circle cx="6" cy="5" r="2.4" />
+      <path d="M1.8 13.5a4.2 4.2 0 0 1 8.4 0" strokeLinecap="round" />
+      <path d="M10.6 3.1a2.4 2.4 0 0 1 0 3.8" strokeLinecap="round" />
+      <path d="M11.6 9.9a4.2 4.2 0 0 1 2.6 3.6" strokeLinecap="round" />
+    </>
+  ),
+  /* Show / hide password. The open eye is the CURRENT state made visible, and
+     the struck-through one is what you get after clicking — the same
+     convention as the theme toggle's glyph. */
+  eye: (
+    <>
+      <path d="M1.5 8s2.4-4 6.5-4 6.5 4 6.5 4-2.4 4-6.5 4-6.5-4-6.5-4z" strokeLinejoin="round" />
+      <circle cx="8" cy="8" r="1.9" />
+    </>
+  ),
+  "eye-off": (
+    <>
+      <path d="M6.2 4.2A6.9 6.9 0 0 1 8 4c4.1 0 6.5 4 6.5 4a12 12 0 0 1-2 2.4" strokeLinecap="round" />
+      <path d="M4.3 5.3A11.7 11.7 0 0 0 1.5 8s2.4 4 6.5 4a6.7 6.7 0 0 0 2.4-.42" strokeLinecap="round" />
+      <path d="M6.7 6.7a1.9 1.9 0 0 0 2.6 2.6" strokeLinecap="round" />
+      <path d="m2.5 2.5 11 11" strokeLinecap="round" />
     </>
   ),
   /* A door being left, with the arrow pointing out of it. The arrow is the

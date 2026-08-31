@@ -13,6 +13,7 @@
  * boundary SCOPE.md §10 R1 asks for around realtime, applied to storage.
  */
 import type {
+  AddMemberInput,
   CommentView,
   ContainerView,
   CreateCommentInput,
@@ -21,6 +22,7 @@ import type {
   ItemView,
   MoveItemInput,
   Principal,
+  SignUpInput,
   UpdateContainerInput,
   UpdateItemInput,
 } from "@backend/domain/view";
@@ -171,6 +173,49 @@ export interface ArcaRepository {
     email: string,
     password: string,
   ): Promise<Principal | null>;
+
+  /**
+   * Self-signup — a stranger joins the table as a PLAYER.
+   *
+   * Takes no principal, because there is nobody to be yet. The role is not a
+   * parameter: this method can only ever mint a player, so no caller can be
+   * talked into minting a GM.
+   *
+   * Returns `null` when the address is already taken. That is the one place in
+   * this interface where a null IS an oracle — it tells an anonymous caller
+   * that an address is registered — and it is unavoidable: a sign-up form that
+   * accepts a duplicate silently either hijacks an existing account or creates
+   * a second one nobody can sign in to. The mitigation is that it says nothing
+   * about which campaign or what role, and the throttle in
+   * `backend/lib/password.ts` applies to the address either way.
+   *
+   * The password is chosen here rather than on first sign-in: the person is
+   * present, typing, and the enrolment window this would otherwise leave open
+   * is a window somebody else can walk through.
+   */
+  registerMember(input: SignUpInput): Promise<Principal | null>;
+
+  /**
+   * The GM adds someone directly — SCOPE.md §3.
+   *
+   * No password, deliberately. The member arrives unenrolled and chooses their
+   * own on first sign-in, so no secret ever travels through the group chat.
+   *
+   * Returns `null` when the address is already taken, for the same reason as
+   * above; here the caller is the GM, who is entitled to know.
+   */
+  addMember(principal: Principal, input: AddMemberInput): Promise<Member | null>;
+
+  /**
+   * Clear a member's password so they can choose a new one — the GM's, and the
+   * whole of account recovery.
+   *
+   * There is no reset mail because there is no mail to send it with. Putting
+   * the member back into the enrolment state they started in is the honest
+   * mechanism, and it is why `users.password_hash` is nullable rather than
+   * merely empty on a new row.
+   */
+  resetMemberPassword(principal: Principal, userId: string): Promise<void>;
 }
 
 /** Raised when an id simply is not there. Distinct from PermissionError, which

@@ -18,25 +18,34 @@ The data model those screens sit on is `Schema.png`, recorded in
 ## Step A: Screen map
 
 ```
-[Sign in] --"email + password"--> [Workspace, a container]
-                                        |
-     +--------------------+-------------+-------------+------------------+
-     |                    |             |             |                  |
-"pick a container"  "pick a database"  "click a row"  "Move on a row"   "+ Add item"
-     |                    |             |             |                  |
-     v                    v             v             v                  v
-[Workspace]          [Database]   [Detail panel]  [Move dialog]     [Item editor]
-     |                    |
-"Share"              "click a row"
-     |                    |
-     v                    v
-[Share dialog]       [Workspace, that row's container]
+[Sign in] <--"Sign in"-- [Sign up]
+    |                        |
+    | "email + password"     | "create account" (joins as a player)
+    |                        |
+    +-----------+------------+
+                v
+      [Workspace, a container]
+                |
+  +-------------+-------------+--------------+--------------+
+  |             |             |              |              |
+"pick a      "pick a      "click a row"  "Move on a     "+ Add item"
+ container"   database"                    row"
+  |             |             |              |              |
+  v             v             v              v              v
+[Workspace]  [Database]  [Detail panel] [Move dialog]  [Item editor]
+  |             |
+"Share"      "click a row"
+  |             |
+  v             v
+[Share      [Workspace, that
+ dialog]     row's container]
 ```
 
 Answering the three questions the worksheet asks:
 
 - **First screen.** `/signin`. Every other route redirects here without a
-  session cookie.
+  session cookie. `/signup` is one link away from it and lands in the same
+  place.
 - **Home base.** The Workspace. The sidebar is on every inside-the-app screen,
   so the container list is always one click away — which is what makes it the
   nav rather than a screen.
@@ -44,6 +53,10 @@ Answering the three questions the worksheet asks:
   have been: it is reached from the sidebar and its rows point at containers,
   so both the way in and the way out are links. Dialogs all carry a `closeHref`
   to the screen underneath.
+
+`/members` is the GM's roster — reached from the people icon in the campaign
+header, and rendered as a "not here" screen for a player. It sits inside the
+same shell as the Workspace, so the way back is the sidebar.
 
 Two routes are stretch and not in the map above: `/character/[containerId]` and
 `/dice`. Both return to the Workspace.
@@ -74,6 +87,23 @@ with it.
 The confirm field is always rendered and labelled *only the first time*. Showing
 it conditionally would mean the page had to say whether an address is already
 enrolled, which turns the form into a way to ask who is at this table.
+
+Both password fields carry a show/hide control (`PasswordField`, the only
+client component on the screen). It earns its place on a first sign-in: an
+unnoticed typo, confirmed twice the same wrong way, is a password nobody knows
+on the one member who can no longer enrol.
+
+### 1b. Create account, and 1c. Members
+
+| | |
+| --- | --- |
+| **Desktop** | `/signup` is the sign-in card plus a Name field. `/members` is the roster inside the Workspace shell: one row per member with their role and enrolment state, then an "Add someone" form. |
+| **Phone** | Both are already single columns. |
+| **Navigates to** | Sign-up lands in the Workspace; Members stays where it is. |
+
+Neither is in `Wireframe.png` — the sketch starts inside the app. They exist
+because membership had two verbs the model always assumed and no screen for
+(SCOPE.md §3.1).
 
 ### 2. Workspace — `Wireframe.png` frame 1
 
@@ -178,7 +208,7 @@ each is matched to what was built.
 | --- | --- | --- |
 | buttons | `Button`, `ButtonLink`, `IconButton`, `IconButtonLink` | atom |
 | icons | `Icon` — one inline set, no sprite fetch | atom |
-| text field | `Field` | atom |
+| text field | `Field`, `PasswordField` | atom |
 | search field | the GET form in `TopBar` | organism |
 | user avatar | `Avatar`, `UserBadge` | atom |
 | side bar menu | `Sidebar` | organism |
@@ -190,10 +220,10 @@ The full tree:
 
 | Level | Components |
 | --- | --- |
-| **Atoms** | `Icon`, `Button` / `ButtonLink`, `IconButton` / `IconButtonLink`, `Chip` / `ContainerBadge` / `ContainerDot`, `Field`, `Avatar`, `UserBadge`, `SyncPill`, `ThemeToggle` |
+| **Atoms** | `Icon`, `Button` / `ButtonLink`, `IconButton` / `IconButtonLink`, `Chip` / `ContainerBadge` / `ContainerDot`, `Field`, `PasswordField`, `Avatar`, `UserBadge`, `SyncPill`, `ThemeToggle` |
 | **Molecules** | `ContainerRow`, `EmptyState`, `Modal`, `WeightMeter` |
 | **Organisms** | `TopBar`, `Sidebar`, `WorkspaceShell`, `QuickAccess`, `ContainerActions`, `ItemTable`, `DetailPanel`, `CommentComposer`, `RealtimeSync`, `OptimisticItems`, and the five dialogs (`MoveItemDialog`, `ItemEditorDialog`, `ContainerEditorDialog`, `ShareDialog`, `RevealToggle`) |
-| **Pages** | `signin`, `workspace`, `database`, `character` *(stretch)*, `dice` *(stretch)* |
+| **Pages** | `signin`, `signup`, `members`, `workspace`, `database`, `character` *(stretch)*, `dice` *(stretch)* |
 
 Two rules, checked:
 

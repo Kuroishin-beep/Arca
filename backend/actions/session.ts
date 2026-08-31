@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { repository } from "@backend/db";
-import type { Principal } from "@backend/domain/view";
+import { SignUpInput, type Principal } from "@backend/domain/view";
 import {
   delayForAttempts,
   emailProblem,
@@ -123,6 +123,49 @@ export async function signInAsAction(formData: FormData): Promise<void> {
   }
 
   await land(enrolled);
+}
+
+/**
+ * Create an account — SCOPE.md M1.
+ *
+ * Self-signup joins this campaign as a PLAYER. Never a GM: the role is not a
+ * form field and `SignUpInput` cannot express one, so there is no value to
+ * strip and no branch to forget.
+ *
+ * This is the one form in Arca that will tell you an address is taken. A
+ * sign-up that silently accepted a duplicate would either hand someone an
+ * existing account or create a second one nobody can sign in to, and both are
+ * worse than the fact it leaks. The throttle still applies to the address.
+ */
+export async function signUpAction(formData: FormData): Promise<void> {
+  const displayName = text(formData.get("displayName")).trim();
+  const email = normaliseEmail(text(formData.get("email")));
+  const password = text(formData.get("password"));
+  const confirm = text(formData.get("confirmPassword"));
+
+  // The typed name and address are echoed back so a rejected password does not
+  // also cost retyping them. Neither is a secret.
+  const at = `/signup?name=${encodeURIComponent(displayName)}&email=${encodeURIComponent(email)}`;
+
+  const parsed = SignUpInput.safeParse({ displayName, email, password });
+  if (!parsed.success) redirect(`${at}&error=bad-name`);
+  if (emailProblem(email)) redirect(`${at}&error=bad-email`);
+
+  // Rate-limited like a sign-in. Without it this form is an unmetered way to
+  // ask, one address at a time, who already has an account.
+  if (lockoutMinutes(email) > 0) redirect(`${at}&error=locked`);
+  await delayForAttempts(email);
+
+  if (passwordProblem(password, email)) redirect(`${at}&error=weak-password`);
+  if (password !== confirm) redirect(`${at}&error=mismatch`);
+
+  const principal = await repository().registerMember(parsed.data);
+  if (!principal) {
+    recordFailure(email);
+    redirect(`${at}&error=taken`);
+  }
+
+  await land(principal);
 }
 
 export async function signOutAction(): Promise<void> {

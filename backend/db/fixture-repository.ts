@@ -26,6 +26,7 @@ import {
 import {
   assertCanEditContainer,
   assertCanManageContainer,
+  assertCanManageRoster,
   assertCanMove,
   assertCanRead,
   assertCanRetireContainer,
@@ -435,6 +436,54 @@ export const fixtureRepository: ArcaRepository = {
 
     clearFailures(email);
     return principalOf(member);
+  },
+
+  async registerMember(input) {
+    const email = normaliseEmail(input.email);
+    // Taken is taken — including by a member the GM added who has not signed in
+    // yet. Letting a stranger register over an unenrolled row would be a way to
+    // claim somebody else's invited seat by guessing their address.
+    if (byEmail(email)) return null;
+
+    const member = {
+      userId: randomUUID() as Principal["userId"],
+      displayName: input.displayName,
+      email,
+      // Never from the input. Self-signup mints players and only players.
+      role: "player" as const,
+      passwordHash: await hashPassword(input.password),
+    };
+    store().users.push(member);
+    return principalOf(member);
+  },
+
+  async addMember(principal, input) {
+    assertCanManageRoster(principal);
+
+    const email = normaliseEmail(input.email);
+    if (byEmail(email)) return null;
+
+    const member = {
+      userId: randomUUID() as Principal["userId"],
+      displayName: input.displayName,
+      email,
+      role: input.role,
+      // Unenrolled: they choose their own password on first sign-in.
+      passwordHash: null,
+    };
+    store().users.push(member);
+    return { ...principalOf(member), hasPassword: false };
+  },
+
+  async resetMemberPassword(principal, userId) {
+    assertCanManageRoster(principal);
+
+    const member = store().users.find((u) => u.userId === userId);
+    if (!member) throw new NotFoundError("No such member.");
+    member.passwordHash = null;
+    // The throttle is keyed by address, so a reset that did not clear it would
+    // leave a locked-out member locked out with a brand new password.
+    clearFailures(member.email);
   },
 
   async enrolMemberPassword(email, password) {

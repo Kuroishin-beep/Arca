@@ -266,3 +266,70 @@ test.describe("databases", () => {
     await gm.context().close();
   });
 });
+
+test.describe("creating an account", () => {
+  /**
+   * The self-signup door — SCOPE.md M1.
+   *
+   * The half worth asserting end to end is not that the form submits, it is
+   * WHAT you become: a player. Anyone with the link can reach this form, so a
+   * sign-up that quietly seated a GM would hand the campaign away. The unit
+   * tests cover the repository refusing a role it was handed; this covers the
+   * whole path from a real form to what the top bar says afterwards.
+   */
+  test("a new account joins as a player, not a GM", async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    // Unique per run: the fixture store lives as long as the server, so a
+    // fixed address would pass once and then hit "already taken".
+    const email = `newcomer-${Date.now()}@elsewhere.example`;
+
+    await page.goto("/signup");
+    await page.locator("#displayName").fill("Sera");
+    await page.locator("#email").fill(email);
+    await page.locator("#password").fill("brass-lantern-77");
+    await page.locator("#confirmPassword").fill("brass-lantern-77");
+    await page.getByRole("button", { name: /create account/i }).click();
+
+    // Signed in and landed, without a second trip through the sign-in form.
+    await page.waitForURL(/\/c\//);
+    await expect(page.getByText(email)).toBeVisible();
+    await expect(page.getByText(/· Player/)).toBeVisible();
+
+    // A player, so the GM's roster screen is not theirs.
+    await expect(page.locator('a[href="/members"]')).toHaveCount(0);
+    await page.goto("/members");
+    await expect(
+      page.getByRole("heading", { name: /not here/i }),
+    ).toBeVisible();
+
+    await context.close();
+  });
+
+  /** The show/hide control has one job and one way to get it wrong: being a
+   *  submit button, which would post the form instead of revealing anything. */
+  test("the password can be revealed without submitting the form", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    await page.goto("/signin");
+    const field = page.locator("#password");
+    await field.fill("brass-lantern");
+    await expect(field).toHaveAttribute("type", "password");
+
+    await page
+      .getByRole("button", { name: /show password/i })
+      .first()
+      .click();
+
+    await expect(field).toHaveAttribute("type", "text");
+    // Still on the sign-in page: the toggle did not submit.
+    await expect(page).toHaveURL(/\/signin/);
+    await expect(field).toHaveValue("brass-lantern");
+
+    await context.close();
+  });
+});

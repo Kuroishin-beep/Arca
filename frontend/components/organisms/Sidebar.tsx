@@ -75,6 +75,22 @@ export function Sidebar({
         <h2 className="min-w-0 flex-1 truncate font-serif text-sm font-bold text-text">
           {campaignName}
         </h2>
+
+        {/* The roster hangs off the campaign, not off a container — it is the
+            one thing on this screen that belongs to the campaign itself.
+            GM-only in the markup AND in the route, because a rendered link is
+            not a permission. */}
+        {principal.role === "gm" ? (
+          <Link
+            href="/members"
+            aria-label="Members"
+            title="Members"
+            className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-muted hover:bg-surface2 hover:text-text"
+          >
+            <Icon name="users" size={14} />
+          </Link>
+        ) : null}
+
         <Icon name="chevron-down" size={12} className="shrink-0 text-faint" />
       </div>
 

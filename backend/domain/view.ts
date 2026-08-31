@@ -97,6 +97,41 @@ export const CommentView = z.object({
 export type CommentView = z.infer<typeof CommentView>;
 
 /* ------------------------------------------------------------------ *
+ * Membership
+ * ------------------------------------------------------------------ */
+
+/**
+ * A display name, an address, and nothing else that a stranger types.
+ *
+ * The role is NOT here. Self-signup joins as a player, full stop — a form that
+ * accepted a role would let anyone POST `role=gm` and take the table, and the
+ * server would have to strip it anyway. `SignUpInput` therefore cannot express
+ * a GM, which is stronger than remembering to ignore it.
+ */
+export const SignUpInput = z.object({
+  displayName: z.string().trim().min(1, "A name is required.").max(80),
+  email: z.string().trim().min(3).max(254),
+  password: z.string().min(1),
+});
+export type SignUpInput = z.infer<typeof SignUpInput>;
+
+/**
+ * The GM adding someone — the same two fields, plus the role they could not
+ * be trusted to pick for themselves.
+ *
+ * No password. The GM does not choose one on someone's behalf: a secret
+ * travelling through the group chat is both a chore and the least private
+ * channel the table has, so the member arrives unenrolled and chooses their own
+ * on first sign-in.
+ */
+export const AddMemberInput = z.object({
+  displayName: z.string().trim().min(1, "A name is required.").max(80),
+  email: z.string().trim().min(3).max(254),
+  role: UserRole,
+});
+export type AddMemberInput = z.infer<typeof AddMemberInput>;
+
+/* ------------------------------------------------------------------ *
  * Sorting — owned by the view, never by the data
  * ------------------------------------------------------------------ */
 

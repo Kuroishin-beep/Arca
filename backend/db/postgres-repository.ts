@@ -32,6 +32,7 @@ import { campaignId } from "@backend/lib/campaign";
 import {
   assertCanEditContainer,
   assertCanManageContainer,
+  assertCanManageRoster,
   assertCanMove,
   assertCanRead,
   assertCanRetireContainer,
@@ -822,6 +823,100 @@ export const postgresRepository: ArcaRepository = {
     return principalOf(row);
   },
 
+  async registerMember(input) {
+    const email = normaliseEmail(input.email);
+    const hash = await hashPassword(input.password);
+
+    // The unique index on `users.email` is the race condition's answer, not
+    // this read — two simultaneous sign-ups with one address both pass a
+    // prior SELECT. `onConflictDoNothing` lets the database arbitrate and
+    // returns no row to the loser.
+    const inserted = await db()
+      .insert(users)
+      .values({ displayName: input.displayName, email, passwordHash: hash })
+      .onConflictDoNothing({ target: users.email })
+      .returning({ id: users.id });
+
+    const row = inserted[0];
+    if (!row) return null;
+
+    // Never from the input. Self-signup mints players and only players.
+    await db()
+      .insert(campaignMembers)
+      .values({ campaignId: campaignId(), userId: row.id, role: "player" })
+      .onConflictDoNothing();
+
+    return {
+      userId: row.id as Principal["userId"],
+      displayName: input.displayName,
+      email,
+      role: "player",
+    };
+  },
+
+  async addMember(principal, input) {
+    assertCanManageRoster(principal);
+
+    const email = normaliseEmail(input.email);
+
+    const inserted = await db()
+      .insert(users)
+      .values({ displayName: input.displayName, email })
+      .onConflictDoNothing({ target: users.email })
+      .returning({ id: users.id });
+
+    const row = inserted[0];
+    if (!row) return null;
+
+    await db()
+      .insert(campaignMembers)
+      .values({ campaignId: campaignId(), userId: row.id, role: input.role })
+      .onConflictDoNothing();
+
+    return {
+      userId: row.id as Principal["userId"],
+      displayName: input.displayName,
+      email,
+      role: input.role,
+      // Unenrolled: they choose their own password on first sign-in.
+      hasPassword: false,
+    };
+  },
+
+  async resetMemberPassword(principal, userId) {
+    assertCanManageRoster(principal);
+
+    // An id that is not a uuid reaches Postgres as a cast error rather than as
+    // "no such member", and this value arrives from a form field.
+    if (!UUID.test(userId)) throw new NotFoundError("No such member.");
+
+    // The join is the authorisation: the GM of THIS campaign cannot clear the
+    // password of someone who is not at this table.
+    const rows = await db()
+      .select({ email: users.email })
+      .from(users)
+      .innerJoin(campaignMembers, eq(campaignMembers.userId, users.id))
+      .where(
+        and(
+          eq(users.id, userId),
+          eq(campaignMembers.campaignId, campaignId()),
+        ),
+      )
+      .limit(1);
+
+    const row = rows[0];
+    if (!row) throw new NotFoundError("No such member.");
+
+    await db()
+      .update(users)
+      .set({ passwordHash: null })
+      .where(eq(users.id, userId));
+
+    // The throttle is keyed by address, so a reset that did not clear it would
+    // leave a locked-out member locked out with a brand new password.
+    clearFailures(row.email);
+  },
+
   async enrolMemberPassword(email, password) {
     const row = await memberWithHash(email);
     if (!row || row.passwordHash !== null) return null;
@@ -843,6 +938,13 @@ export const postgresRepository: ArcaRepository = {
     return principalOf(row);
   },
 };
+
+/** Ids reach this module from form fields and URL segments, where a value that
+ *  is not a uuid is a normal thing to receive. Postgres answers one with a cast
+ *  ERROR rather than an empty result, so it is checked before the query rather
+ *  than caught after it. */
+const UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** One member of THIS campaign, by email, with their stored hash. Not
  *  exported: the hash must not leave this module. */

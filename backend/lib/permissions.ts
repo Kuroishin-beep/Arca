@@ -278,3 +278,26 @@ export function visibleContainers(
       (a, b) => order[a.type] - order[b.type] || a.name.localeCompare(b.name),
     );
 }
+
+/* ------------------------------------------------------------------ *
+ * The roster
+ * ------------------------------------------------------------------ */
+
+/**
+ * Who may change the campaign's membership.
+ *
+ * Adding someone directly, and clearing a forgotten password, are the GM's —
+ * both hand out a seat at the table, and the second is the reset path precisely
+ * because there is no reset mail. Self-signup is a separate door
+ * (`registerMember`) that takes no principal at all and can only ever produce a
+ * player.
+ */
+export function canManageRoster(principal: Principal): boolean {
+  return principal.role === "gm";
+}
+
+export function assertCanManageRoster(principal: Principal): void {
+  if (!canManageRoster(principal)) {
+    throw new PermissionError("Only the GM can change who is at this table.");
+  }
+}
