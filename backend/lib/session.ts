@@ -11,10 +11,10 @@ import { repository } from "@backend/db";
  * `backend/actions/session.ts` and the sign-in screen, and no component,
  * action or repository method at all.
  *
- * One path: a member picks their name from the campaign's roster and proves it
- * with a PIN (`backend/lib/pin.ts`). Six people at one table on a shared link
- * do not need accounts, and the PIN is what stops the roster from being a list
- * of names anyone holding the link can sit down as.
+ * One path: a member types their email address and their password
+ * (`backend/lib/password.ts`). The address is the identity — it is what the
+ * roster is keyed by and what the UI attributes a comment to — and the password
+ * is what stops anyone holding the link from sitting down as the GM.
  *
  * The cookie holds a user id and nothing else — no role, no expiry claim of its
  * own. Role is read from `campaign_members` on every request, so a GM changing
@@ -46,6 +46,7 @@ export async function currentSession(): Promise<SessionState> {
     principal: {
       userId: member.userId,
       displayName: member.displayName,
+      email: member.email,
       role: member.role,
     },
   };

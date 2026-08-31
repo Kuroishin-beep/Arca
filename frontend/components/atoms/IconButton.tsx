@@ -1,6 +1,14 @@
-import type { ButtonHTMLAttributes } from "react";
+import Link from "next/link";
+import type { AnchorHTMLAttributes, ButtonHTMLAttributes } from "react";
 
 import { Icon, type IconName } from "@frontend/components/atoms/Icon";
+
+/** The one place the icon-control's box is described. Shared with
+ *  `IconButtonLink` so a control that navigates and a control that acts are
+ *  the same size and the same weight — they read as one family in the bar
+ *  because they are. */
+const SHELL =
+  "grid h-8 w-8 shrink-0 place-items-center rounded-md border border-border bg-surface text-muted hover:bg-surface2 hover:text-text";
 
 /**
  * The icon-only control — Design.md Step E.
@@ -41,9 +49,51 @@ export function IconButton({
       type={type}
       aria-label={label}
       title={label}
-      className={`grid h-8 w-8 shrink-0 place-items-center rounded-md border border-border bg-surface text-muted hover:bg-surface2 hover:text-text ${className}`}
+      className={`${SHELL} ${className}`}
     >
       <Icon name={icon} size={size} />
     </button>
+  );
+}
+
+/**
+ * The same control, when the thing it does is go somewhere.
+ *
+ * A separate component rather than an `asChild` prop on `IconButton`, because
+ * the two have genuinely different contracts: this one cannot be `disabled`,
+ * cannot submit a form, and is a real link — so it works with JavaScript off
+ * and can be opened in a new tab. Collapsing them behind one prop would hide
+ * all three of those differences behind a boolean.
+ *
+ * `label` is required here for exactly the reason it is there: an icon-only
+ * link with no accessible name announces itself as "link".
+ */
+export function IconButtonLink({
+  icon,
+  label,
+  size = 16,
+  href,
+  className = "",
+  ...props
+}: {
+  icon: IconName;
+  /** Required. Becomes both the accessible name and the tooltip. */
+  label: string;
+  size?: number;
+  href: string;
+} & Omit<
+  AnchorHTMLAttributes<HTMLAnchorElement>,
+  "aria-label" | "children" | "href"
+>) {
+  return (
+    <Link
+      {...props}
+      href={href}
+      aria-label={label}
+      title={label}
+      className={`${SHELL} ${className}`}
+    >
+      <Icon name={icon} size={size} />
+    </Link>
   );
 }

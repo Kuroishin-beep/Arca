@@ -37,17 +37,13 @@ export interface MoveOutcome {
 
 /**
  * A member as every screen needs them: the principal, plus whether they have
- * enrolled a PIN yet.
+ * enrolled a password yet.
  *
- * `hasPin` is on the roster rather than fetched per member because the sign-in
- * screen has to decide, for each name in the list, whether it is asking for a
- * PIN or offering to set one — and doing that with a query per row is a query
- * per row on the one screen that runs before anyone is authenticated.
- *
- * It is a boolean and never the hash. The hash does not leave the repository.
+ * `hasPassword` is a boolean and never the hash. The hash does not leave the
+ * repository — see the note on `listMembers` in each implementation.
  */
 export interface Member extends Principal {
-  hasPin: boolean;
+  hasPassword: boolean;
 }
 
 export interface ArcaRepository {
@@ -138,33 +134,43 @@ export interface ArcaRepository {
   /** THE operation. Authorises both ends, splits partial stacks. */
   moveItem(principal: Principal, input: MoveItemInput): Promise<MoveOutcome>;
 
-  /** Everyone at the table, for the sign-in picker, the owner picker on a
-   *  pack, and comment attribution. */
+  /** Everyone at the table, for the owner picker on a pack and for comment
+   *  attribution. No longer feeds a sign-in picker — since M1 became email and
+   *  password, nobody unauthenticated sees this list. */
   listMembers(): Promise<Member[]>;
 
   /**
-   * Check a member's PIN and return them if it matches — SCOPE.md §4.
+   * Check a member's password and return them if it matches — SCOPE.md §4.
    *
-   * `null` covers every failure on purpose: unknown member, no PIN enrolled,
-   * wrong PIN. The sign-in screen turns all of them into the same message,
-   * because distinguishing them tells someone probing the roster which half of
-   * the pair they got right.
+   * Takes the email as typed; normalising it is this method's job, so no caller
+   * can forget to and turn `Kova@…` into a member who does not exist.
+   *
+   * `null` covers every failure on purpose: unknown address, no password
+   * enrolled, wrong password. The sign-in screen turns all of them into the
+   * same message, because distinguishing them tells someone spraying addresses
+   * which ones are at this table.
    */
-  authenticateMember(userId: string, pin: string): Promise<Principal | null>;
+  authenticateMember(
+    email: string,
+    password: string,
+  ): Promise<Principal | null>;
 
   /**
-   * First sign-in: a member with no PIN yet chooses one.
+   * First sign-in: a member with no password yet chooses one.
    *
-   * Self-enrolment rather than the GM issuing PINs, because the GM handing out
-   * secrets over the group chat is both a chore and the least private channel the
-   * table has. It is safe precisely once — `hasPin` becomes true and this
-   * refuses from then on, so the window is "before that player first signs
-   * in", not "any time".
+   * Self-enrolment rather than the GM issuing credentials, because the GM
+   * handing out secrets over the group chat is both a chore and the least
+   * private channel the table has. It is safe precisely once — `hasPassword`
+   * becomes true and this refuses from then on, so the window is "before that
+   * player first signs in", not "any time".
    *
-   * Returns `null` when the member is unknown or already enrolled; the caller
-   * must not report which.
+   * Returns `null` when the address is not at this table or is already
+   * enrolled; the caller must not report which.
    */
-  enrolMemberPin(userId: string, pin: string): Promise<Principal | null>;
+  enrolMemberPassword(
+    email: string,
+    password: string,
+  ): Promise<Principal | null>;
 }
 
 /** Raised when an id simply is not there. Distinct from PermissionError, which

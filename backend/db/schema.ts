@@ -74,18 +74,28 @@ export const users = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     displayName: text("display_name").notNull(),
     /**
-     * scrypt hash of this member's sign-in PIN — see `backend/lib/pin.ts`.
+     * The identity someone types to sign in, and the one the UI shows beside
+     * their avatar. Stored already normalised — lowercased and trimmed by
+     * `normaliseEmail` — so the unique index below is the real constraint and
+     * not a case-sensitive approximation of one.
+     */
+    email: text("email").notNull(),
+    /**
+     * scrypt hash of this member's sign-in password — see
+     * `backend/lib/password.ts`.
      *
      * Nullable because null is a meaningful state and not a missing value: it
-     * means "has not chosen a PIN yet", which is what puts a member into the
-     * first-run enrolment flow on the sign-in screen. Clearing this column back
-     * to null is also how the GM resets a forgotten PIN.
+     * means "has not chosen a password yet", which is what puts a member into
+     * the first-run enrolment flow on the sign-in screen. Clearing this column
+     * back to null is also how the GM resets a forgotten password, since there
+     * is no reset mail and no mail to send it with.
      */
-    pinHash: text("pin_hash"),
+    passwordHash: text("password_hash"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
+  (t) => [uniqueIndex("users_email_key").on(t.email)],
 );
 
 export const campaignMembers = pgTable(

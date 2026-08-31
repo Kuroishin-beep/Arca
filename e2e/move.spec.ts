@@ -10,48 +10,41 @@ import { test, expect, type Page, type Browser } from "@playwright/test";
  */
 
 /**
- * A fixed PIN per member, so the same person signs in the same way from every
- * test in the suite.
+ * A fixed address and password per member, so the same person signs in the
+ * same way from every test in the suite.
  *
- * They have to be stable rather than random because the campaign is seeded
- * once for the whole run: the FIRST sign-in for a name enrols it, and every
- * sign-in after that has to present the PIN that enrolment chose.
+ * The addresses match `backend/db/seed-data.ts`; the passwords have to be
+ * stable rather than random because the campaign is seeded once for the whole
+ * run: the FIRST sign-in for an address enrols it, and every sign-in after
+ * that has to present the password that enrolment chose.
  */
-const PINS: Record<string, string> = {
-  Ravna: "4821",
-  Kova: "9037",
-  Milo: "5518",
+const ACCOUNTS: Record<string, { email: string; password: string }> = {
+  Ravna: { email: "ravna@ravenholt.example", password: "brass-lantern-4821" },
+  Kova: { email: "kova@ravenholt.example", password: "iron-lantern-9037" },
+  Milo: { email: "milo@ravenholt.example", password: "clay-lantern-5518" },
 };
 
 /**
- * Signs in through the roster: pick the name, then the PIN.
+ * Signs in with the address and password.
  *
- * Handles both states, because which one a name is in depends on whether an
- * earlier test in this run already signed in as them — a freshly seeded member
- * is asked to choose a PIN, and one who has already been through here is asked
- * for it.
+ * The confirm field is filled every time. It is the field the sign-in action
+ * reads as "this is a first sign-in", and filling it is harmless once a
+ * password exists — the action tries the password first and lands before it
+ * ever looks at the confirm. So this one path covers both a freshly seeded
+ * member and one an earlier test in this run already enrolled, without the
+ * test having to know which.
  */
 async function signInAs(browser: Browser, displayName: string): Promise<Page> {
-  const pin = PINS[displayName];
-  if (!pin) throw new Error(`No PIN fixture for ${displayName}.`);
+  const account = ACCOUNTS[displayName];
+  if (!account) throw new Error(`No account fixture for ${displayName}.`);
 
   const context = await browser.newContext();
   const page = await context.newPage();
   await page.goto("/signin");
-  await page.getByRole("link", { name: new RegExp(displayName, "i") }).click();
 
-  // Wait for the form before asking anything about it. `isVisible()` resolves
-  // immediately rather than waiting, so branching on it straight after a click
-  // reads the OLD page and picks the wrong path every time.
-  await page.waitForURL(/member=/);
-  const pinField = page.locator("#pin");
-  await pinField.waitFor();
-  await pinField.fill(pin);
-
-  // Present only while enrolling — a member who already has a PIN is asked for
-  // it once, not twice.
-  const confirmField = page.locator("#confirmPin");
-  if ((await confirmField.count()) > 0) await confirmField.fill(pin);
+  await page.locator("#email").fill(account.email);
+  await page.locator("#password").fill(account.password);
+  await page.locator("#confirmPassword").fill(account.password);
 
   await page.getByRole("button", { name: /sign in/i }).click();
   await page.waitForURL(/\/c\//);
@@ -183,7 +176,12 @@ test.describe("the move", () => {
     // kind is rendered as frozen text rather than radios, because reshaping a
     // container is the GM's call and the server refuses it either way.
     const renamed = `${name} (renamed)`;
-    await player.getByRole("link", { name: /^edit$/i }).click();
+    // Editing lives in the overflow menu now (Wireframe.png puts Share and a
+    // `⋯` at the end of the strip row), so the menu has to be opened first.
+    // It is a <details>, which is why this is a click on a summary and not a
+    // menu-button role.
+    await player.locator('summary[aria-label^="More actions"]').click();
+    await player.getByRole("link", { name: /edit container/i }).click();
     await expect(player.getByRole("dialog")).toBeVisible();
     await expect(player.getByRole("radio")).toHaveCount(0);
     await player.getByLabel("Name").fill(renamed);
@@ -216,7 +214,7 @@ test.describe("the session", () => {
     await player.getByRole("button", { name: /sign out/i }).click();
     await player.waitForURL(/\/signin/);
     await expect(
-      player.getByRole("heading", { name: /sit at the table as/i }),
+      player.getByRole("heading", { name: /sit at the table/i }),
     ).toBeVisible();
 
     // The cookie is gone, so the container is no longer reachable.
@@ -224,5 +222,47 @@ test.describe("the session", () => {
     await expect(player).toHaveURL(/\/signin/);
 
     await player.context().close();
+  });
+});
+
+test.describe("databases", () => {
+  /**
+   * The Databases section — Wireframe.png's second sidebar section.
+   *
+   * The point of the screen is that it reads ACROSS containers, so that is
+   * what this asserts: one type, rows from more than one DISTINCT container,
+   * and a way back into the container holding each row. The permission half
+   * (a hidden container's objects never appearing) is covered exhaustively in
+   * `backend/domain/database.test.ts`, where every principal can be checked
+   * against every database cheaply.
+   */
+  test("a database lists objects from more than one container", async ({
+    browser,
+  }) => {
+    const gm = await signInAs(browser, "Ravna");
+
+    // Whichever database the seed produced, rather than a named type — the
+    // seed's types are free to change without breaking this.
+    const firstDatabase = gm.locator('a[href^="/db/"]').first();
+    await expect(firstDatabase).toBeVisible();
+    await firstDatabase.click();
+    await gm.waitForURL(/\/db\//);
+
+    // The column a container's own table does not have, and the reason this
+    // screen exists.
+    await expect(gm.getByRole("columnheader", { name: /where/i })).toBeVisible();
+
+    // Distinct containers, not merely several rows: a database that happened
+    // to show four items from one pack would pass a row count and prove
+    // nothing about reading across containers.
+    const hrefs = await gm.locator('tbody a[href^="/c/"]').evaluateAll((links) =>
+      links.map((a) => (a as HTMLAnchorElement).getAttribute("href") ?? ""),
+    );
+    const containers = new Set(
+      hrefs.map((href) => href.split("?")[0]).filter(Boolean),
+    );
+    expect(containers.size).toBeGreaterThan(1);
+
+    await gm.context().close();
   });
 });

@@ -86,12 +86,27 @@ export function Avatar({
   );
 }
 
+/**
+ * Who you are signed in as.
+ *
+ * The email rather than the display name, per Wireframe.png, which attributes
+ * every identity on the page to an address. It is also the more useful of the
+ * two here: the display name is what everyone at the table calls you, and the
+ * address is what you typed to get in — so on a shared machine the address is
+ * the string that answers "whose session is this?" without ambiguity.
+ *
+ * The name has not gone anywhere; it is still what the avatar's initials are
+ * built from and what a container is labelled with.
+ */
 export function UserBadge({ principal }: { principal: Principal }) {
   return (
-    <div className="flex shrink-0 items-center gap-2">
+    <div className="flex min-w-0 shrink items-center gap-2">
       <Avatar name={principal.displayName} />
-      <span className="hidden text-xs font-medium text-muted md:inline">
-        {principal.displayName} · {principal.role === "gm" ? "GM" : "Player"}
+      <span
+        className="hidden min-w-0 truncate text-xs font-medium text-muted md:inline"
+        title={`${principal.displayName} · ${principal.email}`}
+      >
+        {principal.email} · {principal.role === "gm" ? "GM" : "Player"}
       </span>
     </div>
   );

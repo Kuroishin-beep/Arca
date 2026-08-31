@@ -7,20 +7,29 @@ import { repository } from "@backend/db";
 import type { Principal } from "@backend/domain/view";
 import {
   delayForAttempts,
+  emailProblem,
   lockoutMinutes,
-  pinProblem,
+  normaliseEmail,
+  passwordProblem,
   recordFailure,
-} from "@backend/lib/pin";
+} from "@backend/lib/password";
 import { SESSION_COOKIE } from "@backend/lib/session";
 
 /**
  * Sign in and out.
  *
- * One mechanism: pick your name from the campaign's roster, prove it with a
- * PIN. A member who has not chosen a PIN yet chooses one here on their first
+ * One mechanism: type the email address the GM has for you, and your password.
+ * A member who has not chosen a password yet chooses one here on their first
  * sign-in, which is why this action covers both cases rather than splitting
- * into two — from the person's side it is the same act, and splitting it would
- * mean the screen had to tell a stranger which names are unclaimed.
+ * into two.
+ *
+ * That single form is a deliberate answer to a leak the old two-step roster had
+ * to live with. Splitting it — submit the address, then be shown either "enter
+ * your password" or "choose a password" — would make the screen an oracle for
+ * which addresses are at this table, one query at a time. Here the confirm
+ * field is always rendered and only ever consulted while enrolling, so the
+ * page looks the same for an address that is at the table, one that is not, and
+ * one that is but has already signed in.
  *
  * Failures come back as an `error` code in the query string rather than as
  * rendered text. The sign-in page is a server component with no client state,
@@ -34,7 +43,7 @@ function text(raw: FormDataEntryValue | null): string {
   return typeof raw === "string" ? raw : "";
 }
 
-/** Everything after a successful sign-in, shared by both paths above. */
+/** Everything after a successful sign-in, shared by both paths below. */
 async function land(principal: Principal): Promise<never> {
   const jar = await cookies();
   jar.set(SESSION_COOKIE, principal.userId, {
@@ -53,47 +62,67 @@ async function land(principal: Principal): Promise<never> {
 }
 
 export async function signInAsAction(formData: FormData): Promise<void> {
-  const userId = text(formData.get("userId"));
-  const pin = text(formData.get("pin")).trim();
-  const confirm = text(formData.get("confirmPin")).trim();
+  const email = normaliseEmail(text(formData.get("email")));
+  const password = text(formData.get("password"));
+  const confirm = text(formData.get("confirmPassword"));
 
-  const members = await repository().listMembers();
-  const member = members.find((m) => m.userId === userId);
-  if (!member) redirect("/signin?error=unknown-member");
+  // The typed address is echoed back so a wrong password does not also cost
+  // retyping the email. It is the one field on this form that is not a secret.
+  const at = `/signin?email=${encodeURIComponent(email)}`;
 
-  const at = `/signin?member=${encodeURIComponent(userId)}`;
+  if (emailProblem(email)) redirect(`${at}&error=bad-email`);
 
-  // Checked before the PIN is looked at, so a locked-out attacker learns
+  // Checked before the password is looked at, so a locked-out attacker learns
   // nothing from the response time either.
-  const locked = lockoutMinutes(userId);
+  const locked = lockoutMinutes(email);
   if (locked > 0) redirect(`${at}&error=locked`);
 
-  if (member.hasPin) {
-    // Slows down after the free attempts are spent. A person who mistyped
-    // once never notices; a script noticing is the point.
-    await delayForAttempts(userId);
+  // Slows down after the free attempts are spent. A person who mistyped once
+  // never notices; a script noticing is the point.
+  await delayForAttempts(email);
 
-    const principal = await repository().authenticateMember(userId, pin);
-    if (!principal) {
-      recordFailure(userId);
-      redirect(`${at}&error=bad-pin`);
-    }
-    await land(principal);
+  // Tried first, and unconditionally. An address with a password set never
+  // reaches the enrolment branch below, so enrolment cannot be used to
+  // overwrite one — and the two branches cost the same lookup, so which one ran
+  // is not visible in the timing.
+  const existing = await repository().authenticateMember(email, password);
+  if (existing) await land(existing);
+
+  // Past this point the sign-in did not succeed, and the reason is one of:
+  // wrong password, no password set yet, or no such address. The three are
+  // answered identically.
+  //
+  // The confirm field is what selects the branch, NOT whether the member is
+  // enrolled — asking the repository that and reporting it is exactly the
+  // oracle this form is shaped to avoid. Someone signing in normally leaves it
+  // empty and gets the wrong-credentials answer; someone signing in for the
+  // first time fills it, which is what the field's label asks for.
+  if (confirm === "") {
+    recordFailure(email);
+    redirect(`${at}&error=bad-credentials`);
   }
 
-  // First sign-in: this member is choosing their PIN.
-  if (pinProblem(pin)) redirect(`${at}&error=weak-pin`);
-  // Confirmed, because a typo here is not a failed sign-in — it is a PIN
+  // Confirmed, because a typo here is not a failed sign-in — it is a password
   // nobody knows, on a member who can no longer enrol.
-  if (pin !== confirm) redirect(`${at}&error=mismatch`);
+  if (password !== confirm) redirect(`${at}&error=mismatch`);
 
-  const principal = await repository().enrolMemberPin(userId, pin);
-  // Almost always the race: someone claimed this name between the page
-  // rendering and this submit. Re-rendering the screen shows it asking for a
-  // PIN instead of offering to set one, which is the honest next step.
-  if (!principal) redirect(`${at}&error=already-enrolled`);
+  // Checked before enrolling, so a first sign-in cannot set something shorter
+  // than the form advertises.
+  if (passwordProblem(password, email)) {
+    recordFailure(email);
+    redirect(`${at}&error=weak-password`);
+  }
 
-  await land(principal);
+  const enrolled = await repository().enrolMemberPassword(email, password);
+  if (!enrolled) {
+    // Unknown address, or one that was enrolled between the two calls above.
+    // Both are reported as the same wrong-credentials message: saying "no such
+    // member" here is what would turn this form into a roster oracle.
+    recordFailure(email);
+    redirect(`${at}&error=bad-credentials`);
+  }
+
+  await land(enrolled);
 }
 
 export async function signOutAction(): Promise<void> {

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { fixtureRepository, resetFixtureStore } from "@backend/db/fixture-repository";
-import { KOVA_ID, SEED_CONTAINERS } from "@backend/db/seed-data";
+import { KOVA_EMAIL, KOVA_ID, SEED_CONTAINERS } from "@backend/db/seed-data";
 import {
   CreateItemInput,
   MoveItemInput,
@@ -25,6 +25,7 @@ import { PermissionError } from "@backend/lib/permissions";
 const kova: Principal = {
   userId: KOVA_ID as Principal["userId"],
   displayName: "Kova",
+  email: KOVA_EMAIL,
   role: "player",
 };
 

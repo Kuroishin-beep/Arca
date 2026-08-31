@@ -4,9 +4,11 @@ import { redirect } from "next/navigation";
 import { ButtonLink } from "@frontend/components/atoms/Button";
 import { Chip, ContainerBadge, ContainerDot } from "@frontend/components/atoms/Chip";
 import { Icon } from "@frontend/components/atoms/Icon";
+import { ContainerActions } from "@frontend/components/organisms/ContainerActions";
 import { ContainerEditorDialog } from "@frontend/components/organisms/ContainerEditorDialog";
 import { DetailPanel } from "@frontend/components/organisms/DetailPanel";
-import { RevealToggle } from "@frontend/components/organisms/RevealToggle";
+import { ShareDialog } from "@frontend/components/organisms/ShareDialog";
+import { WorkspaceShell } from "@frontend/components/organisms/WorkspaceShell";
 import {
   OptimisticItemsProvider,
   OptimisticWeightMeter,
@@ -17,9 +19,9 @@ import {
   type MoveTarget,
 } from "@frontend/components/organisms/MoveItemDialog";
 import { ItemTable } from "@frontend/components/organisms/ItemTable";
-import { Sidebar } from "@frontend/components/organisms/Sidebar";
-import { TopBar } from "@frontend/components/organisms/TopBar";
 import { repository } from "@backend/db";
+import { CAMPAIGN_NAME } from "@backend/db/seed-data";
+import { listDatabases } from "@backend/domain/database";
 import {
   DEFAULT_SORT,
   SortColumn,
@@ -67,6 +69,8 @@ export default async function WorkspacePage({
     dir?: string;
     dialog?: string;
     nav?: string;
+    /** "0" collapses the pinned rail. Absent means shown. */
+    rail?: string;
   }>;
 }) {
   const principal = await currentPrincipal();
@@ -141,6 +145,25 @@ export default async function WorkspacePage({
     sp.item ? `?item=${sp.item}` : query ? `?q=${encodeURIComponent(query)}` : ""
   }`;
 
+  // The pinned rail, collapsed — Wireframe.png labels this control "Collapse".
+  // URL state like everything else on this screen, which also makes a collapsed
+  // rail part of a link you can send someone.
+  const railCollapsed = sp.rail === "0";
+
+  /** The rail toggle: this screen's URL with `rail` flipped and everything
+   *  else kept, so collapsing the sidebar never also drops your search. */
+  const railHref = (() => {
+    const p = new URLSearchParams();
+    if (sp.item) p.set("item", sp.item);
+    if (query) p.set("q", query);
+    if (sp.tags) p.set("tags", sp.tags);
+    if (sp.sort) p.set("sort", sp.sort);
+    if (sp.dir) p.set("dir", sp.dir);
+    if (!railCollapsed) p.set("rail", "0");
+    const qs = p.toString();
+    return `/c/${containerId}${qs ? `?${qs}` : ""}`;
+  })();
+
   // Destinations: every container the principal can READ, annotated with
   // whether they may WRITE to it. Ones they cannot are shown disabled with the
   // reason rather than removed from the list.
@@ -153,6 +176,11 @@ export default async function WorkspacePage({
 
   const drawerOpen = sp.nav === "1";
   const isGm = principal.role === "gm";
+
+  // The Databases section of the sidebar. Derived from the types on objects
+  // this principal can reach, so it is a per-viewer list by construction —
+  // see `backend/domain/database.ts`.
+  const databases = await listDatabases(repo, principal);
 
   // The Sidebar renders this only for someone who may create something — but
   // the action checks the principal again server-side, because a link is not a
@@ -171,8 +199,12 @@ export default async function WorkspacePage({
   // fetched when one of them is actually open.
   const containerDialogOpen =
     sp.dialog === "new-container" || sp.dialog === "edit-container";
-  // Only the GM gets an owner picker, so only the GM needs the roster.
-  const members = containerDialogOpen && isGm ? await repo.listMembers() : [];
+  // Only the GM gets an owner picker, so only the GM needs the roster there.
+  // Share needs it for everyone, because the whole point of that dialog is the
+  // per-member answer — so it is fetched when either is open.
+  const shareOpen = sp.dialog === "share";
+  const members =
+    shareOpen || (containerDialogOpen && isGm) ? await repo.listMembers() : [];
 
   // Somewhere to land after retiring, since the current container will be gone.
   const retireFallbackHref = (() => {
@@ -180,68 +212,85 @@ export default async function WorkspacePage({
     return other ? `/c/${other.id}` : undefined;
   })();
 
+  /**
+   * The detail panel — pinned at lg, a sheet below it.
+   *
+   * Built here and handed to the shell as `aside` rather than rendered inside
+   * the content column, because it is a SIBLING of the main column: the two
+   * scroll independently, and nesting it would put the item detail inside the
+   * scroll container of the table it is describing.
+   */
+  const detailPanel = selected ? (
+    <>
+      <aside
+        aria-label="Item detail"
+        className="hidden w-[var(--detail-w)] shrink-0 flex-col overflow-y-auto border-l border-border bg-surface lg:flex"
+      >
+        <DetailPanel
+          item={selected}
+          container={container}
+          comments={comments}
+          canEdit={editable}
+          query={query}
+        />
+      </aside>
+
+      <div className="fixed inset-0 z-20 lg:hidden">
+        <Link
+          href={`/c/${containerId}${query ? `?q=${encodeURIComponent(query)}` : ""}`}
+          aria-label="Close item detail"
+          className="absolute inset-0 bg-black/60"
+        />
+        <aside
+          aria-label="Item detail"
+          className="absolute inset-y-0 right-0 flex w-full max-w-sm flex-col overflow-y-auto border-l border-border bg-surface"
+        >
+          <DetailPanel
+            item={selected}
+            container={container}
+            comments={comments}
+            canEdit={editable}
+            query={query}
+          />
+        </aside>
+      </div>
+    </>
+  ) : null;
+
   return (
     // The provider spans the table, the footer meter and the dialogs, because
     // a move begun in a dialog has to be reflected in the other two before the
     // server answers (SCOPE.md §8.1 step 4).
     <OptimisticItemsProvider>
-    <div className="flex h-screen flex-col bg-bg">
-      <TopBar
+      <WorkspaceShell
         principal={principal}
-        containerId={containerId}
+        containers={containers}
+        databases={databases}
+        campaignName={CAMPAIGN_NAME}
+        selectedId={containerId}
+        newContainerHref={newContainerHref}
+        searchAction={`/c/${containerId}`}
         query={query}
         placeholder={`Search ${container.name}…`}
-      />
-
-      <div className="flex min-h-0 flex-1">
-        {/* Pinned sidebar at lg */}
-        <nav
-          aria-label="Containers"
-          className="hidden w-[var(--sidebar-w)] shrink-0 flex-col overflow-y-auto border-r border-border bg-surface lg:flex"
-        >
-          <Sidebar
-            containers={containers}
+        navOpen={drawerOpen}
+        drawerHref={`/c/${containerId}?nav=1`}
+        railCollapsed={railCollapsed}
+        railHref={railHref}
+        closeHref={closeHref}
+        quickAccess={{
+          href: `/c/${containerId}`,
+          label: container.name,
+          kind: "container",
+        }}
+        actions={
+          <ContainerActions
+            container={container}
             principal={principal}
-            selectedId={containerId}
-            newContainerHref={newContainerHref}
+            editable={editable}
           />
-        </nav>
-
-        {/* Drawer below lg. A URL state, so it survives the reloads the
-            embedded browser does constantly. */}
-        {drawerOpen ? (
-          <div className="fixed inset-0 z-30 lg:hidden">
-            <Link
-              href={closeHref}
-              aria-label="Close container list"
-              className="absolute inset-0 bg-black/60"
-            />
-            <nav
-              aria-label="Containers"
-              className="absolute inset-y-0 left-0 flex w-[264px] flex-col overflow-y-auto border-r border-border bg-surface"
-            >
-              <div className="flex h-[var(--topbar-h)] shrink-0 items-center justify-between border-b border-border px-3">
-                <span className="font-serif text-lg font-bold text-primary">
-                  Arca
-                </span>
-                <Link
-                  href={closeHref}
-                  className="grid h-8 w-8 place-items-center rounded-md text-muted hover:bg-surface2"
-                >
-                  <Icon name="close" size={14} />
-                  <span className="sr-only">Close</span>
-                </Link>
-              </div>
-              <Sidebar
-                containers={containers}
-                principal={principal}
-                selectedId={containerId}
-              />
-            </nav>
-          </div>
-        ) : null}
-
-        <main className="flex min-w-0 flex-1 flex-col">
+        }
+        aside={detailPanel}
+      >
           <div className="shrink-0 border-b border-border bg-bg px-3 pt-3 md:px-4 md:pt-4">
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex min-w-0 items-center gap-2">
@@ -255,30 +304,6 @@ export default async function WorkspacePage({
                     tell at a glance, without opening anything. */}
                 {isGm && container.type === "world" && !container.revealed ? (
                   <Chip tone="warning">Hidden</Chip>
-                ) : null}
-              </div>
-
-              <div className="ml-auto flex items-center gap-2">
-                {isGm && container.type === "world" ? (
-                  <RevealToggle
-                    containerId={container.id}
-                    revealed={container.revealed}
-                  />
-                ) : null}
-
-                {/* Anyone who may write to this container may also rename it
-                    and set its capacity. What the dialog then offers narrows
-                    again by role: the kind and the owner are the GM's, and the
-                    retire control appears only for someone who may retire this
-                    one. */}
-                {editable ? (
-                  <ButtonLink
-                    href={`/c/${containerId}?dialog=edit-container`}
-                    variant="secondary"
-                    size="sm"
-                  >
-                    Edit
-                  </ButtonLink>
                 ) : null}
               </div>
 
@@ -370,46 +395,7 @@ export default async function WorkspacePage({
               <OptimisticWeightMeter items={allItems} container={container} />
             </div>
           </div>
-        </main>
-
-        {/* Detail panel: pinned at lg, a sheet below it. */}
-        {selected ? (
-          <>
-            <aside
-              aria-label="Item detail"
-              className="hidden w-[var(--detail-w)] shrink-0 flex-col overflow-y-auto border-l border-border bg-surface lg:flex"
-            >
-              <DetailPanel
-                item={selected}
-                container={container}
-                comments={comments}
-                canEdit={editable}
-                query={query}
-              />
-            </aside>
-
-            <div className="fixed inset-0 z-20 lg:hidden">
-              <Link
-                href={`/c/${containerId}${query ? `?q=${encodeURIComponent(query)}` : ""}`}
-                aria-label="Close item detail"
-                className="absolute inset-0 bg-black/60"
-              />
-              <aside
-                aria-label="Item detail"
-                className="absolute inset-y-0 right-0 flex w-full max-w-sm flex-col overflow-y-auto border-l border-border bg-surface"
-              >
-                <DetailPanel
-                  item={selected}
-                  container={container}
-                  comments={comments}
-                  canEdit={editable}
-                  query={query}
-                />
-              </aside>
-            </div>
-          </>
-        ) : null}
-      </div>
+      </WorkspaceShell>
 
       {/* Dialogs are URL state too, so a move in progress survives a reload. */}
       {sp.dialog === "move" && selected && editable ? (
@@ -423,6 +409,17 @@ export default async function WorkspacePage({
 
       {sp.dialog === "add" && editable ? (
         <ItemEditorDialog container={container} closeHref={closeHref} />
+      ) : null}
+
+      {/* Share is gated on READ, not write — which reaching this line already
+          proves. It describes who can see this container; someone who can see
+          it may know who else can. */}
+      {shareOpen ? (
+        <ShareDialog
+          container={container}
+          members={members}
+          closeHref={`/c/${containerId}`}
+        />
       ) : null}
 
       {sp.dialog === "new-container" && allowedTypes.length > 0 ? (
@@ -458,7 +455,6 @@ export default async function WorkspacePage({
           closeHref={closeHref}
         />
       ) : null}
-    </div>
     </OptimisticItemsProvider>
   );
 }

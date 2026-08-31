@@ -27,6 +27,14 @@ import { ContainerId, ContainerType, ItemId, UserId, UserRole } from "./types";
 export const Principal = z.object({
   userId: UserId,
   displayName: z.string().min(1),
+  /**
+   * The address this member signs in with, already normalised. Carried on the
+   * principal rather than looked up where it is shown, because since sign-in
+   * became email-and-password the email IS the identity — the top bar, the
+   * roster and every comment attribute to it — and a per-render lookup for the
+   * one string that is on every screen is a query the session already made.
+   */
+  email: z.string().min(1),
   role: UserRole,
 });
 export type Principal = z.infer<typeof Principal>;
@@ -77,6 +85,10 @@ export const CommentView = z.object({
   id: z.string(),
   containerId: ContainerId,
   authorName: z.string(),
+  /** Shown as the attribution on the comment card, per Wireframe.png. Stored
+   *  as an id on the row and resolved here, so renaming or re-addressing a
+   *  member does not leave stale attributions on old comments. */
+  authorEmail: z.string(),
   authorRole: UserRole,
   content: z.string(),
   parentId: z.string().nullable(),
