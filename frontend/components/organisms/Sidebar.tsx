@@ -42,9 +42,14 @@ export function Sidebar({
   /** Containers the principal may not READ at all, shown as locked rows so the
    *  list does not silently change shape between GM and player. */
   lockedContainers = [],
-  /** Where the "New container" link points. Absent on screens with no
-   *  container context to return to. */
+  /** Where the "New container" link points. Absent only when this principal
+   *  may not create one. */
   newContainerHref,
+  /** Where "New database" points — the item editor, because a database is not
+   *  created, it is named. Absent when there is nowhere they may write. */
+  newDatabaseHref,
+  /** Where the Search row jumps — the current screen's search input. */
+  searchHref,
   /** The campaign name, in the switcher at the top. */
   campaignName,
 }: {
@@ -55,6 +60,8 @@ export function Sidebar({
   selectedDatabase?: string;
   lockedContainers?: ContainerView[];
   newContainerHref?: string;
+  newDatabaseHref?: string;
+  searchHref?: string;
   campaignName: string;
 }) {
   return (
@@ -77,9 +84,7 @@ export function Sidebar({
           fields writing one piece of state is how they end up disagreeing. */}
       <div className="px-3 pt-3">
         <Link
-          href={
-            selectedId ? `/c/${selectedId}#q` : (newContainerHref ?? "/")
-          }
+          href={searchHref ?? "/"}
           className="flex h-8 w-full items-center gap-2 rounded-md border border-border bg-surface2 px-2 text-sm text-muted hover:text-text"
         >
           <Icon name="search" size={13} className="shrink-0" />
@@ -189,9 +194,13 @@ export function Sidebar({
 
         {/* A database is not created, it is named: typing a type onto an item
             brings its database into existence. So this points at the item
-            editor rather than at a dialog that would have nothing to write. */}
-        {newContainerHref && selectedId ? (
-          <NewLink href={`/c/${selectedId}?dialog=add`}>New database</NewLink>
+            editor rather than at a dialog that would have nothing to write.
+
+            Not gated on a container being OPEN — the sidebar is on every screen
+            and must not change shape between them. The route resolves where to
+            send you; here it is either offered or it is not. */}
+        {newDatabaseHref ? (
+          <NewLink href={newDatabaseHref}>New database</NewLink>
         ) : null}
       </Section>
     </>

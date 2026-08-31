@@ -29,6 +29,7 @@ export function WorkspaceShell({
   selectedId,
   selectedDatabase,
   newContainerHref,
+  newDatabaseHref,
   searchAction,
   query,
   placeholder,
@@ -49,6 +50,7 @@ export function WorkspaceShell({
   selectedId?: string;
   selectedDatabase?: string;
   newContainerHref?: string;
+  newDatabaseHref?: string;
   /** Where the top bar's search form GETs to. */
   searchAction?: string;
   query?: string;
@@ -86,6 +88,10 @@ export function WorkspaceShell({
       selectedId={selectedId}
       selectedDatabase={selectedDatabase}
       newContainerHref={newContainerHref}
+      newDatabaseHref={newDatabaseHref}
+      // The search row jumps to THIS screen's input, which is the same target
+      // the top bar's form posts to.
+      searchHref={searchAction ? `${searchAction}#q` : undefined}
       campaignName={campaignName}
     />
   );

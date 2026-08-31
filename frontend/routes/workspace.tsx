@@ -269,6 +269,7 @@ export default async function WorkspacePage({
         campaignName={CAMPAIGN_NAME}
         selectedId={containerId}
         newContainerHref={newContainerHref}
+        newDatabaseHref={editable ? `/c/${containerId}?dialog=add` : undefined}
         searchAction={`/c/${containerId}`}
         query={query}
         placeholder={`Search ${container.name}…`}

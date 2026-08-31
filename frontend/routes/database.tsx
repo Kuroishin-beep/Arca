@@ -13,6 +13,7 @@ import {
   type DatabaseRow,
 } from "@backend/domain/database";
 import { matchesQuery } from "@backend/domain/view";
+import { canWrite, creatableContainerTypes } from "@backend/lib/permissions";
 import { currentPrincipal } from "@backend/lib/session";
 
 /**
@@ -75,12 +76,25 @@ export default async function DatabasePage({
     return qs ? `${base}?${qs}` : base;
   })();
 
+  // Creating a container and adding an item both need a container to act
+  // FROM — the dialogs are URL state on a container's screen. This screen has
+  // no container of its own, so it borrows the first one this principal may
+  // write to. Without this the sidebar's two "New" links would simply vanish
+  // whenever a database is open, and navigation that changes shape between
+  // screens is the thing the shared shell exists to prevent.
+  const writable = containers.find((c) => canWrite(principal, c));
+
   const shell = {
     principal,
     containers,
     databases,
     campaignName: CAMPAIGN_NAME,
     selectedDatabase: database ? slugifyType(slug) : undefined,
+    newContainerHref:
+      writable && creatableContainerTypes(principal).length > 0
+        ? `/c/${writable.id}?dialog=new-container`
+        : undefined,
+    newDatabaseHref: writable ? `/c/${writable.id}?dialog=add` : undefined,
     searchAction: base,
     query,
     placeholder: database ? `Search ${database.name}…` : "Search…",
