@@ -12,6 +12,11 @@
 export interface SeedUser {
   id: string;
   displayName: string;
+  /** Already normalised — lowercase, trimmed — because this is what the
+   *  `users.email` column stores and what a sign-in is compared against.
+   *  `.example` is the RFC 2606 reserved TLD: it can never resolve, so a seed
+   *  address can never accidentally become somewhere mail is sent. */
+  email: string;
   role: "gm" | "player";
 }
 
@@ -59,10 +64,14 @@ const c = (n: number) => `00000000-0000-4000-8000-00000000020${n}`;
 const i = (n: string) => `00000000-0000-4000-8000-${`3${n}`.padStart(12, "0")}`;
 
 export const SEED_USERS: SeedUser[] = [
-  { id: u(1), displayName: "Ravna", role: "gm" },
-  { id: u(2), displayName: "Kova", role: "player" },
-  { id: u(3), displayName: "Milo", role: "player" },
+  { id: u(1), displayName: "Ravna", email: "ravna@ravenholt.example", role: "gm" },
+  { id: u(2), displayName: "Kova", email: "kova@ravenholt.example", role: "player" },
+  { id: u(3), displayName: "Milo", email: "milo@ravenholt.example", role: "player" },
 ];
+
+export const GM_EMAIL = SEED_USERS[0]!.email;
+export const KOVA_EMAIL = SEED_USERS[1]!.email;
+export const MILO_EMAIL = SEED_USERS[2]!.email;
 
 export const GM_ID = u(1);
 export const KOVA_ID = u(2);

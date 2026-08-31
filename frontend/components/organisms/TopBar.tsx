@@ -11,26 +11,36 @@ import type { Principal } from "@backend/domain/view";
 /**
  * Present on every screen. Three jobs, in priority order: say where you are,
  * let you search, and say whether what you are looking at is current.
+ *
+ * It takes hrefs rather than a container id. When the Databases screen arrived
+ * the bar stopped being able to assume every screen is a container — building
+ * `/c/${containerId}?nav=1` in here would have meant the database screen's
+ * drawer toggle navigated to a different screen than the one it was on.
  */
 export function TopBar({
   principal,
-  containerId,
+  drawerHref,
+  searchAction,
   query = "",
   placeholder = "Search items…",
 }: {
   principal: Principal;
-  containerId?: string;
+  /** Where the below-`lg` drawer toggle points. Absent on a screen with no
+   *  drawer. */
+  drawerHref?: string;
+  /** Where the search form GETs to — the current screen. Absent on a screen
+   *  with nothing to search. */
+  searchAction?: string;
   query?: string;
   placeholder?: string;
 }) {
   return (
     <header className="flex h-[var(--topbar-h)] shrink-0 items-center gap-3 border-b border-border bg-surface px-3 md:px-4">
-      {/* Drawer toggle. A plain link to `?nav=1` rather than client state, so
-          the drawer survives a reload — which the embedded browser does a lot
-          of. */}
-      {containerId ? (
+      {/* Drawer toggle. A plain link rather than client state, so the drawer
+          survives a reload — which the embedded browser does a lot of. */}
+      {drawerHref ? (
         <Link
-          href={`/c/${containerId}?nav=1`}
+          href={drawerHref}
           className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-muted hover:bg-surface2 hover:text-text lg:hidden"
         >
           <Icon name="menu" />
@@ -48,9 +58,9 @@ export function TopBar({
 
       {/* A GET form, so search works without JavaScript and a searched view is
           a real URL you can hand to someone. */}
-      {containerId ? (
+      {searchAction ? (
         <form
-          action={`/c/${containerId}`}
+          action={searchAction}
           method="get"
           className="relative ml-auto min-w-0 flex-1 md:ml-4 md:max-w-md"
         >
@@ -85,10 +95,10 @@ export function TopBar({
       {/* Who you are, and leaving — two things, two controls.
           They used to be one: the badge WAS the sign-out button, with the only
           hint an `sr-only` span. So the single most destructive control in the
-          bar was also the one element people click to check which character
-          they are signed in as, and it looked like a label. Signing out is
-          cheap to undo but it costs a PIN, and nothing about an avatar says
-          "this ends your session".
+          bar was also the one element people click to check which account they
+          are signed in as, and it looked like a label. Signing out is cheap to
+          undo but it costs a password, and nothing about an avatar says "this
+          ends your session".
           The badge is now inert identity, and leaving is a labelled control
           next to it. */}
       <UserBadge principal={principal} />

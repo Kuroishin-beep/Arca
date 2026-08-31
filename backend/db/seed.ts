@@ -76,7 +76,11 @@ async function main(): Promise<void> {
   await database
     .insert(users)
     .values(
-      SEED_USERS.map((u) => ({ id: u.id, displayName: u.displayName })),
+      SEED_USERS.map((u) => ({
+        id: u.id,
+        displayName: u.displayName,
+        email: u.email,
+      })),
     )
     .onConflictDoNothing();
 

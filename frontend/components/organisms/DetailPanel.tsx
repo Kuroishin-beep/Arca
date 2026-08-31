@@ -210,9 +210,17 @@ export function DetailPanel({
 function CommentBody({ comment }: { comment: CommentView }) {
   return (
     <>
+      {/* Attributed to the address, per Wireframe.png. The display name is
+          still carried on the comment and is what the avatar's initials come
+          from — it is the visible attribution that changes, because at a table
+          where two people can both be "Kova" the address is the half that
+          identifies. */}
       <div className="mb-1 flex flex-wrap items-baseline gap-2">
-        <span className="text-sm font-bold text-text">
-          {comment.authorName}
+        <span
+          className="min-w-0 truncate text-sm font-bold text-text"
+          title={comment.authorName}
+        >
+          {comment.authorEmail}
         </span>
         {comment.authorRole === "gm" ? <Chip tone="primary">GM</Chip> : null}
         <span className="text-xs text-faint">

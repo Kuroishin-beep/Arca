@@ -26,13 +26,19 @@ import {
 import {
   assertCanEditContainer,
   assertCanManageContainer,
+  assertCanManageRoster,
   assertCanMove,
   assertCanRead,
   assertCanRetireContainer,
   assertCanWrite,
   visibleContainers,
 } from "@backend/lib/permissions";
-import { clearFailures, hashPin, verifyPin } from "@backend/lib/pin";
+import {
+  clearFailures,
+  hashPassword,
+  normaliseEmail,
+  verifyPassword,
+} from "@backend/lib/password";
 
 import {
   type ArcaRepository,
@@ -48,10 +54,11 @@ import {
 } from "./seed-data";
 
 interface Store {
-  /** The roster, plus the enrolled PIN hash. `pinHash` is deliberately part of
-   *  the store and NOT of `Member`: it is compared inside this module and is
-   *  never handed to a caller. Null means "has not chosen one yet". */
-  users: (Principal & { pinHash: string | null })[];
+  /** The roster, plus the enrolled password hash. `passwordHash` is
+   *  deliberately part of the store and NOT of `Member`: it is compared inside
+   *  this module and is never handed to a caller. Null means "has not chosen
+   *  one yet". */
+  users: (Principal & { passwordHash: string | null })[];
   containers: Omit<ContainerView, "itemCount" | "carriedWeight">[];
   items: (ItemView & { archivedAt: Date | null })[];
   comments: CommentView[];
@@ -62,15 +69,16 @@ const STORE_KEY = Symbol.for("arca.fixture.store");
 function freshStore(): Store {
   const now = new Date();
   return {
-    // Seeded unenrolled. Fixture mode is the no-database mode, so a PIN set
-    // here would survive only until the dev server restarts; starting every
-    // member at "choose a PIN" exercises the real first-run flow every time
-    // rather than once.
+    // Seeded unenrolled. Fixture mode is the no-database mode, so a password
+    // set here would survive only until the dev server restarts; starting every
+    // member at "choose a password" exercises the real first-run flow every
+    // time rather than once.
     users: SEED_USERS.map((u) => ({
       userId: u.id as Principal["userId"],
       displayName: u.displayName,
+      email: u.email,
       role: u.role,
-      pinHash: null,
+      passwordHash: null,
     })),
     containers: SEED_CONTAINERS.map((c) => ({
       id: c.id as ContainerView["id"],
@@ -99,6 +107,7 @@ function freshStore(): Store {
         id: c.id,
         containerId: c.containerId as ContainerView["id"],
         authorName: author?.displayName ?? "Unknown",
+        authorEmail: author?.email ?? "unknown@arca.invalid",
         authorRole: author?.role ?? "player",
         content: c.content,
         parentId: c.parentId,
@@ -297,6 +306,7 @@ export const fixtureRepository: ArcaRepository = {
       id: randomUUID(),
       containerId: input.containerId,
       authorName: principal.displayName,
+      authorEmail: principal.email,
       authorRole: principal.role,
       content: input.content,
       parentId,
@@ -403,35 +413,104 @@ export const fixtureRepository: ArcaRepository = {
   },
 
   async listMembers() {
-    // Projected, not returned: `pinHash` lives on the store rows and must not
-    // travel with them. Spreading the row and deleting the field would leave
-    // the hash one forgotten `...member` away from a client component.
-    return store().users.map(({ userId, displayName, role, pinHash }) => ({
-      userId,
-      displayName,
-      role,
-      hasPin: pinHash !== null,
-    }));
+    // Projected, not returned: `passwordHash` lives on the store rows and must
+    // not travel with them. Spreading the row and deleting the field would
+    // leave the hash one forgotten `...member` away from a client component.
+    return store().users.map(
+      ({ userId, displayName, email, role, passwordHash }) => ({
+        userId,
+        displayName,
+        email,
+        role,
+        hasPassword: passwordHash !== null,
+      }),
+    );
   },
 
-  async authenticateMember(userId, pin) {
-    const member = store().users.find((u) => u.userId === userId);
-    // Same `null` for unknown member, unenrolled member and wrong PIN — see
-    // the note on the interface. Nothing here distinguishes them.
-    if (!member?.pinHash) return null;
-    if (!(await verifyPin(pin, member.pinHash))) return null;
+  async authenticateMember(email, password) {
+    const member = byEmail(email);
+    // Same `null` for unknown address, unenrolled member and wrong password —
+    // see the note on the interface. Nothing here distinguishes them.
+    if (!member?.passwordHash) return null;
+    if (!(await verifyPassword(password, member.passwordHash))) return null;
 
-    clearFailures(userId);
-    return { userId: member.userId, displayName: member.displayName, role: member.role };
+    clearFailures(email);
+    return principalOf(member);
   },
 
-  async enrolMemberPin(userId, pin) {
-    const member = store().users.find((u) => u.userId === userId);
-    // Refusing when a PIN already exists is what keeps this a first-run step
-    // rather than a way to overwrite somebody else's.
-    if (!member || member.pinHash !== null) return null;
+  async registerMember(input) {
+    const email = normaliseEmail(input.email);
+    // Taken is taken — including by a member the GM added who has not signed in
+    // yet. Letting a stranger register over an unenrolled row would be a way to
+    // claim somebody else's invited seat by guessing their address.
+    if (byEmail(email)) return null;
 
-    member.pinHash = await hashPin(pin);
-    return { userId: member.userId, displayName: member.displayName, role: member.role };
+    const member = {
+      userId: randomUUID() as Principal["userId"],
+      displayName: input.displayName,
+      email,
+      // Never from the input. Self-signup mints players and only players.
+      role: "player" as const,
+      passwordHash: await hashPassword(input.password),
+    };
+    store().users.push(member);
+    return principalOf(member);
+  },
+
+  async addMember(principal, input) {
+    assertCanManageRoster(principal);
+
+    const email = normaliseEmail(input.email);
+    if (byEmail(email)) return null;
+
+    const member = {
+      userId: randomUUID() as Principal["userId"],
+      displayName: input.displayName,
+      email,
+      role: input.role,
+      // Unenrolled: they choose their own password on first sign-in.
+      passwordHash: null,
+    };
+    store().users.push(member);
+    return { ...principalOf(member), hasPassword: false };
+  },
+
+  async resetMemberPassword(principal, userId) {
+    assertCanManageRoster(principal);
+
+    const member = store().users.find((u) => u.userId === userId);
+    if (!member) throw new NotFoundError("No such member.");
+    member.passwordHash = null;
+    // The throttle is keyed by address, so a reset that did not clear it would
+    // leave a locked-out member locked out with a brand new password.
+    clearFailures(member.email);
+  },
+
+  async enrolMemberPassword(email, password) {
+    const member = byEmail(email);
+    // Refusing when a password already exists is what keeps this a first-run
+    // step rather than a way to overwrite somebody else's.
+    if (!member || member.passwordHash !== null) return null;
+
+    member.passwordHash = await hashPassword(password);
+    return principalOf(member);
   },
 };
+
+/** Normalised on the way in, so `Kova@…` and `kova@…` find the same member —
+ *  the store holds already-normalised addresses. */
+function byEmail(email: string) {
+  const wanted = normaliseEmail(email);
+  return store().users.find((u) => u.email === wanted) ?? null;
+}
+
+/** Strips `passwordHash` by naming the fields that may leave, rather than by
+ *  removing the one that may not. */
+function principalOf(member: Store["users"][number]): Principal {
+  return {
+    userId: member.userId,
+    displayName: member.displayName,
+    email: member.email,
+    role: member.role,
+  };
+}

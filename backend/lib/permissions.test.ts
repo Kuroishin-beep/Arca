@@ -2,7 +2,15 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { fixtureRepository, resetFixtureStore } from "@backend/db/fixture-repository";
 import { ConflictError } from "@backend/db/repository";
-import { GM_ID, KOVA_ID, MILO_ID, SEED_CONTAINERS } from "@backend/db/seed-data";
+import {
+  GM_EMAIL,
+  GM_ID,
+  KOVA_EMAIL,
+  KOVA_ID,
+  MILO_EMAIL,
+  MILO_ID,
+  SEED_CONTAINERS,
+} from "@backend/db/seed-data";
 import type { ContainerId } from "@backend/domain/types";
 import type { Principal } from "@backend/domain/view";
 import { PermissionError } from "@backend/lib/permissions";
@@ -19,16 +27,19 @@ import { PermissionError } from "@backend/lib/permissions";
 const gm: Principal = {
   userId: GM_ID as Principal["userId"],
   displayName: "Ravna",
+  email: GM_EMAIL,
   role: "gm",
 };
 const kova: Principal = {
   userId: KOVA_ID as Principal["userId"],
   displayName: "Kova",
+  email: KOVA_EMAIL,
   role: "player",
 };
 const milo: Principal = {
   userId: MILO_ID as Principal["userId"],
   displayName: "Milo",
+  email: MILO_EMAIL,
   role: "player",
 };
 

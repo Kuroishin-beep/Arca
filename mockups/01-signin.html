@@ -18,7 +18,7 @@
 <body class="min-h-full">
 <div class="mx-auto flex max-w-6xl flex-col gap-6 p-4 md:p-6">
 
-  <p class="mock-label">01 · Sign in — roster, loading, PIN</p>
+  <p class="mock-label">01 · Sign in — the form, loading, first sign-in</p>
 
   <div class="grid gap-4 lg:grid-cols-3">
 
@@ -34,30 +34,27 @@
         <h1 class="font-serif text-2xl font-bold text-text">Arca</h1>
         <p class="mt-2 text-base text-muted">Shared inventory for the Ravenholt Westmarch. Runs inside TaleSpire.</p>
 
-        <ul class="mt-6 flex flex-col gap-2 text-left">
-          <li>
-            <a href="#" class="flex h-12 w-full items-center gap-3 rounded-md border border-border bg-surface px-3 hover:bg-surface2">
-              <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-surface3 text-sm font-bold text-text">R</span>
-              <span class="min-w-0 flex-1">
-                <span class="block truncate text-base font-medium text-text">Ravna</span>
-                <span class="block truncate text-sm text-muted">Sees and edits everything</span>
-              </span>
-            </a>
-          </li>
-          <li>
-            <a href="#" class="flex h-12 w-full items-center gap-3 rounded-md border border-border bg-surface px-3 hover:bg-surface2">
-              <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-surface3 text-sm font-bold text-text">K</span>
-              <span class="min-w-0 flex-1">
-                <span class="block truncate text-base font-medium text-text">Kova</span>
-                <span class="block truncate text-sm text-muted">Own pack and shared containers only</span>
-              </span>
-            </a>
-          </li>
-        </ul>
+        <div class="mt-6 flex flex-col gap-3 text-left">
+          <div>
+            <label for="mock-email" class="mb-1 block text-sm font-medium text-text">Email</label>
+            <input id="mock-email" type="email" value="kova@ravenholt.example"
+                   class="h-10 w-full rounded-md border border-border bg-surface2 px-2 text-base text-text">
+          </div>
+          <div>
+            <label for="mock-password" class="mb-1 block text-sm font-medium text-text">Password</label>
+            <input id="mock-password" type="password" value="••••••••••"
+                   class="h-10 w-full rounded-md border border-border bg-surface2 px-2 text-base text-text">
+          </div>
+          <button type="button" data-component="Button" data-variant="primary"
+                  class="flex h-10 w-full items-center justify-center rounded-md bg-primary text-base font-bold text-invert hover:bg-primaryHover">
+            Sign in
+          </button>
+        </div>
 
         <p class="mt-4 text-sm text-muted">
-          The roster is the campaign membership. Someone who is not at this table never sees
-          their name here, so there is no gate to bounce off.
+          No roster on this screen. Membership is still the campaign's, but listing every
+          name to anyone holding the link published who is at this table — and an address
+          the person already knows removes the reason to.
         </p>
       </div>
     </section>
@@ -78,39 +75,45 @@
       </div>
     </section>
 
-    <!-- ── State C: the PIN step ─────────────────────────────────── -->
-    <!-- Two shapes, one screen: a member who has a PIN is asked for it, and a
-         member on their first sign-in chooses one. Choosing asks twice, because
-         a typo there is a PIN nobody knows on the one member who can no longer
-         enrol. -->
+    <!-- ── State C: the first sign-in ────────────────────────────── -->
+    <!-- One shape, both cases. The confirm field is ALWAYS rendered and only
+         ever read while enrolling: showing it once the app knows whether an
+         address has a password would make the screen an oracle for which
+         addresses are at this table, one query at a time. -->
     <section class="mock-frame flex min-h-[520px] flex-col items-center justify-center bg-bg p-6">
       <div class="w-full max-w-xs">
-        <h2 class="font-serif text-lg font-bold text-text">Sign in as</h2>
-        <p class="mt-1 text-sm text-muted">No PIN set yet. Choose one now — you will use it every time.</p>
+        <h2 class="font-serif text-lg font-bold text-text">Sit at the table</h2>
+        <p class="mt-1 text-sm text-muted">
+          Your email is the one the GM added to this campaign.
+        </p>
 
-        <div class="mt-3 flex items-center gap-3 rounded-md border border-border bg-surface px-3 py-2">
-          <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-surface3 text-sm font-bold text-text">K</span>
-          <span class="min-w-0 flex-1 truncate text-base font-medium text-text">Kova</span>
-          <a href="#" class="shrink-0 rounded-md px-2 py-1 text-sm text-muted hover:text-primary">Change</a>
+        <div class="mt-3">
+          <label for="mock-email-c" class="mb-1 block text-sm font-medium text-text">Email</label>
+          <input id="mock-email-c" type="email" value="kova@ravenholt.example"
+                 class="h-10 w-full rounded-md border border-border bg-surface2 px-2 text-base text-text">
         </div>
 
         <div class="mt-3">
-          <label for="mock-pin" class="mb-1 block text-sm font-medium text-text">Choose a PIN</label>
-          <input id="mock-pin" type="password" inputmode="numeric" value="••••"
+          <label for="mock-password-c" class="mb-1 block text-sm font-medium text-text">Password</label>
+          <input id="mock-password-c" type="password" value="••••••••••"
                  class="h-10 w-full rounded-md border border-border bg-surface2 px-2 text-base text-text">
-          <p class="mt-1 text-sm text-muted">4 to 8 digits.</p>
         </div>
 
         <div class="mt-3">
-          <label for="mock-pin-confirm" class="mb-1 block text-sm font-medium text-text">Confirm PIN</label>
-          <input id="mock-pin-confirm" type="password" inputmode="numeric" value="••••"
+          <label for="mock-confirm" class="mb-1 block text-sm font-medium text-text">Confirm password</label>
+          <input id="mock-confirm" type="password" value="••••••••••"
                  class="h-10 w-full rounded-md border border-border bg-surface2 px-2 text-base text-text">
+          <p class="mt-1 text-sm text-muted">Only the first time you sign in. Leave it empty after that.</p>
         </div>
 
         <button type="button" data-component="Button" data-variant="primary"
                 class="mt-4 flex h-10 w-full items-center justify-center rounded-md bg-primary text-base font-bold text-invert hover:bg-primaryHover">
-          Set PIN and sign in
+          Sign in
         </button>
+
+        <p class="mt-3 text-center text-sm text-muted">
+          Forgot it? There is no reset mail to send — ask the GM to clear your password.
+        </p>
       </div>
     </section>
   </div>

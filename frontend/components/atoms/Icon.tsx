@@ -31,6 +31,13 @@ export type IconName =
   | "info"
   | "trash"
   | "sign-out"
+  | "table"
+  | "panel"
+  | "share"
+  | "pin"
+  | "users"
+  | "eye"
+  | "eye-off"
   | "sun"
   | "moon";
 
@@ -118,6 +125,74 @@ const PATHS: Record<IconName, React.ReactNode> = {
       d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5 5 13h6l.5-8.5"
       strokeLinecap="round"
     />
+  ),
+  /* A database, drawn as the table it is rendered as rather than as the
+     stacked cylinders that mean "disk". Nobody at this table is thinking about
+     storage; they are thinking about a grid of weapons. */
+  table: (
+    <>
+      <rect x="2" y="3" width="12" height="10" rx="1" />
+      <path d="M2 6.5h12M6.5 6.5V13" strokeLinecap="round" />
+    </>
+  ),
+  /* The sidebar collapse toggle: a panel with its left rail filled, so the
+     glyph shows WHICH edge is about to move. */
+  panel: (
+    <>
+      <rect x="2" y="3" width="12" height="10" rx="1" />
+      <path d="M6 3v10" />
+      <path d="M2.9 3.9h2.2v8.2H2.9z" fill="currentColor" stroke="none" />
+    </>
+  ),
+  /* Two nodes and an arc — a thing being handed on, rather than the upward
+     arrow that means "upload" on half the platforms this runs beside. */
+  share: (
+    <>
+      <circle cx="12" cy="4" r="1.8" />
+      <circle cx="4" cy="8" r="1.8" />
+      <circle cx="12" cy="12" r="1.8" />
+      <path d="m5.6 7.1 4.8-2.2M5.6 8.9l4.8 2.2" strokeLinecap="round" />
+    </>
+  ),
+  /* A drawing pin seen head-on, for Quick Access. Deliberately not a star:
+     a star reads as "favourite", a rating, something about the object. This is
+     about where YOU keep it. */
+  pin: (
+    <>
+      <path
+        d="M6 2h4l-.6 4 2.1 2.2H4.5L6.6 6z"
+        strokeLinejoin="round"
+      />
+      <path d="M8 8.2V14" strokeLinecap="round" />
+    </>
+  ),
+  /* Two people, the front one whole and the back one implied by a shoulder.
+     Drawn at two sizes so it reads as "several" rather than as one figure with
+     a smudge behind it. */
+  users: (
+    <>
+      <circle cx="6" cy="5" r="2.4" />
+      <path d="M1.8 13.5a4.2 4.2 0 0 1 8.4 0" strokeLinecap="round" />
+      <path d="M10.6 3.1a2.4 2.4 0 0 1 0 3.8" strokeLinecap="round" />
+      <path d="M11.6 9.9a4.2 4.2 0 0 1 2.6 3.6" strokeLinecap="round" />
+    </>
+  ),
+  /* Show / hide password. The open eye is the CURRENT state made visible, and
+     the struck-through one is what you get after clicking — the same
+     convention as the theme toggle's glyph. */
+  eye: (
+    <>
+      <path d="M1.5 8s2.4-4 6.5-4 6.5 4 6.5 4-2.4 4-6.5 4-6.5-4-6.5-4z" strokeLinejoin="round" />
+      <circle cx="8" cy="8" r="1.9" />
+    </>
+  ),
+  "eye-off": (
+    <>
+      <path d="M6.2 4.2A6.9 6.9 0 0 1 8 4c4.1 0 6.5 4 6.5 4a12 12 0 0 1-2 2.4" strokeLinecap="round" />
+      <path d="M4.3 5.3A11.7 11.7 0 0 0 1.5 8s2.4 4 6.5 4a6.7 6.7 0 0 0 2.4-.42" strokeLinecap="round" />
+      <path d="M6.7 6.7a1.9 1.9 0 0 0 2.6 2.6" strokeLinecap="round" />
+      <path d="m2.5 2.5 11 11" strokeLinecap="round" />
+    </>
   ),
   /* A door being left, with the arrow pointing out of it. The arrow is the
      half people actually read, so it gets the longer stroke. */

@@ -78,6 +78,32 @@ Permission rules, stated as invariants:
 - No player may read a container they have no grant on. Row-level enforcement,
   not a client-side filter.
 
+### 3.1 How someone becomes a member
+
+Two doors, and they grant different things:
+
+| Door | Who may use it | Produces | Password |
+| --- | --- | --- | --- |
+| `/signup` | anyone with the link | a **player**, always | chosen on the spot |
+| `/members` | the GM only | a player **or a GM** | chosen by them on first sign-in |
+
+Self-signup is a deliberate loosening, recorded here rather than left implied:
+before it, membership was the GM's decision alone and there was no sign-up at
+all. What it grants is what any player has — party containers and revealed
+world containers. It does **not** grant a pack (a character container is
+created and owned deliberately), write access to a world container, or the GM
+seat: `SignUpInput` has no role field and `registerMember` hard-codes `player`,
+so there is no value to strip and no branch to forget.
+
+Sign-up refuses an address that already exists, including one the GM added that
+has not signed in yet. Without that, guessing an invited address would be a way
+to claim somebody else's seat — including a GM's.
+
+Account recovery is a person asking a person. There is no reset mail because
+there is no mail: the GM clears `users.password_hash` from `/members` and the
+member chooses a new one on their next sign-in, which is the same state a
+newly added member starts in.
+
 Following the `User()` insight from the Superhuman Docs research: permissions
 are **one view definition evaluated per viewer**, not two hand-maintained
 codepaths. The GM view and the player view are the same query with a different
@@ -94,7 +120,7 @@ principal.
 | **Database** | **PostgreSQL** (Vercel Postgres / Neon) | The schema doc requires JSONB for user-defined property values, plus real foreign keys and CHECK constraints for the ownership invariants. Row Level Security enforces the permission table above at the database, so a bug in a route handler cannot leak another player's pack. |
 | **ORM / query** | **Drizzle ORM** + `drizzle-kit` migrations | SQL-shaped, so the many-to-many containment joins stay legible. Migrations are checked-in SQL files, which matters for a schema that will grow property tables. Types are inferred, so they cannot drift from the columns. |
 | **Validation** | **Zod** (already a dependency) | One definition per entity: the TypeScript type is inferred from the schema, so there is no validator maintained separately from the type. Same schemas validate Server Action inputs. |
-| **Auth** | **Roster + per-member PIN** (`backend/lib/pin.ts`, scrypt) | No OAuth provider and no accounts to create: the roster IS `campaign_members`, so membership stays a GM decision, and a PIN chosen on first sign-in is what stops the roster being a list of names anyone with the link can sit down as. The cookie carries a user id only; role is re-read from `campaign_members` per request, so a role change takes effect on the next click. |
+| **Auth** | **Email + password** (`backend/lib/password.ts`, scrypt) | No OAuth provider. The address is the identity — it is what a comment is attributed to and what the top bar shows — and the password is what stops anyone holding the link sitting down as the GM. Two doors produce a `campaign_members` row: the GM adds someone on `/members`, or a person creates their own account on `/signup`, which joins as a **player** and can never mint a GM (§3.1). The roster is not rendered to anyone unauthenticated. The cookie carries a user id only; role is re-read from `campaign_members` per request, so a role change takes effect on the next click. |
 | **Realtime** | **Postgres `LISTEN`/`NOTIFY` bridged to SSE**, with **Supabase Realtime as the fallback** | Serverless functions cannot hold a socket, so a Vercel-hosted app needs either a Server-Sent Events route on the Node runtime or a hosted realtime service. SSE is one-directional, which is all Arca needs — writes go through Server Actions, only the fan-out needs a channel. |
 | **State (client)** | **TanStack Query** + `useOptimistic` | A move must feel instant. Optimistic update on the client, reconcile against the SSE broadcast, roll back with a toast on rejection. |
 | **Styling** | **Tailwind CSS v4** over CSS custom properties | See [Design.md](final-project-planning/Design.md) Step A. Tokens in `:root`, theme in an `@theme` block in `app/globals.css` — v4 is CSS-first and has no `tailwind.config.ts`. No gradients anywhere. |
@@ -189,7 +215,7 @@ rule 9 of the schema doc. There is no `total_weight` column to fall out of date.
 
 | # | Feature | Acceptance criteria |
 | --- | --- | --- |
-| M1 | **PIN sign-in and campaign membership** | A member picks their name, chooses a PIN on first sign-in, and lands in their campaign. Someone who is not a member never sees their name on the roster, so there is no container list to reach and no screen to bounce off. |
+| M1 | **Email sign-in, sign-up and campaign membership** | A member signs in with their address and password. Anyone may create an account and join as a player (§3.1); the GM may add someone directly, at either role, and clear a forgotten password. On the sign-in form an address that is not in the campaign is refused with the same message as a wrong password, so it cannot be used to find out who is at the table. |
 | M2 | **Container list (sidebar)** | Containers are grouped My Packs / Party / World. Each row shows icon, name, item count. A player never sees an unrevealed world container in the DOM. |
 | M3 | **Item table** | Selecting a container lists its items with name, qty, weight, value, tags. Sorting by any column. Sort state announced via `aria-sort`. |
 | M4 | **Add item** | A modal creates an item in the current container. Name required, qty a positive integer, weight non-negative. Validation errors render against the field. |
@@ -238,8 +264,11 @@ Stated so it is not assumed later:
 
 | # | Screen | Purpose | Mockup |
 | --- | --- | --- | --- |
-| 1 | **Sign in** | roster, PIN entry and first-run enrolment, role display | `mockups/01-signin.html` |
+| 1 | **Sign in** | email and password, with first-run enrolment | `mockups/01-signin.html` |
+| 1b | **Create account** | name, email, password — joins as a player | — |
+| 1c | **Members** *(GM)* | the roster, adding someone, clearing a password | — |
 | 2 | **Workspace** | The app. Sidebar + item table + detail panel | `mockups/02-workspace.html` |
+| 2b | **Database** | Every object of one type, across every container you may open. Sidebar section from `Wireframe.png` | — |
 | 3 | **Move item** | The headline flow as a focused dialog | `mockups/03-move-item.html` |
 | 4 | **Item editor** | Add / edit, with validation | `mockups/04-item-editor.html` |
 | 5 | **States** | Empty, loading, error, permission-denied, over-encumbered, conflict | `mockups/05-states.html` |
@@ -252,17 +281,21 @@ Screen map:
 ```
 [Sign in] --"authenticated"--> [Workspace]
                                    |
-        +--------------------------+--------------------------+
-        |                          |                          |
- "select container"        "click Move on a row"       "click + Add item"
-        |                          |                          |
-        v                          v                          v
- [Workspace, container]      [Move item dialog]         [Item editor]
-        |                          |                          |
- "click a row"              "confirm" -> back          "save" -> back
-        v
- [Detail panel]  --"stretch: open character"--> [Character sheet]
-                 --"stretch: open dice"-------> [diceFinder]
+    +---------------+--------------+--------------+---------------+
+    |               |              |              |               |
+"select        "select a      "click Move    "click + Add    "click Share"
+ container"     database"      on a row"       item"             |
+    |               |              |              |               v
+    v               v              v              v         [Share dialog]
+[Workspace,     [Database]   [Move dialog]  [Item editor]
+ container]         |
+    |          "click a row"
+"click a row"       |
+    v               v
+[Detail panel]  [Workspace, that row's container]
+    |
+    +--"stretch: open character"--> [Character sheet]
+    +--"stretch: open dice"-------> [diceFinder]
 ```
 
 Every screen returns to the Workspace; there is no dead end.
@@ -356,7 +389,7 @@ moved that — here's where it is now" rather than a silent overwrite.
 
 Arca v1 is done when all of the following are true:
 
-1. A GM and three players sign in with their PINs and see the same campaign.
+1. A GM and three players sign in with their email and password and see the same campaign.
 2. A player moves a healing potion from their pack to the party wagon; every
    other panel reflects it within 2 seconds without a refresh.
 3. A player attempts to open a GM-only world container by editing the URL and

@@ -2,39 +2,41 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { signInAsAction } from "@backend/actions/session";
-import { Avatar } from "@frontend/components/atoms/Status";
 import { Icon } from "@frontend/components/atoms/Icon";
+import { PasswordField } from "@frontend/components/atoms/PasswordField";
 import { ThemeToggle } from "@frontend/components/atoms/ThemeToggle";
-import { type Member, repository, repositoryKind } from "@backend/db";
+import { repositoryKind } from "@backend/db";
 import { currentSession } from "@backend/lib/session";
 import { realtimeKind } from "@backend/realtime";
 
 /**
  * Sign in — SCOPE.md M1.
  *
- * Pick your name from the roster, prove it with a PIN. The roster IS the
- * campaign's membership: a name appears here because the GM put a row in
- * `campaign_members`, so there is no sign-up, no invite to accept, and no
- * screen for someone who is not at this table — they simply never see their
- * name on it.
+ * Type your address and your password. Two doors lead here: the GM adds you on
+ * `/members`, or you create your own account on `/signup` — which joins this
+ * campaign as a player. Either way membership is a `campaign_members` row, and
+ * this screen never has to know which door you came through.
  *
- * One member is expanded at a time, addressed by `?member=`. That keeps this a
- * server component with no client state: which name is open, and which error is
- * showing, are both in the URL. It also means the page never renders six PIN
- * fields at once, which reads as a form to fill in rather than a person to
- * pick.
+ * What changed when this stopped being a name picker: the roster is no longer
+ * on the page. Listing six names to anyone holding the link was always the
+ * weakest part of that screen — it published who is at this table — and the
+ * only reason it was there was that the PIN step needed to know which member it
+ * was asking about. An address the person already knows removes the need, so
+ * the list goes with it.
+ *
+ * Still a server component with no client state: the typed address and the
+ * error are both in the URL.
  */
 const MESSAGES: Record<string, string> = {
-  "unknown-member": "That name is not at this table any more.",
-  // Deliberately one message for a wrong PIN and for a name with no PIN set:
-  // telling them apart tells someone probing the roster which half of the pair
-  // they got right.
-  "bad-pin": "That PIN is not right.",
+  "bad-email": "That is not an email address.",
+  // Deliberately one message for a wrong password, an address with no password
+  // set, and an address that is not at this table at all. Telling them apart
+  // tells someone spraying addresses which ones belong to the campaign.
+  "bad-credentials": "That email and password do not match.",
   locked: "Too many tries. Wait a few minutes and try again.",
-  "weak-pin": "Pick 4 to 8 digits, not all the same, and not 1234.",
-  mismatch: "Those two PINs are not the same.",
-  "already-enrolled":
-    "That name already has a PIN. Enter it, or ask the GM to reset it.",
+  "weak-password":
+    "Pick at least 8 characters, and not something obvious.",
+  mismatch: "Those two passwords are not the same.",
   "no-containers":
     "You are signed in, but there is nothing here yet. Ask the GM to add a container.",
 };
@@ -42,14 +44,12 @@ const MESSAGES: Record<string, string> = {
 export default async function SignInPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; member?: string }>;
+  searchParams: Promise<{ error?: string; email?: string }>;
 }) {
   const state = await currentSession();
   if (state.kind === "member") redirect("/");
 
-  const { error, member: selectedId } = await searchParams;
-  const members = await repository().listMembers();
-  const selected = members.find((m) => m.userId === selectedId);
+  const { error, email } = await searchParams;
   const message = error ? MESSAGES[error] : undefined;
 
   return (
@@ -86,51 +86,19 @@ export default async function SignInPage({
 
         <div className="mt-6">
           <h2 className="mb-1 font-serif text-lg font-bold text-text">
-            {selected ? "Sign in as" : "Sit at the table as"}
+            Sit at the table
           </h2>
           <p className="mb-3 text-sm text-muted">
-            {selected
-              ? selected.hasPin
-                ? "Enter your PIN."
-                : "No PIN set yet. Choose one now — you will use it every time."
-              : "Each role sees a different set of containers. That is the permission model, not a demo mode."}
+            Your email is the one the GM added to this campaign. Each role sees a
+            different set of containers — that is the permission model, not a
+            demo mode.
           </p>
 
-          {selected ? (
-            <PinForm member={selected} />
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {members.map((m) => (
-                <li key={m.userId}>
-                  <Link
-                    href={`/signin?member=${encodeURIComponent(m.userId)}`}
-                    className="flex h-12 w-full items-center gap-3 rounded-md border border-border bg-surface px-3 text-left hover:bg-surface2"
-                  >
-                    <Avatar name={m.displayName} />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-base font-medium text-text">
-                        {m.displayName}
-                      </span>
-                      <span className="block truncate text-sm text-muted">
-                        {m.role === "gm"
-                          ? "Sees and edits everything"
-                          : "Own pack and shared containers only"}
-                      </span>
-                    </span>
-                    <Icon
-                      name="arrow-right"
-                      size={16}
-                      className="shrink-0 text-muted"
-                    />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
+          <SignInForm email={email ?? ""} />
         </div>
 
         <p className="mt-6 text-center font-mono text-xs text-faint">
-          storage: {repositoryKind()} · sync: {realtimeKind()} · auth: pin
+          storage: {repositoryKind()} · sync: {realtimeKind()} · auth: email
         </p>
       </div>
     </main>
@@ -138,86 +106,78 @@ export default async function SignInPage({
 }
 
 /**
- * The PIN step for one member.
+ * One form, both cases.
  *
- * `hasPin` decides between entering one and choosing one, and choosing asks
- * twice. A mistyped PIN on the way in costs one more attempt; a mistyped PIN
- * while setting one is a PIN nobody knows, on the one member who can no longer
- * enrol — so that case gets the confirmation field and the other does not.
+ * The confirm field is always rendered rather than appearing once the app knows
+ * whether this address has a password. Revealing that is the whole leak the
+ * combined form exists to avoid, and a field that appears in response to a
+ * typed address announces the answer as loudly as a sentence would.
+ *
+ * So it is labelled for what it is — needed the first time, ignored after —
+ * and `backend/actions/session.ts` treats a filled confirm as "this is a first
+ * sign-in" and an empty one as an ordinary attempt.
  */
-function PinForm({ member }: { member: Member }) {
-  const enrolling = !member.hasPin;
-
+function SignInForm({ email }: { email: string }) {
   return (
     <form action={signInAsAction} className="flex flex-col gap-3">
-      <input type="hidden" name="userId" value={member.userId} />
-
-      <div className="flex items-center gap-3 rounded-md border border-border bg-surface px-3 py-2">
-        <Avatar name={member.displayName} />
-        <span className="min-w-0 flex-1 truncate text-base font-medium text-text">
-          {member.displayName}
-        </span>
-        <Link
-          href="/signin"
-          className="shrink-0 rounded-md px-2 py-1 text-sm text-muted hover:text-primary"
-        >
-          Change
-        </Link>
-      </div>
-
       <div>
-        <label htmlFor="pin" className="mb-1 block text-sm font-medium text-text">
-          {enrolling ? "Choose a PIN" : "PIN"}
+        <label htmlFor="email" className="mb-1 block text-sm font-medium text-text">
+          Email
         </label>
         <input
-          id="pin"
-          name="pin"
-          type="password"
+          id="email"
+          name="email"
+          type="email"
           required
-          autoFocus
-          autoComplete={enrolling ? "new-password" : "current-password"}
-          // Digits only, and a numeric keypad on a phone: this gets typed
-          // one-handed next to a dice tray.
-          inputMode="numeric"
-          pattern="\d{4,8}"
-          minLength={4}
-          maxLength={8}
+          autoFocus={email === ""}
+          autoComplete="username"
+          defaultValue={email}
+          // `email` rather than `text`: on a phone this is the difference
+          // between a keyboard with an @ key and one without.
+          inputMode="email"
+          autoCapitalize="none"
+          spellCheck={false}
+          placeholder="you@example.com"
           className="h-10 w-full rounded-md border border-border bg-surface2 px-2 text-base text-text"
         />
-        {enrolling ? (
-          <p className="mt-1 text-sm text-muted">4 to 8 digits.</p>
-        ) : null}
       </div>
 
-      {enrolling ? (
-        <div>
-          <label
-            htmlFor="confirmPin"
-            className="mb-1 block text-sm font-medium text-text"
-          >
-            Confirm PIN
-          </label>
-          <input
-            id="confirmPin"
-            name="confirmPin"
-            type="password"
-            required
-            autoComplete="new-password"
-            inputMode="numeric"
-            pattern="\d{4,8}"
-            minLength={4}
-            maxLength={8}
-            className="h-10 w-full rounded-md border border-border bg-surface2 px-2 text-base text-text"
-          />
-        </div>
-      ) : null}
+      <PasswordField
+        id="password"
+        name="password"
+        label="Password"
+        required
+        autoFocus={email !== ""}
+        autoComplete="current-password"
+        minLength={8}
+      />
+
+      <PasswordField
+        id="confirmPassword"
+        name="confirmPassword"
+        label="Confirm password"
+        hint="Only the first time you sign in. Leave it empty after that."
+        autoComplete="new-password"
+      />
 
       <button
         type="submit"
         className="flex h-10 w-full items-center justify-center gap-2 rounded-md bg-primary text-base font-bold text-invert hover:bg-primary-hover"
       >
-        {enrolling ? "Set PIN and sign in" : "Sign in"}
+        Sign in
       </button>
+
+      <p className="text-center text-sm text-muted">
+        New here?{" "}
+        <Link href="/signup" className="font-medium text-primary hover:underline">
+          Create an account
+        </Link>
+      </p>
+
+      <p className="text-center text-sm text-muted">
+        Forgot it? There is no reset mail to send — ask the GM to clear your
+        password and sign in again.
+      </p>
     </form>
   );
 }

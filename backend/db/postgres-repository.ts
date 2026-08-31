@@ -32,13 +32,19 @@ import { campaignId } from "@backend/lib/campaign";
 import {
   assertCanEditContainer,
   assertCanManageContainer,
+  assertCanManageRoster,
   assertCanMove,
   assertCanRead,
   assertCanRetireContainer,
   assertCanWrite,
   visibleContainers,
 } from "@backend/lib/permissions";
-import { clearFailures, hashPin, verifyPin } from "@backend/lib/pin";
+import {
+  clearFailures,
+  hashPassword,
+  normaliseEmail,
+  verifyPassword,
+} from "@backend/lib/password";
 
 import { db } from "./client";
 import {
@@ -516,6 +522,7 @@ export const postgresRepository: ArcaRepository = {
         parentId: comments.parentId,
         createdAt: comments.createdAt,
         authorName: users.displayName,
+        authorEmail: users.email,
         authorRole: campaignMembers.role,
       })
       .from(comments)
@@ -535,6 +542,7 @@ export const postgresRepository: ArcaRepository = {
           id: r.id,
           containerId: r.containerId as CommentView["containerId"],
           authorName: r.authorName,
+          authorEmail: r.authorEmail,
           authorRole: r.authorRole ?? "player",
           content: r.content,
           parentId: r.parentId,
@@ -584,6 +592,7 @@ export const postgresRepository: ArcaRepository = {
       id: row.id,
       containerId: input.containerId,
       authorName: principal.displayName,
+      authorEmail: principal.email,
       authorRole: principal.role,
       content: input.content,
       parentId,
@@ -782,11 +791,12 @@ export const postgresRepository: ArcaRepository = {
       .select({
         userId: users.id,
         displayName: users.displayName,
+        email: users.email,
         role: campaignMembers.role,
         // The presence of a hash, never the hash. Selecting the column and
         // mapping it away later would put it in scope in a module that renders
         // to a page.
-        hasPin: sql<boolean>`${users.pinHash} is not null`,
+        hasPassword: sql<boolean>`${users.passwordHash} is not null`,
       })
       .from(campaignMembers)
       .innerJoin(users, eq(users.id, campaignMembers.userId))
@@ -795,77 +805,188 @@ export const postgresRepository: ArcaRepository = {
     return rows.map((r) => ({
       userId: r.userId as Principal["userId"],
       displayName: r.displayName,
+      email: r.email,
       role: r.role,
-      hasPin: r.hasPin,
+      hasPassword: r.hasPassword,
     }));
   },
 
-  async authenticateMember(userId, pin) {
+  async authenticateMember(email, password) {
     // The join is the authorisation: a user row with no membership in THIS
-    // campaign produces no row here, so a correct PIN on an account that has
-    // been removed from the table is still not a principal.
-    const row = await memberWithPin(userId);
-    if (!row?.pinHash) return null;
-    if (!(await verifyPin(pin, row.pinHash))) return null;
+    // campaign produces no row here, so a correct password on an account that
+    // has been removed from the table is still not a principal.
+    const row = await memberWithHash(email);
+    if (!row?.passwordHash) return null;
+    if (!(await verifyPassword(password, row.passwordHash))) return null;
 
-    clearFailures(userId);
+    clearFailures(email);
+    return principalOf(row);
+  },
+
+  async registerMember(input) {
+    const email = normaliseEmail(input.email);
+    const hash = await hashPassword(input.password);
+
+    // The unique index on `users.email` is the race condition's answer, not
+    // this read — two simultaneous sign-ups with one address both pass a
+    // prior SELECT. `onConflictDoNothing` lets the database arbitrate and
+    // returns no row to the loser.
+    const inserted = await db()
+      .insert(users)
+      .values({ displayName: input.displayName, email, passwordHash: hash })
+      .onConflictDoNothing({ target: users.email })
+      .returning({ id: users.id });
+
+    const row = inserted[0];
+    if (!row) return null;
+
+    // Never from the input. Self-signup mints players and only players.
+    await db()
+      .insert(campaignMembers)
+      .values({ campaignId: campaignId(), userId: row.id, role: "player" })
+      .onConflictDoNothing();
+
     return {
-      userId: row.userId as Principal["userId"],
-      displayName: row.displayName,
-      role: row.role,
+      userId: row.id as Principal["userId"],
+      displayName: input.displayName,
+      email,
+      role: "player",
     };
   },
 
-  async enrolMemberPin(userId, pin) {
-    const row = await memberWithPin(userId);
-    if (!row || row.pinHash !== null) return null;
+  async addMember(principal, input) {
+    assertCanManageRoster(principal);
 
-    const hash = await hashPin(pin);
+    const email = normaliseEmail(input.email);
+
+    const inserted = await db()
+      .insert(users)
+      .values({ displayName: input.displayName, email })
+      .onConflictDoNothing({ target: users.email })
+      .returning({ id: users.id });
+
+    const row = inserted[0];
+    if (!row) return null;
+
+    await db()
+      .insert(campaignMembers)
+      .values({ campaignId: campaignId(), userId: row.id, role: input.role })
+      .onConflictDoNothing();
+
+    return {
+      userId: row.id as Principal["userId"],
+      displayName: input.displayName,
+      email,
+      role: input.role,
+      // Unenrolled: they choose their own password on first sign-in.
+      hasPassword: false,
+    };
+  },
+
+  async resetMemberPassword(principal, userId) {
+    assertCanManageRoster(principal);
+
+    // An id that is not a uuid reaches Postgres as a cast error rather than as
+    // "no such member", and this value arrives from a form field.
+    if (!UUID.test(userId)) throw new NotFoundError("No such member.");
+
+    // The join is the authorisation: the GM of THIS campaign cannot clear the
+    // password of someone who is not at this table.
+    const rows = await db()
+      .select({ email: users.email })
+      .from(users)
+      .innerJoin(campaignMembers, eq(campaignMembers.userId, users.id))
+      .where(
+        and(
+          eq(users.id, userId),
+          eq(campaignMembers.campaignId, campaignId()),
+        ),
+      )
+      .limit(1);
+
+    const row = rows[0];
+    if (!row) throw new NotFoundError("No such member.");
+
+    await db()
+      .update(users)
+      .set({ passwordHash: null })
+      .where(eq(users.id, userId));
+
+    // The throttle is keyed by address, so a reset that did not clear it would
+    // leave a locked-out member locked out with a brand new password.
+    clearFailures(row.email);
+  },
+
+  async enrolMemberPassword(email, password) {
+    const row = await memberWithHash(email);
+    if (!row || row.passwordHash !== null) return null;
+
+    const hash = await hashPassword(password);
 
     // `is null` in the WHERE, not just in the check above: two tabs opened on
-    // the same unenrolled name would otherwise both pass the read and the
-    // second would overwrite the first person's PIN. The row's unenrolled
+    // the same unenrolled address would otherwise both pass the read and the
+    // second would overwrite the first person's password. The row's unenrolled
     // state is the lock.
     const updated = await db()
       .update(users)
-      .set({ pinHash: hash })
-      .where(and(eq(users.id, userId), isNull(users.pinHash)))
+      .set({ passwordHash: hash })
+      .where(and(eq(users.id, row.userId), isNull(users.passwordHash)))
       .returning({ id: users.id });
 
     if (updated.length === 0) return null;
 
-    return {
-      userId: row.userId as Principal["userId"],
-      displayName: row.displayName,
-      role: row.role,
-    };
+    return principalOf(row);
   },
 };
 
-/** One member of THIS campaign, with their stored hash. Not exported: the hash
- *  must not leave this module. */
-async function memberWithPin(userId: string) {
-  // An id that is not a uuid reaches Postgres as a cast error rather than as
-  // "no such member", and the sign-in form takes its value from a URL-shaped
-  // world where that is a normal thing to receive.
-  if (!UUID.test(userId)) return null;
+/** Ids reach this module from form fields and URL segments, where a value that
+ *  is not a uuid is a normal thing to receive. Postgres answers one with a cast
+ *  ERROR rather than an empty result, so it is checked before the query rather
+ *  than caught after it. */
+const UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** One member of THIS campaign, by email, with their stored hash. Not
+ *  exported: the hash must not leave this module. */
+async function memberWithHash(email: string) {
+  // Normalised here rather than at the call sites, so no route can look a
+  // member up by an address the column could never hold.
+  const wanted = normaliseEmail(email);
+  if (wanted === "") return null;
 
   const rows = await db()
     .select({
       userId: users.id,
       displayName: users.displayName,
+      email: users.email,
       role: campaignMembers.role,
-      pinHash: users.pinHash,
+      passwordHash: users.passwordHash,
     })
     .from(users)
     .innerJoin(campaignMembers, eq(campaignMembers.userId, users.id))
     .where(
-      and(eq(users.id, userId), eq(campaignMembers.campaignId, campaignId())),
+      and(
+        eq(users.email, wanted),
+        eq(campaignMembers.campaignId, campaignId()),
+      ),
     )
     .limit(1);
 
   return rows[0] ?? null;
 }
 
-const UUID =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Names the fields that may leave, rather than removing the one that may
+ *  not — so a column added to the select above is not published by default. */
+function principalOf(row: {
+  userId: string;
+  displayName: string;
+  email: string;
+  role: Principal["role"];
+}): Principal {
+  return {
+    userId: row.userId as Principal["userId"],
+    displayName: row.displayName,
+    email: row.email,
+    role: row.role,
+  };
+}
