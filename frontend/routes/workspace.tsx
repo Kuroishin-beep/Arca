@@ -376,15 +376,21 @@ export default async function WorkspacePage({
             )}
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-            <ItemTable
-              items={items}
-              containerId={containerId}
-              sort={sort}
-              selectedId={selected?.id}
-              canEdit={editable}
-              query={query}
-            />
+          {/* `xl` and up (Design.md Step F): the table gains a max-width and
+              centres rather than stretching its columns across whatever is
+              left over once the three panes are all pinned — an item name
+              does not get more readable by getting wider. */}
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto xl:items-center">
+            <div className="w-full xl:max-w-5xl">
+              <ItemTable
+                items={items}
+                containerId={containerId}
+                sort={sort}
+                selectedId={selected?.id}
+                canEdit={editable}
+                query={query}
+              />
+            </div>
           </div>
 
           {/* Footer summary. Every number here is derived at read time. */}

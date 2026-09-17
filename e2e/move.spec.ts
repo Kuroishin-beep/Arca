@@ -243,7 +243,15 @@ test.describe("databases", () => {
 
     // Whichever database the seed produced, rather than a named type — the
     // seed's types are free to change without breaking this.
-    const firstDatabase = gm.locator('a[href^="/db/"]').first();
+    //
+    // `:visible` matters here specifically: the sidebar renders TWO navs (a
+    // 48px icon rail between `panel` and `md`, the full labelled list from
+    // `md` up — Design.md Step F) and only one is ever shown at a given
+    // width. A bare `a[href^="/db/"]` locator sees both regardless of which
+    // is display:none, and `.first()` always lands on the same one in DOM
+    // order — which is the icon rail, not the labelled list this test means
+    // to click.
+    const firstDatabase = gm.locator('a[href^="/db/"]:visible').first();
     await expect(firstDatabase).toBeVisible();
     await firstDatabase.click();
     await gm.waitForURL(/\/db\//);

@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { ContainerDot } from "@frontend/components/atoms/Chip";
 import { ContainerRow } from "@frontend/components/molecules/ContainerRow";
 import { Icon } from "@frontend/components/atoms/Icon";
 import type { ContainerType } from "@backend/domain/types";
@@ -24,7 +25,12 @@ import {
  * cosmetic — it is the same distinction the permission rules key off, so
  * flattening it would hide the one thing about the list that is load-bearing.
  *
- * Pinned at `lg`. Below that it is a drawer, rendered by the workspace.
+ * Pinned full (248px) at `md` and up. Between `panel` and `md` — the docked
+ * Symbiote's own primary target width — it is pinned too, but as a 48px icon
+ * rail (`compact`, below): the workspace renders both and lets Tailwind's
+ * breakpoints pick one, because a rail that only shows icons needs different
+ * markup, not the same rows squeezed. Below `panel` there is no room for even
+ * that, so it is a drawer, rendered by the workspace.
  */
 const GROUPS: { type: ContainerType; heading: string }[] = [
   { type: "character", heading: "My Packs" },
@@ -52,6 +58,15 @@ export function Sidebar({
   searchHref,
   /** The campaign name, in the switcher at the top. */
   campaignName,
+  /** Render the 48px icon rail instead of the full labelled list —
+   *  `panel`-to-`md` width, where there is room to pin something but not to
+   *  label it. */
+  compact,
+  /** The compact rail's own expand affordance: opens the same drawer the
+   *  workspace already builds for below-`panel`, so "expandable on click" is
+   *  the existing overlay rather than a second thing to build and keep in
+   *  sync with it. Unused when `compact` is false. */
+  drawerHref,
 }: {
   containers: ContainerView[];
   databases: DatabaseSummary[];
@@ -63,7 +78,87 @@ export function Sidebar({
   newDatabaseHref?: string;
   searchHref?: string;
   campaignName: string;
+  compact?: boolean;
+  drawerHref?: string;
 }) {
+  if (compact) {
+    return (
+      <>
+        <div className="flex h-[var(--topbar-h)] shrink-0 items-center justify-center border-b border-border">
+          <Icon name="chest" size={16} className="text-primary" />
+        </div>
+
+        {drawerHref ? (
+          <Link
+            href={drawerHref}
+            aria-label="Show the full container list"
+            title="Show the full container list"
+            className="mx-auto mt-2 grid h-8 w-8 shrink-0 place-items-center rounded-md text-muted hover:bg-surface2 hover:text-text"
+          >
+            <Icon name="menu" size={15} />
+          </Link>
+        ) : null}
+
+        {/* One icon per container, not one per group — the group headings are
+            the thing a 48px rail has no room to keep, and the colour + shape
+            pair (ContainerDot) is still the one signal that survives being
+            reduced to an icon. */}
+        <div className="mt-2 flex flex-1 flex-col items-center gap-1 overflow-y-auto px-1 pb-2">
+          {containers.map((container) => (
+            <Link
+              key={container.id}
+              href={`/c/${container.id}`}
+              aria-current={container.id === selectedId ? "page" : undefined}
+              title={container.name}
+              className={`grid h-9 w-9 shrink-0 place-items-center rounded-md ${
+                container.id === selectedId
+                  ? "bg-surface2"
+                  : "hover:bg-surface2"
+              }`}
+            >
+              <ContainerDot type={container.type} />
+              <span className="sr-only">{container.name}</span>
+            </Link>
+          ))}
+          {lockedContainers.map((container) => (
+            <span
+              key={container.id}
+              aria-disabled="true"
+              title={`${container.name} is GM-only.`}
+              className="grid h-9 w-9 shrink-0 cursor-not-allowed place-items-center rounded-md opacity-60"
+            >
+              <Icon name="lock" size={13} className="text-faint" />
+              <span className="sr-only">{container.name}, GM-only</span>
+            </span>
+          ))}
+        </div>
+
+        {databases.length > 0 ? (
+          <div className="flex shrink-0 flex-col items-center gap-1 border-t border-border px-1 py-2">
+            {databases.map((database) => (
+              <Link
+                key={database.slug}
+                href={`/db/${database.slug}`}
+                aria-current={
+                  database.slug === selectedDatabase ? "page" : undefined
+                }
+                title={database.name}
+                className={`grid h-9 w-9 shrink-0 place-items-center rounded-md ${
+                  database.slug === selectedDatabase
+                    ? "bg-surface2 text-primary"
+                    : "text-muted hover:bg-surface2"
+                }`}
+              >
+                <Icon name="table" size={15} />
+                <span className="sr-only">{database.name}</span>
+              </Link>
+            ))}
+          </div>
+        ) : null}
+      </>
+    );
+  }
+
   return (
     <>
       {/* Campaign switcher. One campaign exists, so the chevron is honest
