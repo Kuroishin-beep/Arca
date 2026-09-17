@@ -7,6 +7,7 @@ import { moveItemAction } from "@backend/actions/items";
 import { Button } from "@frontend/components/atoms/Button";
 import { ContainerDot } from "@frontend/components/atoms/Chip";
 import { Icon } from "@frontend/components/atoms/Icon";
+import { NumberStepper } from "@frontend/components/atoms/NumberStepper";
 import { Modal } from "@frontend/components/molecules/Modal";
 import { useOptimisticItems } from "@frontend/components/organisms/OptimisticItems";
 import type { ContainerView, ItemView } from "@backend/domain/view";
@@ -139,35 +140,14 @@ export function MoveItemDialog({
             How many?
           </label>
           <div className="flex items-center gap-3">
-            <div className="flex h-10 items-center rounded-md border border-border bg-surface2">
-              <button
-                type="button"
-                onClick={() => setQty((q) => Math.max(1, q - 1))}
-                className="grid h-full w-10 place-items-center rounded-l-md text-muted hover:bg-surface3 hover:text-text"
-              >
-                <Icon name="minus" size={14} strokeWidth={2} />
-                <span className="sr-only">Decrease quantity</span>
-              </button>
-              <input
-                id="move-qty"
-                type="number"
-                min={1}
-                max={item.qty}
-                value={qty}
-                onChange={(e) =>
-                  setQty(clamp(Number(e.target.value), 1, item.qty))
-                }
-                className="h-full w-14 border-x border-border bg-transparent text-center font-mono text-base tabular-nums text-text"
-              />
-              <button
-                type="button"
-                onClick={() => setQty((q) => Math.min(item.qty, q + 1))}
-                className="grid h-full w-10 place-items-center rounded-r-md text-muted hover:bg-surface3 hover:text-text"
-              >
-                <Icon name="plus" size={14} strokeWidth={2} />
-                <span className="sr-only">Increase quantity</span>
-              </button>
-            </div>
+            <NumberStepper
+              id="move-qty"
+              label="quantity"
+              value={qty}
+              min={1}
+              max={item.qty}
+              onChange={setQty}
+            />
             {item.qty > 1 ? (
               <Button size="sm" onClick={() => setQty(item.qty)}>
                 Move all {item.qty}
@@ -362,8 +342,5 @@ function PreviewBar({
     </div>
   );
 }
-
-const clamp = (n: number, min: number, max: number) =>
-  Number.isFinite(n) ? Math.min(max, Math.max(min, Math.trunc(n))) : min;
 
 const round1 = (n: number) => Math.round(n * 10) / 10;

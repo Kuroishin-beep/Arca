@@ -1,10 +1,13 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { signUpAction } from "@backend/actions/session";
+import { Button } from "@frontend/components/atoms/Button";
+import { TextField } from "@frontend/components/atoms/Field";
 import { Icon } from "@frontend/components/atoms/Icon";
 import { PasswordField } from "@frontend/components/atoms/PasswordField";
 import { ThemeToggle } from "@frontend/components/atoms/ThemeToggle";
+import { AuthTabs } from "@frontend/components/molecules/AuthTabs";
+import { storageProblem } from "@backend/db";
 import { currentSession } from "@backend/lib/session";
 
 /**
@@ -47,6 +50,7 @@ export default async function SignUpPage({
 
   const { error, email, name } = await searchParams;
   const message = error ? MESSAGES[error] : undefined;
+  const problem = await storageProblem();
 
   return (
     <main className="relative flex min-h-full items-center justify-center p-4">
@@ -78,7 +82,24 @@ export default async function SignUpPage({
           </p>
         ) : null}
 
+        {problem ? (
+          <p
+            role="alert"
+            className="mt-4 flex items-start gap-2 rounded-md border border-warning bg-warning-weak p-3 text-base text-text"
+          >
+            <Icon name="alert" size={14} className="mt-0.5 shrink-0 text-warning" />
+            {/* Rendered BEFORE the form is used rather than after it fails.
+                Submitting into an unreachable database produced a 500 whose
+                only content was the generated SQL — on the one screen where
+                somebody meets this app for the first time. */}
+            <span>{problem}</span>
+          </p>
+        ) : null}
+
+
         <div className="mt-6">
+          <AuthTabs active="signup" />
+
           <h2 className="mb-1 font-serif text-lg font-bold text-text">
             Pull up a chair
           </h2>
@@ -91,48 +112,31 @@ export default async function SignUpPage({
           </p>
 
           <form action={signUpAction} className="flex flex-col gap-3">
-            <div>
-              <label
-                htmlFor="displayName"
-                className="mb-1 block text-sm font-medium text-text"
-              >
-                Name
-              </label>
-              <input
-                id="displayName"
-                name="displayName"
-                type="text"
-                required
-                autoFocus
-                autoComplete="nickname"
-                defaultValue={name ?? ""}
-                maxLength={80}
-                placeholder="What the table calls you"
-                className="h-10 w-full rounded-md border border-border bg-surface2 px-2 text-base text-text placeholder:text-faint"
-              />
-            </div>
+            <TextField
+              id="displayName"
+              name="displayName"
+              label="Name"
+              required
+              autoFocus
+              autoComplete="nickname"
+              defaultValue={name ?? ""}
+              maxLength={80}
+              placeholder="What the table calls you"
+            />
 
-            <div>
-              <label
-                htmlFor="email"
-                className="mb-1 block text-sm font-medium text-text"
-              >
-                Email
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                required
-                autoComplete="username"
-                defaultValue={email ?? ""}
-                inputMode="email"
-                autoCapitalize="none"
-                spellCheck={false}
-                placeholder="you@example.com"
-                className="h-10 w-full rounded-md border border-border bg-surface2 px-2 text-base text-text placeholder:text-faint"
-              />
-            </div>
+            <TextField
+              id="email"
+              name="email"
+              label="Email"
+              type="email"
+              required
+              autoComplete="username"
+              defaultValue={email ?? ""}
+              inputMode="email"
+              autoCapitalize="none"
+              spellCheck={false}
+              placeholder="you@example.com"
+            />
 
             <PasswordField
               id="password"
@@ -153,20 +157,10 @@ export default async function SignUpPage({
               minLength={8}
             />
 
-            <button
-              type="submit"
-              className="flex h-10 w-full items-center justify-center gap-2 rounded-md bg-primary text-base font-bold text-invert hover:bg-primary-hover"
-            >
+            <Button type="submit" variant="primary" fullWidth className="h-10 text-base">
               Create account
-            </button>
+            </Button>
           </form>
-
-          <p className="mt-4 text-center text-sm text-muted">
-            Already have one?{" "}
-            <Link href="/signin" className="font-medium text-primary hover:underline">
-              Sign in
-            </Link>
-          </p>
         </div>
       </div>
     </main>

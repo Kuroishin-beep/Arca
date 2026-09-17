@@ -33,6 +33,17 @@ export function RealtimeSync({
   const router = useRouter();
   const [status, setStatus] = useState<SyncStatus>("syncing");
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | undefined>();
+  /**
+   * The accessibility checklist's own example — "3 items moved to Party
+   * Wagon" — is not honest with what a `change` event actually carries
+   * (`{ actorId, at }`, R4's minimal NOTIFY payload); saying that would be
+   * inventing detail the server never sent. So this announces the one true
+   * thing: another principal changed something and the panel just caught up.
+   * Cleared right before each announcement so a screen reader re-announces
+   * even when two changes in a row produce the identical sentence — an
+   * unchanged live region is read once, not once per change.
+   */
+  const [announcement, setAnnouncement] = useState("");
 
   /**
    * `router` is depended on directly rather than stashed in a ref.
@@ -70,10 +81,12 @@ export function RealtimeSync({
 
       setStatus("syncing");
       if (pending) clearTimeout(pending);
+      setAnnouncement("");
       pending = setTimeout(() => {
         router.refresh();
         setStatus("idle");
         setLastSyncedAt(new Date());
+        setAnnouncement("Updated — another device changed this campaign.");
       }, 50);
     });
 
@@ -98,6 +111,11 @@ export function RealtimeSync({
   }, [userId, router]);
 
   return (
-    <SyncPill status={status} lastSyncedAt={lastSyncedAt} className={className} />
+    <>
+      <SyncPill status={status} lastSyncedAt={lastSyncedAt} className={className} />
+      <span role="status" aria-live="polite" className="sr-only">
+        {announcement}
+      </span>
+    </>
   );
 }

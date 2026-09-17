@@ -170,7 +170,16 @@ export function ItemTable({
             >
               Tags
             </th>
-            <th scope="col" className="w-10 px-2 py-2">
+            {/* `lg` and up only (Design.md Step F): the three-pane width is
+                the first one with room for the object's own notes without
+                crowding the name column it sits after. */}
+            <th
+              scope="col"
+              className="hidden px-3 py-2 text-sm font-medium text-muted lg:table-cell"
+            >
+              Notes
+            </th>
+            <th scope="col" className="hidden w-10 px-2 py-2 lg:table-cell">
               <span className="sr-only">Actions</span>
             </th>
           </tr>
@@ -220,7 +229,14 @@ export function ItemTable({
                     </Chip>
                   ) : null}
                 </td>
-                <td className="px-2 text-right">
+                <td className="hidden max-w-0 px-3 text-muted lg:table-cell">
+                  {item.notes ? (
+                    <span className="block truncate">{item.notes}</span>
+                  ) : (
+                    <span className="text-faint">—</span>
+                  )}
+                </td>
+                <td className="hidden px-2 text-right lg:table-cell">
                   <Link
                     href={rowHref(containerId, item.id, query)}
                     className="grid h-7 w-7 place-items-center rounded-md text-muted hover:bg-surface3 hover:text-text"

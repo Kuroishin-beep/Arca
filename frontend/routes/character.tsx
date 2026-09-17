@@ -6,7 +6,12 @@ import { Avatar } from "@frontend/components/atoms/Status";
 import { WeightMeter } from "@frontend/components/molecules/WeightMeter";
 import { TopBar } from "@frontend/components/organisms/TopBar";
 import { repository } from "@backend/db";
-import { itemWeight } from "@backend/domain/view";
+import {
+  encumbrance,
+  itemWeight,
+  weightPercent,
+  type ItemView,
+} from "@backend/domain/view";
 import { PermissionError } from "@backend/lib/permissions";
 import { currentPrincipal } from "@backend/lib/session";
 
@@ -49,6 +54,21 @@ export default async function CharacterSheetPage({
   const items = await repo.listItems(principal, containerId);
   const equipment = [...items].sort((a, b) => a.name.localeCompare(b.name));
 
+  // A real split, not a fabricated "equipped" slot Arca does not model: the
+  // `types` an item carries ARE stored data, and `Weapon` is one campaigns
+  // actually tag. Grouping on it separates "what you'd draw" from "what you're
+  // hauling" without inventing a field this schema does not have.
+  const weapons = equipment.filter((item) => item.types.includes("Weapon"));
+  const carried = equipment.filter((item) => !item.types.includes("Weapon"));
+
+  const state = encumbrance(container.carriedWeight, container.capacity);
+  const percent = weightPercent(container.carriedWeight, container.capacity);
+  const STATE_TEXT = {
+    ok: "text-text",
+    "at-limit": "text-warning",
+    over: "text-danger",
+  } as const;
+
   return (
     <div className="flex h-screen flex-col bg-bg">
       <TopBar principal={principal} />
@@ -80,6 +100,28 @@ export default async function CharacterSheetPage({
               </div>
             </div>
           </section>
+
+          {/* Three real numbers, in the big-number-card shape a stat block
+              uses — but every value here is one this schema actually stores
+              or derives, never a placeholder standing in for one it doesn't. */}
+          <div className="grid grid-cols-3 gap-3">
+            <StatCard label="Items carried" value={String(container.itemCount)} />
+            <StatCard
+              label="Weight"
+              value={
+                container.capacity === null
+                  ? `${container.carriedWeight.toFixed(1)} kg`
+                  : `${container.carriedWeight.toFixed(1)}/${container.capacity.toFixed(1)}`
+              }
+              unit={container.capacity === null ? undefined : "kg"}
+              tone={STATE_TEXT[state]}
+            />
+            <StatCard
+              label="Encumbrance"
+              value={container.capacity === null ? "—" : `${percent}%`}
+              tone={STATE_TEXT[state]}
+            />
+          </div>
 
           <div className="grid gap-5 lg:grid-cols-[300px_1fr]">
             <div className="flex flex-col gap-5">
@@ -116,80 +158,24 @@ export default async function CharacterSheetPage({
             </div>
 
             <div className="flex min-w-0 flex-col gap-5">
-              <section className="rounded-lg border border-border bg-surface">
-                <div className="flex items-center gap-3 border-b border-border p-4">
-                  <h2 className="font-serif text-lg font-bold text-text">
-                    Equipment
-                  </h2>
-                  <Chip tone="primary">{container.name}</Chip>
-                </div>
-
-                {equipment.length === 0 ? (
-                  <p className="p-4 text-base text-muted">
-                    Nothing carried.
-                  </p>
-                ) : (
-                  <table className="w-full text-base">
-                    <thead>
-                      <tr className="border-b border-border text-left">
-                        <th
-                          scope="col"
-                          className="px-4 py-2 text-sm font-medium text-muted"
-                        >
-                          Item
-                        </th>
-                        <th
-                          scope="col"
-                          className="hidden px-3 py-2 text-sm font-medium text-muted sm:table-cell"
-                        >
-                          Tags
-                        </th>
-                        <th
-                          scope="col"
-                          className="w-14 px-3 py-2 text-right text-sm font-medium text-muted"
-                        >
-                          Qty
-                        </th>
-                        <th
-                          scope="col"
-                          className="w-20 px-3 py-2 text-right text-sm font-medium text-muted"
-                        >
-                          Wt
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {equipment.map((item) => (
-                        <tr
-                          key={item.id}
-                          className="h-9 border-b border-border last:border-0 hover:bg-surface2"
-                        >
-                          <td className="max-w-0 px-4">
-                            <span className="block truncate text-text">
-                              {item.name}
-                            </span>
-                          </td>
-                          <td className="hidden px-3 sm:table-cell">
-                            {item.tags[0] ? <Chip>{item.tags[0]}</Chip> : null}
-                          </td>
-                          <td className="px-3 text-right font-mono tabular-nums text-text">
-                            {item.qty}
-                          </td>
-                          <td className="px-3 text-right font-mono tabular-nums text-text">
-                            {itemWeight(item).toFixed(1)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-
-                <p className="border-t border-border p-3 text-sm text-faint">
-                  A slot (“main hand”, “belt”) is metadata on the containment
-                  edge, not on the item — the axe is one object whether it is on
-                  a belt or in the wagon.
-                </p>
-              </section>
+              <EquipmentTable
+                title="Weapons"
+                subtitle="carries the Weapon type"
+                items={weapons}
+                emptyLabel="Nothing tagged as a weapon."
+              />
+              <EquipmentTable
+                title="Carried"
+                subtitle="everything else"
+                items={carried}
+                emptyLabel="Nothing else carried."
+              />
+              <p className="-mt-2 text-sm text-faint">
+                Split on the <span className="font-mono">Weapon</span> type an
+                item actually carries — not on a slot (&ldquo;main
+                hand&rdquo;, &ldquo;belt&rdquo;) Arca has no field for. The axe
+                is one object whether it is on a belt or in the wagon.
+              </p>
 
               <section className="rounded-lg border border-border bg-surface p-4">
                 <h2 className="mb-3 font-serif text-lg font-bold text-text">
@@ -212,5 +198,125 @@ export default async function CharacterSheetPage({
         </div>
       </main>
     </div>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  unit,
+  tone = "text-text",
+}: {
+  label: string;
+  value: string;
+  unit?: string;
+  tone?: string;
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-surface p-4 text-center">
+      <p className="text-sm font-medium uppercase tracking-wide text-faint">
+        {label}
+      </p>
+      <p className={`mt-1 font-serif text-2xl font-bold ${tone}`}>
+        {value}
+        {unit ? (
+          <span className="ml-1 text-sm font-normal text-muted">{unit}</span>
+        ) : null}
+      </p>
+    </div>
+  );
+}
+
+function EquipmentTable({
+  title,
+  subtitle,
+  items,
+  emptyLabel,
+}: {
+  title: string;
+  subtitle: string;
+  items: ItemView[];
+  emptyLabel: string;
+}) {
+  return (
+    <section className="rounded-lg border border-border bg-surface">
+      <div className="flex items-center gap-2 border-b border-border p-4">
+        <h2 className="font-serif text-lg font-bold text-text">{title}</h2>
+        <span className="text-sm text-faint">{subtitle}</span>
+        <Chip tone="neutral" className="ml-auto">
+          {items.length}
+        </Chip>
+      </div>
+
+      {items.length === 0 ? (
+        <p className="p-4 text-base text-muted">{emptyLabel}</p>
+      ) : (
+        <table className="w-full text-base">
+          <thead>
+            <tr className="border-b border-border text-left">
+              <th scope="col" className="px-4 py-2 text-sm font-medium text-muted">
+                Item
+              </th>
+              <th
+                scope="col"
+                className="hidden px-3 py-2 text-sm font-medium text-muted sm:table-cell"
+              >
+                Tags
+              </th>
+              <th
+                scope="col"
+                className="hidden px-3 py-2 text-sm font-medium text-muted md:table-cell"
+              >
+                Notes
+              </th>
+              <th
+                scope="col"
+                className="w-14 px-3 py-2 text-right text-sm font-medium text-muted"
+              >
+                Qty
+              </th>
+              <th
+                scope="col"
+                className="w-20 px-3 py-2 text-right text-sm font-medium text-muted"
+              >
+                Wt
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item) => (
+              <tr
+                key={item.id}
+                className="h-9 border-b border-border last:border-0 hover:bg-surface2"
+              >
+                <td className="max-w-0 px-4">
+                  <span className="block truncate text-text">{item.name}</span>
+                </td>
+                <td className="hidden px-3 sm:table-cell">
+                  <div className="flex flex-wrap gap-1">
+                    {item.tags.map((tag) => (
+                      <Chip key={tag}>{tag}</Chip>
+                    ))}
+                  </div>
+                </td>
+                <td className="hidden max-w-0 px-3 text-muted md:table-cell">
+                  {item.notes ? (
+                    <span className="block truncate">{item.notes}</span>
+                  ) : (
+                    <span className="text-faint">—</span>
+                  )}
+                </td>
+                <td className="px-3 text-right font-mono tabular-nums text-text">
+                  {item.qty}
+                </td>
+                <td className="px-3 text-right font-mono tabular-nums text-text">
+                  {itemWeight(item).toFixed(1)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
   );
 }

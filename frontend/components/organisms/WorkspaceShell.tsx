@@ -55,14 +55,16 @@ export function WorkspaceShell({
   searchAction?: string;
   query?: string;
   placeholder?: string;
-  /** The below-`lg` drawer, a URL state so it survives the reloads the embedded
-   *  browser does constantly. */
+  /** The below-`panel` drawer, and the compact rail's expand affordance
+   *  between `panel` and `md`, a URL state so it survives the reloads the
+   *  embedded browser does constantly. */
   navOpen?: boolean;
   /** Where the top bar's drawer toggle points. Absent on a screen with no
    *  drawer to open. */
   drawerHref?: string;
-  /** The `lg`-and-up rail, collapsed. Also URL state, and for the same
-   *  reason — plus it means a collapsed rail is part of a link you can send. */
+  /** The `panel`-and-up rail, collapsed — the icon rail and the full list
+   *  alike. Also URL state, and for the same reason — plus it means a
+   *  collapsed rail is part of a link you can send. */
   railCollapsed?: boolean;
   /** Where the collapse toggle points: the same URL with the rail flipped. */
   railHref: string;
@@ -96,6 +98,22 @@ export function WorkspaceShell({
     />
   );
 
+  // The `panel`-to-`md` rail is icons only, so it does not need the props the
+  // full list uses to label itself — just enough to draw one dot per
+  // container and point the expand affordance at the drawer below.
+  const navCompact = (
+    <Sidebar
+      containers={containers}
+      databases={databases}
+      principal={principal}
+      selectedId={selectedId}
+      selectedDatabase={selectedDatabase}
+      campaignName={campaignName}
+      compact
+      drawerHref={navOpen ? undefined : drawerHref}
+    />
+  );
+
   return (
     <div className="flex h-screen flex-col bg-bg">
       <TopBar
@@ -107,19 +125,34 @@ export function WorkspaceShell({
       />
 
       <div className="flex min-h-0 flex-1">
-        {/* Pinned rail at lg, unless collapsed. */}
+        {/* Pinned from `panel` up, unless collapsed — as a 48px icon rail
+            between `panel` and `md`, and the full 248px list from `md` on
+            (Design.md Step F). Two `<nav>`s rather than one that reflows,
+            because the compact rail's markup is genuinely different (icons,
+            no group headings), not the same rows at a squeezed width. */}
         {railCollapsed ? null : (
           <nav
             aria-label="Containers"
-            className="hidden w-[var(--sidebar-w)] shrink-0 flex-col overflow-y-auto border-r border-border bg-surface lg:flex"
+            className="hidden w-12 shrink-0 flex-col overflow-y-auto border-r border-border bg-surface panel:flex md:hidden"
+          >
+            {navCompact}
+          </nav>
+        )}
+        {railCollapsed ? null : (
+          <nav
+            aria-label="Containers"
+            className="hidden w-[var(--sidebar-w)] shrink-0 flex-col overflow-y-auto border-r border-border bg-surface md:flex"
           >
             {nav}
           </nav>
         )}
 
-        {/* Drawer below lg. */}
+        {/* Drawer below `panel`, and the compact rail's own expand affordance
+            between `panel` and `md`. Gone at `md` and up, where the full list
+            is already pinned and there is nothing left for it to expand
+            into. */}
         {navOpen ? (
-          <div className="fixed inset-0 z-30 lg:hidden">
+          <div className="fixed inset-0 z-30 md:hidden">
             <Link
               href={closeHref}
               aria-label="Close container list"
@@ -159,7 +192,7 @@ export function WorkspaceShell({
               label={railCollapsed ? "Show the sidebar" : "Hide the sidebar"}
               size={13}
               href={railHref}
-              className="hidden h-7 w-7 lg:grid"
+              className="hidden h-7 w-7 panel:grid"
             />
             <QuickAccess current={quickAccess} />
 

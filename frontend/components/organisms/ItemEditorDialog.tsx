@@ -8,6 +8,7 @@ import { Button } from "@frontend/components/atoms/Button";
 import { ContainerDot } from "@frontend/components/atoms/Chip";
 import { TextAreaField, TextField } from "@frontend/components/atoms/Field";
 import { Icon } from "@frontend/components/atoms/Icon";
+import { NumberStepper } from "@frontend/components/atoms/NumberStepper";
 import { Modal } from "@frontend/components/molecules/Modal";
 import type { ContainerView, ItemView } from "@backend/domain/view";
 
@@ -33,6 +34,7 @@ export function ItemEditorDialog({
   const editing = item !== undefined;
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const [qty, setQty] = useState(item?.qty ?? 1);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -111,17 +113,28 @@ export function ItemEditorDialog({
           />
 
           <div className="grid grid-cols-3 gap-3">
-            <TextField
-              id="qty"
-              name="qty"
-              label="Qty"
-              type="number"
-              min={1}
-              step={1}
-              numeric
-              defaultValue={item?.qty ?? 1}
-              error={fieldErrors.qty}
-            />
+            <div>
+              <label
+                htmlFor="qty"
+                className="mb-1 block text-sm font-medium text-muted"
+              >
+                Qty
+              </label>
+              <NumberStepper
+                id="qty"
+                name="qty"
+                label="quantity"
+                value={qty}
+                min={1}
+                onChange={setQty}
+              />
+              {fieldErrors.qty ? (
+                <p className="mt-1 flex items-center gap-1 text-sm text-danger">
+                  <Icon name="alert" size={12} strokeWidth={1.8} />
+                  {fieldErrors.qty}
+                </p>
+              ) : null}
+            </div>
             <TextField
               id="weight"
               name="weight"

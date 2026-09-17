@@ -25,7 +25,7 @@ export function TopBar({
   placeholder = "Search items…",
 }: {
   principal: Principal;
-  /** Where the below-`lg` drawer toggle points. Absent on a screen with no
+  /** Where the below-`panel` drawer toggle points. Absent on a screen with no
    *  drawer. */
   drawerHref?: string;
   /** Where the search form GETs to — the current screen. Absent on a screen
@@ -37,11 +37,14 @@ export function TopBar({
   return (
     <header className="flex h-[var(--topbar-h)] shrink-0 items-center gap-3 border-b border-border bg-surface px-3 md:px-4">
       {/* Drawer toggle. A plain link rather than client state, so the drawer
-          survives a reload — which the embedded browser does a lot of. */}
+          survives a reload — which the embedded browser does a lot of.
+          Hidden from `panel` up: the compact rail pinned there carries its
+          own expand affordance pointing at the same drawer, so this one
+          would just be a second control for the same href. */}
       {drawerHref ? (
         <Link
           href={drawerHref}
-          className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-muted hover:bg-surface2 hover:text-text lg:hidden"
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-muted hover:bg-surface2 hover:text-text panel:hidden"
         >
           <Icon name="menu" />
           <span className="sr-only">Show container list</span>

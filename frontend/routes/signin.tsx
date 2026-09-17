@@ -1,11 +1,13 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { signInAsAction } from "@backend/actions/session";
+import { Button } from "@frontend/components/atoms/Button";
+import { TextField } from "@frontend/components/atoms/Field";
 import { Icon } from "@frontend/components/atoms/Icon";
 import { PasswordField } from "@frontend/components/atoms/PasswordField";
 import { ThemeToggle } from "@frontend/components/atoms/ThemeToggle";
-import { repositoryKind } from "@backend/db";
+import { AuthTabs } from "@frontend/components/molecules/AuthTabs";
+import { repositoryKind, storageProblem } from "@backend/db";
 import { currentSession } from "@backend/lib/session";
 import { realtimeKind } from "@backend/realtime";
 
@@ -51,6 +53,7 @@ export default async function SignInPage({
 
   const { error, email } = await searchParams;
   const message = error ? MESSAGES[error] : undefined;
+  const problem = await storageProblem();
 
   return (
     <main className="relative flex min-h-full items-center justify-center p-4">
@@ -84,7 +87,24 @@ export default async function SignInPage({
           </p>
         ) : null}
 
+        {problem ? (
+          <p
+            role="alert"
+            className="mt-4 flex items-start gap-2 rounded-md border border-warning bg-warning-weak p-3 text-base text-text"
+          >
+            <Icon name="alert" size={14} className="mt-0.5 shrink-0 text-warning" />
+            {/* Rendered BEFORE the form is used rather than after it fails.
+                Submitting into an unreachable database produced a 500 whose
+                only content was the generated SQL — on the one screen where
+                somebody meets this app for the first time. */}
+            <span>{problem}</span>
+          </p>
+        ) : null}
+
+
         <div className="mt-6">
+          <AuthTabs active="signin" />
+
           <h2 className="mb-1 font-serif text-lg font-bold text-text">
             Sit at the table
           </h2>
@@ -120,27 +140,22 @@ export default async function SignInPage({
 function SignInForm({ email }: { email: string }) {
   return (
     <form action={signInAsAction} className="flex flex-col gap-3">
-      <div>
-        <label htmlFor="email" className="mb-1 block text-sm font-medium text-text">
-          Email
-        </label>
-        <input
-          id="email"
-          name="email"
-          type="email"
-          required
-          autoFocus={email === ""}
-          autoComplete="username"
-          defaultValue={email}
-          // `email` rather than `text`: on a phone this is the difference
-          // between a keyboard with an @ key and one without.
-          inputMode="email"
-          autoCapitalize="none"
-          spellCheck={false}
-          placeholder="you@example.com"
-          className="h-10 w-full rounded-md border border-border bg-surface2 px-2 text-base text-text"
-        />
-      </div>
+      <TextField
+        id="email"
+        name="email"
+        label="Email"
+        type="email"
+        required
+        autoFocus={email === ""}
+        autoComplete="username"
+        defaultValue={email}
+        // `email` rather than `text`: on a phone this is the difference
+        // between a keyboard with an @ key and one without.
+        inputMode="email"
+        autoCapitalize="none"
+        spellCheck={false}
+        placeholder="you@example.com"
+      />
 
       <PasswordField
         id="password"
@@ -160,19 +175,9 @@ function SignInForm({ email }: { email: string }) {
         autoComplete="new-password"
       />
 
-      <button
-        type="submit"
-        className="flex h-10 w-full items-center justify-center gap-2 rounded-md bg-primary text-base font-bold text-invert hover:bg-primary-hover"
-      >
+      <Button type="submit" variant="primary" fullWidth className="h-10 text-base">
         Sign in
-      </button>
-
-      <p className="text-center text-sm text-muted">
-        New here?{" "}
-        <Link href="/signup" className="font-medium text-primary hover:underline">
-          Create an account
-        </Link>
-      </p>
+      </Button>
 
       <p className="text-center text-sm text-muted">
         Forgot it? There is no reset mail to send — ask the GM to clear your
