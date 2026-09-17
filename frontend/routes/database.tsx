@@ -196,51 +196,79 @@ function DatabaseTable({ rows }: { rows: DatabaseRow[] }) {
       <thead className="sticky top-0 z-10 bg-surface">
         <tr className="border-b border-border text-left">
           <Th>Name</Th>
+          {/* Every object here carries `Physical Object` — that type is what
+              makes it show up in a database at all, so listing it back would
+              be noise on every single row. The types alongside it are the
+              ones worth a glance. */}
+          <Th className="hidden md:table-cell">Type</Th>
+          <Th className="hidden lg:table-cell">Tags</Th>
           <Th className="w-[1%] text-right">Qty</Th>
-          <Th className="w-[1%] text-right">Weight</Th>
+          <Th className="hidden w-[1%] text-right md:table-cell">Weight</Th>
+          <Th className="hidden w-[1%] text-right md:table-cell">Value</Th>
           <Th className="w-[30%]">Where</Th>
         </tr>
       </thead>
       <tbody>
-        {rows.map(({ item, container }) => (
-          <tr
-            key={item.id}
-            className="border-b border-border last:border-0 hover:bg-surface2"
-          >
-            <td className="px-3 py-2">
-              {/* Every row is a link INTO the container, with the item already
-                  selected. That is the edit path: this table does not write,
-                  so the useful thing it can do is take you to the screen that
-                  does. */}
-              <Link
-                href={`/c/${container.id}?item=${item.id}`}
-                className="font-medium text-text hover:text-primary"
-              >
-                {item.name}
-              </Link>
-              {item.tags.length > 0 ? (
-                <span className="ml-2 text-xs text-faint">
-                  {item.tags.join(" · ")}
-                </span>
-              ) : null}
-            </td>
-            <td className="px-3 py-2 text-right font-mono tabular-nums text-text">
-              {item.qty}
-            </td>
-            <td className="px-3 py-2 text-right font-mono tabular-nums text-muted">
-              {(item.weight * item.qty).toFixed(1)}
-            </td>
-            <td className="px-3 py-2">
-              <Link
-                href={`/c/${container.id}`}
-                className="flex items-center gap-2 text-muted hover:text-text"
-              >
-                <ContainerDot type={container.type} />
-                <span className="min-w-0 truncate">{container.name}</span>
-              </Link>
-            </td>
-          </tr>
-        ))}
+        {rows.map(({ item, container }) => {
+          const types = item.types.filter((t) => t !== "Physical Object");
+          return (
+            <tr
+              key={item.id}
+              className="border-b border-border last:border-0 hover:bg-surface2"
+            >
+              <td className="max-w-0 px-3 py-2">
+                {/* Every row is a link INTO the container, with the item
+                    already selected. That is the edit path: this table does
+                    not write, so the useful thing it can do is take you to
+                    the screen that does. */}
+                <Link
+                  href={`/c/${container.id}?item=${item.id}`}
+                  className="block truncate font-medium text-text hover:text-primary"
+                >
+                  {item.name}
+                </Link>
+              </td>
+              <td className="hidden px-3 py-2 md:table-cell">
+                {types.length > 0 ? (
+                  <div className="flex flex-wrap gap-1">
+                    {types.map((type) => (
+                      <Chip key={type} tone="primary">
+                        {type}
+                      </Chip>
+                    ))}
+                  </div>
+                ) : null}
+              </td>
+              <td className="hidden px-3 py-2 lg:table-cell">
+                {item.tags.length > 0 ? (
+                  <div className="flex flex-wrap gap-1">
+                    {item.tags.map((tag) => (
+                      <Chip key={tag}>{tag}</Chip>
+                    ))}
+                  </div>
+                ) : null}
+              </td>
+              <td className="px-3 py-2 text-right font-mono tabular-nums text-text">
+                {item.qty}
+              </td>
+              <td className="hidden px-3 py-2 text-right font-mono tabular-nums text-muted md:table-cell">
+                {(item.weight * item.qty).toFixed(1)}
+              </td>
+              <td className="hidden px-3 py-2 text-right font-mono tabular-nums text-muted md:table-cell">
+                {item.value || "—"}
+              </td>
+              <td className="px-3 py-2">
+                <Link
+                  href={`/c/${container.id}`}
+                  className="flex items-center gap-2 text-muted hover:text-text"
+                >
+                  <ContainerDot type={container.type} />
+                  <span className="min-w-0 truncate">{container.name}</span>
+                </Link>
+              </td>
+            </tr>
+          );
+        })}
       </tbody>
     </table>
   );
