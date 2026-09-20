@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { addMemberAction, resetPasswordAction } from "@backend/actions/members";
@@ -96,6 +97,21 @@ export default async function MembersPage({
   }
 
   const members = await repo.listMembers();
+
+  /**
+   * Which character each member plays, so the roster and the sheet agree on
+   * one name.
+   *
+   * A character container IS the character, so this is just its owner — no
+   * second name to store and no join table. The GM is the only one who reaches
+   * this screen and can read every container, so nobody's row goes blank for
+   * want of permission.
+   */
+  const characterOf = new Map(
+    containers
+      .filter((c) => c.type === "character" && c.ownerId !== null)
+      .map((c) => [c.ownerId as string, c] as const),
+  );
   const notice = sp.error
     ? MESSAGES[sp.error]
     : sp.added
@@ -160,6 +176,21 @@ export default async function MembersPage({
                 ) : (
                   <Chip tone="neutral">Player</Chip>
                 )}
+
+                {/* The same string the sidebar, the sheet and the database's
+                    "Where" column show, because all four read the container's
+                    name. One identity, four places, nothing to keep in sync. */}
+                {characterOf.has(member.userId) ? (
+                  <Link
+                    href={`/character/${characterOf.get(member.userId)!.id}`}
+                    className="shrink-0 text-sm text-muted hover:text-primary"
+                  >
+                    plays{" "}
+                    <span className="font-medium text-text">
+                      {characterOf.get(member.userId)!.name}
+                    </span>
+                  </Link>
+                ) : null}
 
                 {/* The enrolment state, said plainly. "Has not signed in yet"
                     is the difference between a member who forgot their

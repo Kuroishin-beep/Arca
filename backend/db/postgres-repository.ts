@@ -17,6 +17,7 @@
  */
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 
+import { sheetFromProperties } from "@backend/domain/character";
 import {
   type CommentView,
   type ContainerView,
@@ -295,6 +296,41 @@ async function setProperties(
     });
 }
 
+/**
+ * Create any of these property definitions that the campaign does not have yet.
+ *
+ * `setProperties` throws on an unknown definition on purpose — a typo in a
+ * property name should not silently write a value nothing will ever read back.
+ * But the character sheet arrived after this database was seeded, and the
+ * alternative to creating its definitions on demand is telling someone to run
+ * `npm run db:seed`, which DELETES THE CAMPAIGN and rebuilds it. Losing a
+ * table's inventory to unlock a feature is not an upgrade path.
+ *
+ * This is the same move `setTypes` already makes for object types — "a campaign
+ * discovers its structure rather than declaring it up front" — applied to the
+ * one other piece of schema metadata that has the same problem.
+ */
+async function ensurePropertyDefinitions(
+  names: readonly string[],
+): Promise<void> {
+  if (names.length === 0) return;
+
+  await db()
+    .insert(propertyDefinitions)
+    .values(
+      names.map((name) => ({
+        campaignId: campaignId(),
+        name,
+        // `json` because every one of these holds a structured value rather
+        // than a scalar. The column is JSONB either way; this is the label a
+        // human reads in the definitions table.
+        dataType: "json",
+        description: "Character sheet",
+      })),
+    )
+    .onConflictDoNothing();
+}
+
 async function setTypes(objectId: string, typeNames: string[]): Promise<void> {
   if (typeNames.length === 0) return;
 
@@ -480,6 +516,54 @@ export const postgresRepository: ArcaRepository = {
       .update(objects)
       .set({ archivedAt: new Date(), updatedAt: new Date() })
       .where(eq(objects.id, containerId));
+  },
+
+  async getCharacter(principal, containerId) {
+    const container = await requireContainer(containerId);
+    assertCanRead(principal, container);
+    if (container.type !== "character") return null;
+
+    // The sheet lives on the container's OWN object — the same property bag
+    // `capacity` comes out of, because a container IS an object.
+    const props = await propertiesFor([containerId]);
+
+    return {
+      containerId: container.id,
+      name: container.name,
+      ownerId: container.ownerId,
+      sheet: sheetFromProperties(props.get(containerId)),
+    };
+  },
+
+  async updateCharacter(principal, input) {
+    const container = await requireContainer(input.containerId);
+    assertCanWrite(principal, container);
+    if (container.type !== "character") {
+      throw new NotFoundError("That container is not a character.");
+    }
+
+    const { containerId, ...patch } = input;
+    const present = Object.entries(patch).filter(([, v]) => v !== undefined);
+
+    if (present.length > 0) {
+      await ensurePropertyDefinitions(present.map(([name]) => name));
+      await setProperties(containerId, Object.fromEntries(present));
+      await db()
+        .update(objects)
+        .set({ updatedAt: new Date() })
+        .where(eq(objects.id, containerId));
+    }
+
+    // Re-read rather than merging in memory. The clamp in `sheetFromProperties`
+    // has to see the STORED result — lowering CON and leaving HP above the new
+    // maximum is exactly the case a merged-in-memory answer would report wrong.
+    const props = await propertiesFor([containerId]);
+    return {
+      containerId: container.id,
+      name: container.name,
+      ownerId: container.ownerId,
+      sheet: sheetFromProperties(props.get(containerId)),
+    };
   },
 
   async listItems(principal, containerId) {

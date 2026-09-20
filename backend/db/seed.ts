@@ -12,10 +12,16 @@
  */
 import { sql } from "drizzle-orm";
 
+import {
+  CHARACTER_PROPERTY_NAMES,
+  sheetToProperties,
+} from "@backend/domain/character";
+
 import { db, rawSql } from "./client";
 import {
   CAMPAIGN_ID,
   CAMPAIGN_NAME,
+  SEED_CHARACTERS,
   SEED_COMMENTS,
   SEED_CONTAINERS,
   SEED_ITEMS,
@@ -51,6 +57,16 @@ const PROPERTY_DEFS: { name: string; dataType: string; description: string }[] =
       dataType: "number",
       description: "Carry capacity, kg — containers only",
     },
+    // The character sheet's eight, on the character container's own object
+    // (SCOPE.md S1). `json` rather than `number`/`text` because each one holds
+    // a structured section rather than a scalar — and because splitting them
+    // into thirty-odd scalar definitions would put the whole rulebook in this
+    // table without making any of it more queryable than JSONB already is.
+    ...CHARACTER_PROPERTY_NAMES.map((name) => ({
+      name,
+      dataType: "json",
+      description: "Character sheet",
+    })),
   ];
 
 async function main(): Promise<void> {
@@ -139,6 +155,23 @@ async function main(): Promise<void> {
   );
   if (capacityId && capacityRows.length > 0) {
     await database.insert(objectProperties).values(capacityRows);
+  }
+
+  // Character sheets hang off the container object itself, exactly as capacity
+  // does — no new table, which is the whole argument for the object graph.
+  const characterRows = Object.entries(SEED_CHARACTERS).flatMap(
+    ([containerId, sheet]) =>
+      Object.entries(sheetToProperties(sheet))
+        .map(([name, value]) => {
+          const id = propertyId.get(name);
+          return id
+            ? { objectId: containerId, propertyDefinitionId: id, value }
+            : null;
+        })
+        .filter((r): r is NonNullable<typeof r> => r !== null),
+  );
+  if (characterRows.length > 0) {
+    await database.insert(objectProperties).values(characterRows);
   }
 
   // Items: one `objects` row, its property values, its type memberships, and

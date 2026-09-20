@@ -13,12 +13,19 @@
 import { randomUUID } from "node:crypto";
 
 import {
+  type CharacterSheet,
+  clampSheet,
+  emptySheet,
+} from "@backend/domain/character";
+import {
+  type CharacterView,
   type CommentView,
   type ContainerView,
   type CreateItemInput,
   type ItemView,
   type MoveItemInput,
   type Principal,
+  type UpdateCharacterInput,
   type UpdateItemInput,
   carriedWeight,
   ownershipProblem,
@@ -47,6 +54,7 @@ import {
   NotFoundError,
 } from "./repository";
 import {
+  SEED_CHARACTERS,
   SEED_COMMENTS,
   SEED_CONTAINERS,
   SEED_ITEMS,
@@ -62,6 +70,13 @@ interface Store {
   containers: Omit<ContainerView, "itemCount" | "carriedWeight">[];
   items: (ItemView & { archivedAt: Date | null })[];
   comments: CommentView[];
+  /**
+   * Sheets by container id, and only for the containers that have one. A
+   * character container with no entry gets `emptySheet()` on read, which is the
+   * same thing the Postgres side does when the eight properties are absent —
+   * so "never filled in" behaves identically on both backends.
+   */
+  characters: Record<string, CharacterSheet>;
 }
 
 const STORE_KEY = Symbol.for("arca.fixture.store");
@@ -101,6 +116,12 @@ function freshStore(): Store {
       updatedAt: now,
       archivedAt: null,
     })),
+    characters: Object.fromEntries(
+      Object.entries(SEED_CHARACTERS).map(([id, sheet]) => [
+        id,
+        structuredClone(sheet),
+      ]),
+    ),
     comments: SEED_COMMENTS.map((c) => {
       const author = SEED_USERS.find((u) => u.id === c.authorId);
       return {
@@ -261,6 +282,54 @@ export const fixtureRepository: ArcaRepository = {
     const all = store().containers;
     const at = all.findIndex((c) => c.id === containerId);
     if (at >= 0) all.splice(at, 1);
+  },
+
+  async getCharacter(principal, containerId): Promise<CharacterView | null> {
+    const container = findContainer(containerId);
+    assertCanRead(principal, container);
+    if (container.type !== "character") return null;
+
+    return {
+      containerId: container.id,
+      name: container.name,
+      ownerId: container.ownerId,
+      // Clamped on the way out, not only on the way in: a sheet whose CON was
+      // lowered while HP sat at the old maximum has to render legally.
+      sheet: clampSheet(store().characters[containerId] ?? emptySheet()),
+    };
+  },
+
+  async updateCharacter(
+    principal,
+    input: UpdateCharacterInput,
+  ): Promise<CharacterView> {
+    const container = findContainer(input.containerId);
+    assertCanWrite(principal, container);
+    if (container.type !== "character") {
+      throw new NotFoundError("That container is not a character.");
+    }
+
+    const { containerId, ...patch } = input;
+    const current = store().characters[containerId] ?? emptySheet();
+
+    // Only the sections actually present are replaced; `undefined` means leave
+    // it alone, which is what makes ticking a skill safe while someone else is
+    // editing the profile.
+    const next = clampSheet({
+      ...current,
+      ...(Object.fromEntries(
+        Object.entries(patch).filter(([, v]) => v !== undefined),
+      ) as Partial<CharacterSheet>),
+    });
+
+    store().characters[containerId] = next;
+
+    return {
+      containerId: container.id,
+      name: container.name,
+      ownerId: container.ownerId,
+      sheet: next,
+    };
   },
 
   async listItems(principal, containerId) {

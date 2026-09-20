@@ -8,6 +8,7 @@
  * Names and contents match the mockups in `mockups/` so a screenshot and a
  * running screen can be compared directly.
  */
+import type { CharacterSheet } from "@backend/domain/character";
 
 export interface SeedUser {
   id: string;
@@ -78,9 +79,15 @@ export const KOVA_ID = u(2);
 export const MILO_ID = u(3);
 
 export const SEED_CONTAINERS: SeedContainer[] = [
+  // A character container is named for the CHARACTER, not for the bag. That is
+  // the whole of the naming rule: the sidebar, the database's "Where" column,
+  // the move dialog and the character sheet all read `container.name`, so one
+  // string is one identity everywhere and renaming from any of them renames in
+  // all of them. Calling this "Kova's Pack" while the sheet said "Kova" was two
+  // names for one person, and no amount of syncing makes that read well.
   {
     id: c(1),
-    name: "Kova's Pack",
+    name: "Kova",
     type: "character",
     ownerId: KOVA_ID,
     revealed: true,
@@ -88,7 +95,7 @@ export const SEED_CONTAINERS: SeedContainer[] = [
   },
   {
     id: c(2),
-    name: "Milo's Pack",
+    name: "Milo",
     type: "character",
     ownerId: MILO_ID,
     revealed: true,
@@ -131,6 +138,93 @@ export const SEED_CONTAINERS: SeedContainer[] = [
 ];
 
 export const PARTY_WAGON_ID = c(3);
+export const KOVA_CONTAINER_ID = c(1);
+export const MILO_CONTAINER_ID = c(2);
+
+/* ------------------------------------------------------------------ *
+ * Character sheets — SCOPE.md S1
+ * ------------------------------------------------------------------ */
+
+/**
+ * Two filled-in sheets, keyed by the character container they belong to.
+ *
+ * Seeded with real numbers rather than left empty, for the same reason the
+ * items are: an empty sheet proves the form renders, and a filled one proves
+ * the DERIVED values do. Kova's movement of 14 is not typed in anywhere — it
+ * falls out of elf (10) plus the AGL 16 step (+4), and if that ever reads 10 on
+ * screen the derivation is broken in a way an empty sheet would have hidden.
+ *
+ * Each character's trained skills match what they are actually carrying:
+ * Kova has the longbow and the trained Bows to use it, Milo has the warhammer
+ * and Hammers. A sheet that contradicts the pack it sits on is a worked example
+ * of nothing.
+ */
+export const SEED_CHARACTERS: Record<string, CharacterSheet> = {
+  [c(1)]: {
+    attributes: { STR: 11, CON: 12, AGL: 16, INT: 14, WIL: 14, CHA: 11 },
+    hp: 12,
+    wp: 14,
+    deathRolls: { successes: 0, failures: 0 },
+    conditions: {
+      exhausted: false,
+      sickly: false,
+      dazed: false,
+      angry: false,
+      scared: false,
+      disheartened: false,
+    },
+    profile: {
+      kin: "elf",
+      profession: "Hunter",
+      age: "adult",
+      appearance: "Lean, weather-worn, green cloak that has seen three winters.",
+      weakness: "Child of the wild. Never sleeps indoors.",
+      memento: "A fletching from her first kill.",
+    },
+    skills: {
+      Awareness: { trained: true, marked: false },
+      Bushcraft: { trained: true, marked: true },
+      "Hunting & Fishing": { trained: true, marked: false },
+      Sneaking: { trained: true, marked: false },
+      Bows: { trained: true, marked: true },
+      Knives: { trained: true, marked: false },
+      Acrobatics: { trained: false, marked: true },
+    },
+    spells: [],
+  },
+  [c(2)]: {
+    // Deliberately wounded and one condition down: the sheet's warning states
+    // are worth seeing without having to injure somebody first.
+    attributes: { STR: 14, CON: 13, AGL: 12, INT: 10, WIL: 11, CHA: 13 },
+    hp: 9,
+    wp: 11,
+    deathRolls: { successes: 0, failures: 0 },
+    conditions: {
+      exhausted: true,
+      sickly: false,
+      dazed: false,
+      angry: false,
+      scared: false,
+      disheartened: false,
+    },
+    profile: {
+      kin: "halfling",
+      profession: "Artisan",
+      age: "adult",
+      appearance: "Broad for a halfling, soot under the fingernails.",
+      weakness: "Cannot leave a broken thing unmended.",
+      memento: "His grandmother's hammer.",
+    },
+    skills: {
+      Crafting: { trained: true, marked: true },
+      Bartering: { trained: true, marked: false },
+      Persuasion: { trained: true, marked: false },
+      Hammers: { trained: true, marked: false },
+      Brawling: { trained: true, marked: false },
+    },
+    spells: [],
+  },
+};
 
 export const SEED_ITEMS: SeedItem[] = [
   // ── Party Wagon ──────────────────────────────────────────────────

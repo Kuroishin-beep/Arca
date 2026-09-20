@@ -12,6 +12,15 @@
  */
 import { z } from "zod";
 
+import {
+  Attributes,
+  CharacterSheet,
+  Conditions,
+  DeathRolls,
+  Profile,
+  SkillMap,
+  Spells,
+} from "./character";
 import { ContainerId, ContainerType, ItemId, UserId, UserRole } from "./types";
 
 /* ------------------------------------------------------------------ *
@@ -323,6 +332,52 @@ export const MoveItemInput = z.object({
   qty: z.coerce.number().int().positive(),
 });
 export type MoveItemInput = z.infer<typeof MoveItemInput>;
+
+/* ------------------------------------------------------------------ *
+ * Characters — SCOPE.md S1
+ * ------------------------------------------------------------------ */
+
+/**
+ * A character sheet as a screen needs it: the stored sheet, plus the container
+ * it IS.
+ *
+ * `name` is the container's name and not a second field. A character container
+ * is the character — so the sidebar, the database's "Where" column, the move
+ * dialog and this sheet all read one string, and renaming from any of them
+ * renames everywhere. A separate `characterName` property would be a second
+ * name to keep in sync, and the two would disagree the first time somebody
+ * renamed the container instead of the sheet.
+ */
+export const CharacterView = z.object({
+  containerId: ContainerId,
+  name: z.string(),
+  ownerId: UserId.nullable(),
+  sheet: CharacterSheet,
+});
+export type CharacterView = z.infer<typeof CharacterView>;
+
+/**
+ * A true patch, for the same reason `UpdateItemInput` is one: every section
+ * optional with NO defaults, so `undefined` reaches the repository meaning
+ * "leave this property alone".
+ *
+ * Sections rather than fields is the whole point of the shape. Ticking a skill
+ * sends `skills` and nothing else, so it cannot overwrite a profile the GM is
+ * editing in another panel at the same moment — which a single `sheet` blob
+ * would do every time.
+ */
+export const UpdateCharacterInput = z.object({
+  containerId: ContainerId,
+  attributes: Attributes.optional(),
+  hp: z.coerce.number().int().min(0).optional(),
+  wp: z.coerce.number().int().min(0).optional(),
+  deathRolls: DeathRolls.optional(),
+  conditions: Conditions.optional(),
+  profile: Profile.optional(),
+  skills: SkillMap.optional(),
+  spells: Spells.optional(),
+});
+export type UpdateCharacterInput = z.infer<typeof UpdateCharacterInput>;
 
 /* ------------------------------------------------------------------ *
  * Derived values

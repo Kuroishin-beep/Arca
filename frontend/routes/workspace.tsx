@@ -308,8 +308,21 @@ export default async function WorkspacePage({
                 ) : null}
               </div>
 
-              {editable ? (
-                <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2">
+                {/* The sheet was reachable only by typing its URL until now.
+                    A character container IS a character, so the way to its
+                    sheet belongs beside the container's own name. */}
+                {container.type === "character" ? (
+                  <ButtonLink
+                    href={`/character/${containerId}`}
+                    size="sm"
+                    icon="users"
+                  >
+                    Character sheet
+                  </ButtonLink>
+                ) : null}
+
+                {editable ? (
                   <ButtonLink
                     href={`/c/${containerId}?dialog=add`}
                     variant="primary"
@@ -318,8 +331,8 @@ export default async function WorkspacePage({
                   >
                     Add item
                   </ButtonLink>
-                </div>
-              ) : null}
+                ) : null}
+              </div>
             </div>
 
             {/* Filter row: tag chips (M9) plus whatever narrowing is active.

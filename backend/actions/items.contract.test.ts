@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { fixtureRepository, resetFixtureStore } from "@backend/db/fixture-repository";
-import { KOVA_EMAIL, KOVA_ID, SEED_CONTAINERS } from "@backend/db/seed-data";
+import {
+  KOVA_CONTAINER_ID,
+  KOVA_EMAIL,
+  KOVA_ID,
+  SEED_CONTAINERS,
+} from "@backend/db/seed-data";
 import {
   CreateItemInput,
   MoveItemInput,
@@ -31,7 +36,9 @@ const kova: Principal = {
 
 const id = (name: string) => SEED_CONTAINERS.find((c) => c.name === name)!.id;
 const WAGON = id("Party Wagon");
-const KOVAS_PACK = id("Kova's Pack");
+// By id, not by name: a character container is named for its character, and
+// renaming a character must not break a test about who may write where.
+const KOVAS_PACK = KOVA_CONTAINER_ID;
 const BARROW = id("Barrow Chest");
 
 /** Mirrors the parsing in createItemAction, including the comma-split lists. */

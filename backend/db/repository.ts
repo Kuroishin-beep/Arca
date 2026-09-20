@@ -14,6 +14,7 @@
  */
 import type {
   AddMemberInput,
+  CharacterView,
   CommentView,
   ContainerView,
   CreateCommentInput,
@@ -23,6 +24,7 @@ import type {
   MoveItemInput,
   Principal,
   SignUpInput,
+  UpdateCharacterInput,
   UpdateContainerInput,
   UpdateItemInput,
 } from "@backend/domain/view";
@@ -102,6 +104,36 @@ export interface ArcaRepository {
    * closest thing to losing loot that a soft delete can manage.
    */
   archiveContainer(principal: Principal, containerId: string): Promise<void>;
+
+  /**
+   * The character sheet a character container carries — SCOPE.md S1.
+   *
+   * `null` when the container is not a character one, so a caller never has to
+   * ask twice; a PermissionError when it exists and is not theirs to read, the
+   * same rule `getContainer` applies.
+   *
+   * A container that has never been filled in returns a DEFAULT sheet rather
+   * than null. Every character container is a character — the alternative is a
+   * screen that has to distinguish "no sheet" from "an empty sheet" and render
+   * two different empty states for what is, at a table, one situation.
+   */
+  getCharacter(
+    principal: Principal,
+    containerId: string,
+  ): Promise<CharacterView | null>;
+
+  /**
+   * Write one or more sections of a sheet.
+   *
+   * Gated on `canWrite` for the container, which already says exactly the right
+   * thing: a player may edit their own pack and the GM may edit any. No new
+   * permission rule was needed, and inventing one would have been a second
+   * place for "whose character is this?" to be answered differently.
+   */
+  updateCharacter(
+    principal: Principal,
+    input: UpdateCharacterInput,
+  ): Promise<CharacterView>;
 
   listItems(principal: Principal, containerId: string): Promise<ItemView[]>;
 
