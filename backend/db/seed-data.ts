@@ -64,19 +64,53 @@ const c = (n: number) => `00000000-0000-4000-8000-00000000020${n}`;
 // every request before this was caught.
 const i = (n: string) => `00000000-0000-4000-8000-${`3${n}`.padStart(12, "0")}`;
 
+/**
+ * The campaign's real GM, as opposed to the fictional one.
+ *
+ * Ravna is a character in the seed story; Xen is the person who actually runs
+ * this deployment, and the account is seeded so a fresh database comes up with
+ * a GM who can sign in rather than one who has to be inserted by hand.
+ *
+ * ── Why the address is configuration and not a literal ────────────────────
+ *
+ * This repository is public. A real address written into a tracked file is a
+ * real address in a scraper's list, permanently — git keeps it after it is
+ * edited out, so it cannot be taken back. `ARCA_GM_EMAIL` keeps it in the
+ * deployment instead, where it belongs.
+ *
+ * The fallback is RFC 2606 reserved and can never resolve, so a deployment
+ * that has not set the variable seeds an inert placeholder rather than
+ * something that half-works.
+ *
+ * ── And why there is no password here ─────────────────────────────────────
+ *
+ * There is nowhere to put one on purpose. Arca has never shipped a password —
+ * a member arrives unenrolled and chooses their own on first sign-in
+ * (`enrolMemberPassword`) — and a hash committed to a public repository is an
+ * offline cracking target that outlives every rotation of the secret it
+ * protects. The account below is seeded UNENROLLED, exactly like every other.
+ */
+const GM_ADDRESS =
+  process.env.ARCA_GM_EMAIL?.trim().toLowerCase() || "xen@ravenholt.example";
+
 export const SEED_USERS: SeedUser[] = [
   { id: u(1), displayName: "Ravna", email: "ravna@ravenholt.example", role: "gm" },
   { id: u(2), displayName: "Kova", email: "kova@ravenholt.example", role: "player" },
   { id: u(3), displayName: "Milo", email: "milo@ravenholt.example", role: "player" },
+  // Appended, never inserted: the exports below index this array by position,
+  // and the character containers reference these ids.
+  { id: u(4), displayName: "Xen", email: GM_ADDRESS, role: "gm" },
 ];
 
 export const GM_EMAIL = SEED_USERS[0]!.email;
 export const KOVA_EMAIL = SEED_USERS[1]!.email;
 export const MILO_EMAIL = SEED_USERS[2]!.email;
+export const XEN_EMAIL = SEED_USERS[3]!.email;
 
 export const GM_ID = u(1);
 export const KOVA_ID = u(2);
 export const MILO_ID = u(3);
+export const XEN_ID = u(4);
 
 export const SEED_CONTAINERS: SeedContainer[] = [
   // A character container is named for the CHARACTER, not for the bag. That is
