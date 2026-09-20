@@ -176,6 +176,98 @@ export const KOVA_CONTAINER_ID = c(1);
 export const MILO_CONTAINER_ID = c(2);
 
 /* ------------------------------------------------------------------ *
+ * The catalogue — SCOPE.md S3
+ * ------------------------------------------------------------------ */
+
+export interface SeedCatalogItem {
+  id: string;
+  name: string;
+  weight: number;
+  value: string;
+  tags: string[];
+  types: string[];
+  notes: string;
+}
+
+/**
+ * What the campaign has DEFINED, as opposed to what anybody is carrying.
+ *
+ * Seeded with the ordinary adventuring kit a table reaches for twice a
+ * session, because that is the case the catalogue exists for: a rope is the
+ * same rope in every pack, and typing its weight in six times is six chances
+ * to type it differently.
+ *
+ * Note there is no `qty` here, and there cannot be. A quantity belongs to a
+ * copy in a container — "how many rope does the catalogue have" is not a
+ * question about a definition.
+ *
+ * These deliberately do NOT duplicate the seed's existing items. Those are
+ * typed in by hand and stay that way, so the seed demonstrates both kinds of
+ * item side by side rather than quietly converting one into the other.
+ */
+/** Same shape as `i` above, in a 4-prefixed block so a catalogue id is
+ *  distinguishable from an item id at a glance in a query result. */
+const k = (n: string) =>
+  `00000000-0000-4000-8000-${`4${n}`.padStart(12, "0")}`;
+
+export const SEED_CATALOG: SeedCatalogItem[] = [
+  {
+    id: k("001"),
+    name: "Rope, hempen (10 m)",
+    weight: 1,
+    value: "4 sp",
+    tags: ["gear"],
+    types: ["Physical Object", "Gear"],
+    notes: "Ten metres. Frays, but holds a person.",
+  },
+  {
+    id: k("002"),
+    name: "Torch",
+    weight: 0.5,
+    value: "1 sp",
+    tags: ["gear", "consumable"],
+    types: ["Physical Object", "Gear", "Consumable"],
+    notes: "Burns for an hour. Light in a barrow is not optional.",
+  },
+  {
+    id: k("003"),
+    name: "Rations, dried (1 day)",
+    weight: 0.5,
+    value: "2 sp",
+    tags: ["consumable"],
+    types: ["Physical Object", "Consumable"],
+    notes: "One day's food.",
+  },
+  {
+    id: k("004"),
+    name: "Healing Potion",
+    weight: 0.5,
+    value: "50 gp",
+    tags: ["consumable"],
+    types: ["Physical Object", "Consumable"],
+    notes: "Restores D6 hit points. One action to drink.",
+  },
+  {
+    id: k("005"),
+    name: "Longsword",
+    weight: 1.5,
+    value: "25 gp",
+    tags: ["weapon"],
+    types: ["Physical Object", "Weapon", "Equipment"],
+    notes: "2D8 damage, durability 15. Swords.",
+  },
+  {
+    id: k("006"),
+    name: "Shortbow",
+    weight: 2,
+    value: "25 gp",
+    tags: ["weapon"],
+    types: ["Physical Object", "Weapon", "Equipment"],
+    notes: "D10 damage at range 30. Needs a quiver. Bows.",
+  },
+];
+
+/* ------------------------------------------------------------------ *
  * Character sheets — SCOPE.md S1
  * ------------------------------------------------------------------ */
 

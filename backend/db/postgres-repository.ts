@@ -19,9 +19,11 @@ import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import { sheetFromProperties } from "@backend/domain/character";
 import {
+  type CatalogItemView,
   type CommentView,
   type ContainerView,
   type CreateItemInput,
+  INSTANCE_OF,
   type ItemView,
   type MoveItemInput,
   type Principal,
@@ -32,6 +34,7 @@ import {
 import { campaignId } from "@backend/lib/campaign";
 import {
   assertCanEditContainer,
+  assertCanManageCatalog,
   assertCanManageContainer,
   assertCanManageRoster,
   assertCanMove,
@@ -61,10 +64,12 @@ import {
   containerObjects,
   containers,
   objectProperties,
+  objectRelations,
   objectTypeMemberships,
   objectTypes,
   objects,
   propertyDefinitions,
+  relationTypes,
   users,
 } from "./schema";
 
@@ -142,26 +147,99 @@ function asStringArray(v: unknown): string[] {
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
 }
 
-/** The projection: object graph in, flat ItemView out. */
+/**
+ * The projection: object graph in, flat ItemView out.
+ *
+ * `entry` is the catalogue definition this object is a copy of, when it is one
+ * (SCOPE.md S3). Where it is present its fields WIN, because a copy does not
+ * store them — correcting a rope's weight in the catalogue has to correct it in
+ * every pack holding one, and the only way a copy can be wrong is if it kept
+ * its own snapshot.
+ *
+ * `qty` and `notes` are never taken from the entry. A quantity belongs to a
+ * container, and "found this in the barrow" belongs to whoever wrote it.
+ */
 function project(
   objectId: string,
   containerId: string,
   updatedAt: Date,
   props: Record<string, unknown> | undefined,
   types: string[] | undefined,
+  entry?: { props: Record<string, unknown> | undefined; types: string[] },
 ): ItemView {
+  const own = props ?? {};
+  const from = entry?.props ?? own;
   return {
     id: objectId as ItemView["id"],
     containerId: containerId as ItemView["containerId"],
-    name: asString(props?.name, "Unnamed"),
-    qty: Math.max(1, Math.trunc(asNumber(props?.qty, 1))),
-    weight: asNumber(props?.weight, 0),
-    value: asString(props?.value),
-    tags: asStringArray(props?.tags),
-    notes: asString(props?.notes),
-    types: types ?? [],
+    name: asString(from.name, "Unnamed"),
+    qty: Math.max(1, Math.trunc(asNumber(own.qty, 1))),
+    weight: asNumber(from.weight, 0),
+    value: asString(from.value),
+    tags: asStringArray(from.tags),
+    notes: asString(own.notes),
+    types: entry ? entry.types : (types ?? []),
+    catalogItemId: null,
     updatedAt,
   };
+}
+
+/**
+ * Which catalogue entry each of these objects is a copy of — SCOPE.md S3.
+ *
+ * Joined through the relation type's NAME rather than through a cached id.
+ * `relation_types` has no unique constraint on (campaign, name), so two
+ * concurrent first-writes could create two rows both called `instance_of`;
+ * matching on the name means links made against either one still resolve, and
+ * the duplicate is cosmetic rather than a class of copy that silently forgets
+ * its definition.
+ */
+async function catalogLinksFor(
+  objectIds: string[],
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (objectIds.length === 0) return out;
+
+  const rows = await db()
+    .select({
+      source: objectRelations.sourceObjectId,
+      target: objectRelations.targetObjectId,
+    })
+    .from(objectRelations)
+    .innerJoin(
+      relationTypes,
+      eq(relationTypes.id, objectRelations.relationTypeId),
+    )
+    .where(
+      and(
+        eq(relationTypes.campaignId, campaignId()),
+        eq(relationTypes.name, INSTANCE_OF),
+        inArray(objectRelations.sourceObjectId, objectIds),
+      ),
+    );
+
+  for (const row of rows) out.set(row.source, row.target);
+  return out;
+}
+
+/** The definitions behind a set of copies: their properties and their types. */
+async function entriesFor(entryIds: string[]): Promise<
+  Map<string, { props: Record<string, unknown> | undefined; types: string[] }>
+> {
+  const out = new Map<
+    string,
+    { props: Record<string, unknown> | undefined; types: string[] }
+  >();
+  if (entryIds.length === 0) return out;
+
+  const [props, types] = await Promise.all([
+    propertiesFor(entryIds),
+    typeNamesFor(entryIds),
+  ]);
+  for (const id of entryIds) {
+    out.set(id, { props: props.get(id), types: types.get(id) ?? [] });
+  }
+  return out;
 }
 
 async function itemsIn(containerId: string): Promise<ItemView[]> {
@@ -181,20 +259,149 @@ async function itemsIn(containerId: string): Promise<ItemView[]> {
     );
 
   const ids = rows.map((r) => r.objectId);
-  const [props, types] = await Promise.all([
+  const [props, types, links] = await Promise.all([
     propertiesFor(ids),
     typeNamesFor(ids),
+    catalogLinksFor(ids),
   ]);
 
-  return rows.map((r) =>
-    project(
+  // One extra round trip for the whole batch, not one per row: a container of
+  // catalogue copies would otherwise be an N+1 on the definitions.
+  const entries = await entriesFor([...new Set(links.values())]);
+
+  return rows.map((r) => {
+    const entryId = links.get(r.objectId);
+    const item = project(
       r.objectId,
       containerId,
       r.updatedAt,
       props.get(r.objectId),
       types.get(r.objectId),
-    ),
-  );
+      entryId ? entries.get(entryId) : undefined,
+    );
+    return entryId
+      ? { ...item, catalogItemId: entryId as ItemView["catalogItemId"] }
+      : item;
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * The catalogue — SCOPE.md S3
+ * ------------------------------------------------------------------ */
+
+/**
+ * A catalogue entry is an object that NO container holds and that is not
+ * itself a container.
+ *
+ * Both halves are load-bearing. The first is the definition — a thing that is
+ * not anywhere is a definition of a thing rather than one of them — and it is
+ * why entries stay out of every container and database view without a filter
+ * being added to either. The second exists because a container is also an
+ * object with no containment edge, so without it every pack in the campaign
+ * would list itself as a catalogue entry.
+ */
+async function catalogRows(
+  onlyId?: string,
+): Promise<{ id: string; updatedAt: Date }[]> {
+  return db()
+    .select({ id: objects.id, updatedAt: objects.updatedAt })
+    .from(objects)
+    .where(
+      and(
+        eq(objects.campaignId, campaignId()),
+        isNull(objects.archivedAt),
+        onlyId ? eq(objects.id, onlyId) : undefined,
+        sql`NOT EXISTS (SELECT 1 FROM container_objects co WHERE co.object_id = ${objects.id})`,
+        sql`NOT EXISTS (SELECT 1 FROM containers c WHERE c.object_id = ${objects.id})`,
+      ),
+    );
+}
+
+/** Live copies per entry. Derived, which is what lets `archiveCatalogItem`
+ *  ask "is anything still reading this?" without a counter to keep correct. */
+async function copyCounts(entryIds: string[]): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (entryIds.length === 0) return out;
+
+  const rows = await db()
+    .select({
+      target: objectRelations.targetObjectId,
+      copies: sql<number>`count(*)::int`,
+    })
+    .from(objectRelations)
+    .innerJoin(
+      relationTypes,
+      eq(relationTypes.id, objectRelations.relationTypeId),
+    )
+    .innerJoin(objects, eq(objects.id, objectRelations.sourceObjectId))
+    .where(
+      and(
+        eq(relationTypes.campaignId, campaignId()),
+        eq(relationTypes.name, INSTANCE_OF),
+        isNull(objects.archivedAt),
+        inArray(objectRelations.targetObjectId, entryIds),
+      ),
+    )
+    .groupBy(objectRelations.targetObjectId);
+
+  for (const row of rows) out.set(row.target, Number(row.copies));
+  return out;
+}
+
+/**
+ * The `instance_of` relation type, created on demand.
+ *
+ * Same reasoning as `setTypes` and `ensurePropertyDefinitions`: the campaign
+ * discovers its structure rather than declaring it up front, and the
+ * alternative for a database seeded before this feature existed is `db:seed`,
+ * which deletes the campaign.
+ */
+async function instanceOfRelationType(): Promise<string> {
+  const existing = await db()
+    .select({ id: relationTypes.id })
+    .from(relationTypes)
+    .where(
+      and(
+        eq(relationTypes.campaignId, campaignId()),
+        eq(relationTypes.name, INSTANCE_OF),
+      ),
+    )
+    .limit(1);
+
+  if (existing[0]) return existing[0].id;
+
+  const inserted = await db()
+    .insert(relationTypes)
+    .values({
+      campaignId: campaignId(),
+      name: INSTANCE_OF,
+      description: "This object is a copy of a catalogue entry.",
+    })
+    .returning({ id: relationTypes.id });
+
+  const created = inserted[0];
+  if (!created) throw new Error("Insert returned no row.");
+  return created.id;
+}
+
+function projectCatalog(
+  id: string,
+  updatedAt: Date,
+  props: Record<string, unknown> | undefined,
+  types: string[] | undefined,
+  copies: number,
+): CatalogItemView {
+  return {
+    id: id as CatalogItemView["id"],
+    name: asString(props?.name, "Unnamed"),
+    weight: asNumber(props?.weight, 0),
+    value: asString(props?.value),
+    tags: asStringArray(props?.tags),
+    types: types ?? [],
+    notes: asString(props?.notes),
+    copies,
+    updatedAt,
+  };
 }
 
 /* ------------------------------------------------------------------ *
@@ -516,6 +723,175 @@ export const postgresRepository: ArcaRepository = {
       .update(objects)
       .set({ archivedAt: new Date(), updatedAt: new Date() })
       .where(eq(objects.id, containerId));
+  },
+
+  /* ---------------------------------------------------------------- *
+   * The catalogue — SCOPE.md S3
+   * ---------------------------------------------------------------- */
+
+  async listCatalog() {
+    const rows = await catalogRows();
+    const ids = rows.map((r) => r.id);
+    const [props, types, copies] = await Promise.all([
+      propertiesFor(ids),
+      typeNamesFor(ids),
+      copyCounts(ids),
+    ]);
+
+    return rows
+      .map((r) =>
+        projectCatalog(
+          r.id,
+          r.updatedAt,
+          props.get(r.id),
+          types.get(r.id),
+          copies.get(r.id) ?? 0,
+        ),
+      )
+      .sort((a, b) => a.name.localeCompare(b.name));
+  },
+
+  async getCatalogItem(_principal, catalogItemId) {
+    const rows = await catalogRows(catalogItemId);
+    const row = rows[0];
+    if (!row) return null;
+
+    const [props, types, copies] = await Promise.all([
+      propertiesFor([row.id]),
+      typeNamesFor([row.id]),
+      copyCounts([row.id]),
+    ]);
+    return projectCatalog(
+      row.id,
+      row.updatedAt,
+      props.get(row.id),
+      types.get(row.id),
+      copies.get(row.id) ?? 0,
+    );
+  },
+
+  async createCatalogItem(principal, input) {
+    assertCanManageCatalog(principal);
+
+    // An object and nothing else. No containment edge is not an omission here,
+    // it IS the definition: a thing that is not anywhere is a definition of a
+    // thing rather than one of them.
+    const inserted = await db()
+      .insert(objects)
+      .values({ campaignId: campaignId() })
+      .returning({ id: objects.id });
+
+    const created = inserted[0];
+    if (!created) throw new Error("Insert returned no row.");
+
+    await setProperties(created.id, {
+      name: input.name,
+      weight: input.weight,
+      value: input.value,
+      tags: input.tags,
+      notes: input.notes,
+    });
+    await setTypes(created.id, input.types);
+
+    const entry = await postgresRepository.getCatalogItem(
+      principal,
+      created.id,
+    );
+    if (!entry) throw new Error("Catalogue entry vanished after insert.");
+    return entry;
+  },
+
+  async updateCatalogItem(principal, input) {
+    assertCanManageCatalog(principal);
+
+    const { id, types, ...fields } = input;
+    const existing = await catalogRows(id);
+    if (existing.length === 0) {
+      throw new NotFoundError("No such catalogue entry.");
+    }
+
+    await setProperties(id, fields);
+    if (types !== undefined) await setTypes(id, types);
+    await db()
+      .update(objects)
+      .set({ updatedAt: new Date() })
+      .where(eq(objects.id, id));
+
+    // Nothing fans out to the copies, and nothing needs to: they read these
+    // fields through the link rather than holding their own.
+    const entry = await postgresRepository.getCatalogItem(principal, id);
+    if (!entry) throw new Error("Catalogue entry vanished after update.");
+    return entry;
+  },
+
+  async archiveCatalogItem(principal, catalogItemId) {
+    assertCanManageCatalog(principal);
+
+    const existing = await catalogRows(catalogItemId);
+    if (existing.length === 0) {
+      throw new NotFoundError("No such catalogue entry.");
+    }
+
+    const copies = (await copyCounts([catalogItemId])).get(catalogItemId) ?? 0;
+    if (copies > 0) {
+      throw new ConflictError(
+        `${copies} ${copies === 1 ? "copy" : "copies"} of that still ` +
+          `${copies === 1 ? "exists" : "exist"}. Archiving it would leave ` +
+          `${copies === 1 ? "it" : "them"} reading a definition nothing can open.`,
+      );
+    }
+
+    await db()
+      .update(objects)
+      .set({ archivedAt: new Date(), updatedAt: new Date() })
+      .where(eq(objects.id, catalogItemId));
+  },
+
+  async addFromCatalog(principal, input) {
+    const container = await requireContainer(input.containerId);
+    // Destination only: nothing leaves the catalogue, so there is no source to
+    // authorise. This is a copy, not a move.
+    assertCanWrite(principal, container);
+
+    const entry = await catalogRows(input.catalogItemId);
+    if (entry.length === 0) {
+      throw new NotFoundError("No such catalogue entry.");
+    }
+
+    const relationTypeId = await instanceOfRelationType();
+
+    const objectId = await db().transaction(async (tx) => {
+      const inserted = await tx
+        .insert(objects)
+        .values({ campaignId: campaignId() })
+        .returning({ id: objects.id });
+
+      const created = inserted[0];
+      if (!created) throw new Error("Insert returned no row.");
+
+      await tx.insert(containerObjects).values({
+        containerId: input.containerId,
+        objectId: created.id,
+      });
+
+      await tx.insert(objectRelations).values({
+        sourceObjectId: created.id,
+        relationTypeId,
+        targetObjectId: input.catalogItemId,
+      });
+
+      return created.id;
+    });
+
+    // Only what is genuinely its own. Everything else is read through the
+    // link, so writing it here would be creating the snapshot this feature
+    // exists to avoid.
+    await setProperties(objectId, { qty: input.qty, notes: "" });
+
+    const items = await itemsIn(input.containerId);
+    const created = items.find((i) => i.id === objectId);
+    if (!created) throw new Error("Copy vanished after insert.");
+    return created;
   },
 
   async getCharacter(principal, containerId) {

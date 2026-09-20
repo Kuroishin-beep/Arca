@@ -18,6 +18,7 @@ import {
   emptySheet,
 } from "@backend/domain/character";
 import {
+  type CatalogItemView,
   type CharacterView,
   type CommentView,
   type ContainerView,
@@ -32,6 +33,7 @@ import {
 } from "@backend/domain/view";
 import {
   assertCanEditContainer,
+  assertCanManageCatalog,
   assertCanManageContainer,
   assertCanManageRoster,
   assertCanMove,
@@ -54,6 +56,7 @@ import {
   NotFoundError,
 } from "./repository";
 import {
+  SEED_CATALOG,
   SEED_CHARACTERS,
   SEED_COMMENTS,
   SEED_CONTAINERS,
@@ -77,6 +80,13 @@ interface Store {
    * so "never filled in" behaves identically on both backends.
    */
   characters: Record<string, CharacterSheet>;
+  /**
+   * Catalogue entries — SCOPE.md S3. Objects no container holds, which is why
+   * they are their own list here rather than items with a flag: the Postgres
+   * side distinguishes them by the absence of a containment edge, and a list
+   * nothing joins to is the in-memory shape of that.
+   */
+  catalog: (Omit<CatalogItemView, "copies"> & { archivedAt: Date | null })[];
 }
 
 const STORE_KEY = Symbol.for("arca.fixture.store");
@@ -113,6 +123,21 @@ function freshStore(): Store {
       tags: [...item.tags],
       notes: item.notes,
       types: [...item.types],
+      // The seed's items are typed in by hand, not taken from the catalogue —
+      // they predate it, and leaving them free-standing keeps the seed a
+      // worked example of BOTH kinds of item.
+      catalogItemId: null,
+      updatedAt: now,
+      archivedAt: null,
+    })),
+    catalog: SEED_CATALOG.map((entry) => ({
+      id: entry.id as ItemView["id"],
+      name: entry.name,
+      weight: entry.weight,
+      value: entry.value,
+      tags: [...entry.tags],
+      types: [...entry.types],
+      notes: entry.notes,
       updatedAt: now,
       archivedAt: null,
     })),
@@ -162,9 +187,37 @@ function liveItemsIn(containerId: string): ItemView[] {
     .map(stripInternal);
 }
 
+/**
+ * Drop the internal column and resolve the catalogue link (SCOPE.md S3).
+ *
+ * A copy stores only `qty` and `notes`. Everything else is read from its
+ * entry HERE, on the way out, rather than copied in on the way in — which is
+ * the difference between "the rope's weight was corrected" and "the rope's
+ * weight was corrected in the catalogue and in none of the six packs holding
+ * one".
+ *
+ * An entry that has been archived out from under a copy falls back to
+ * whatever the copy itself holds, so a broken link degrades to a nameless row
+ * rather than to a crash. `archiveCatalogItem` refuses to create that
+ * situation; this is the belt to its braces.
+ */
 function stripInternal(item: ItemView & { archivedAt: Date | null }): ItemView {
   const { archivedAt: _archivedAt, ...rest } = item;
-  return rest;
+  if (rest.catalogItemId === null) return rest;
+
+  const entry = store().catalog.find(
+    (c) => c.id === rest.catalogItemId && c.archivedAt === null,
+  );
+  if (!entry) return rest;
+
+  return {
+    ...rest,
+    name: entry.name,
+    weight: entry.weight,
+    value: entry.value,
+    tags: [...entry.tags],
+    types: [...entry.types],
+  };
 }
 
 /** Containers carry their derived counts; nothing is stored. */
@@ -183,6 +236,29 @@ function findContainer(containerId: string): ContainerView {
   const raw = store().containers.find((c) => c.id === containerId);
   if (!raw) throw new NotFoundError("No such container.");
   return hydrate(raw);
+}
+
+/** Live copies of one catalogue entry, across every container. Derived, which
+ *  is why archiving can ask the question without a stored counter to trust. */
+function copyCount(catalogItemId: string): number {
+  return store().items.filter(
+    (i) => i.catalogItemId === catalogItemId && i.archivedAt === null,
+  ).length;
+}
+
+function withCopyCount(
+  entry: Store["catalog"][number],
+): CatalogItemView {
+  const { archivedAt: _archivedAt, ...rest } = entry;
+  return { ...rest, copies: copyCount(entry.id) };
+}
+
+function findCatalogItem(catalogItemId: string) {
+  const entry = store().catalog.find(
+    (c) => c.id === catalogItemId && c.archivedAt === null,
+  );
+  if (!entry) throw new NotFoundError("No such catalogue entry.");
+  return entry;
 }
 
 function findItem(itemId: string) {
@@ -349,6 +425,107 @@ export const fixtureRepository: ArcaRepository = {
     return stripInternal(item);
   },
 
+  /* ---------------------------------------------------------------- *
+   * The catalogue — SCOPE.md S3
+   * ---------------------------------------------------------------- */
+
+  async listCatalog(): Promise<CatalogItemView[]> {
+    // Unfiltered by principal on purpose: a catalogue says what a rope
+    // weighs, never who has one. See `listCatalog` on the interface.
+    return store()
+      .catalog.filter((entry) => entry.archivedAt === null)
+      .map(withCopyCount)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  },
+
+  async getCatalogItem(_principal, catalogItemId) {
+    const entry = store().catalog.find(
+      (c) => c.id === catalogItemId && c.archivedAt === null,
+    );
+    return entry ? withCopyCount(entry) : null;
+  },
+
+  async createCatalogItem(principal, input) {
+    assertCanManageCatalog(principal);
+
+    const entry = {
+      id: randomUUID() as ItemView["id"],
+      name: input.name,
+      weight: input.weight,
+      value: input.value,
+      tags: [...input.tags],
+      types: [...input.types],
+      notes: input.notes,
+      updatedAt: new Date(),
+      archivedAt: null,
+    };
+    store().catalog.push(entry);
+    return withCopyCount(entry);
+  },
+
+  async updateCatalogItem(principal, input) {
+    assertCanManageCatalog(principal);
+
+    const entry = findCatalogItem(input.id);
+    const { id: _id, ...patch } = input;
+    for (const [key, value] of Object.entries(patch)) {
+      if (value !== undefined) {
+        // Only the keys actually present; `undefined` means leave it alone,
+        // the same patch discipline `updateItem` follows.
+        (entry as Record<string, unknown>)[key] = value;
+      }
+    }
+    entry.updatedAt = new Date();
+
+    // Nothing fans out. Every copy reads these fields through the link, so
+    // correcting them here has already corrected them everywhere.
+    return withCopyCount(entry);
+  },
+
+  async archiveCatalogItem(principal, catalogItemId) {
+    assertCanManageCatalog(principal);
+
+    const entry = findCatalogItem(catalogItemId);
+    const copies = copyCount(entry.id);
+    if (copies > 0) {
+      throw new ConflictError(
+        `${copies} ${copies === 1 ? "copy" : "copies"} of that still ` +
+          `${copies === 1 ? "exists" : "exist"}. Archiving it would leave ` +
+          `${copies === 1 ? "it" : "them"} reading a definition nothing can open.`,
+      );
+    }
+    entry.archivedAt = new Date();
+  },
+
+  async addFromCatalog(principal, input) {
+    const container = findContainer(input.containerId);
+    // The destination only. Nothing leaves the catalogue, so there is no
+    // source to authorise — this is a copy, not a move.
+    assertCanWrite(principal, container);
+
+    const entry = findCatalogItem(input.catalogItemId);
+
+    const item: ItemView & { archivedAt: Date | null } = {
+      id: randomUUID() as ItemView["id"],
+      containerId: container.id,
+      // Stored empty, and read through the link. Writing the entry's values
+      // in here would make this a copy in the bad sense: a snapshot that
+      // stops agreeing with its source the moment the source is corrected.
+      name: "",
+      weight: 0,
+      value: "",
+      tags: [],
+      types: [],
+      qty: input.qty,
+      notes: "",
+      catalogItemId: entry.id,
+      updatedAt: new Date(),
+      archivedAt: null,
+    };
+    store().items.push(item);
+    return stripInternal(item);
+  },
+
   async listComments(principal, containerId) {
     assertCanRead(principal, findContainer(containerId));
     return store()
@@ -397,6 +574,9 @@ export const fixtureRepository: ArcaRepository = {
       tags: input.tags,
       notes: input.notes,
       types: input.types,
+      // Typed in by hand, so it owns its own fields. `addFromCatalog` is the
+      // other door, and the one that sets a link.
+      catalogItemId: null,
       updatedAt: new Date(),
       archivedAt: null,
     };

@@ -13,10 +13,13 @@
  * boundary SCOPE.md §10 R1 asks for around realtime, applied to storage.
  */
 import type {
+  AddFromCatalogInput,
   AddMemberInput,
+  CatalogItemView,
   CharacterView,
   CommentView,
   ContainerView,
+  CreateCatalogItemInput,
   CreateCommentInput,
   CreateContainerInput,
   CreateItemInput,
@@ -24,6 +27,7 @@ import type {
   MoveItemInput,
   Principal,
   SignUpInput,
+  UpdateCatalogItemInput,
   UpdateCharacterInput,
   UpdateContainerInput,
   UpdateItemInput,
@@ -167,6 +171,72 @@ export interface ArcaRepository {
 
   /** THE operation. Authorises both ends, splits partial stacks. */
   moveItem(principal: Principal, input: MoveItemInput): Promise<MoveOutcome>;
+
+  /* ---------------------------------------------------------------- *
+   * The catalogue — SCOPE.md S3
+   * ---------------------------------------------------------------- */
+
+  /**
+   * Every catalogue entry in the campaign.
+   *
+   * Readable by ANYONE at the table, and that is not an oversight: a
+   * catalogue is a rulebook, not an inventory. It says what a hempen rope
+   * weighs, never who has one. Nothing in an entry is per-container, so there
+   * is nothing here for a read rule to protect.
+   */
+  listCatalog(principal: Principal): Promise<CatalogItemView[]>;
+
+  getCatalogItem(
+    principal: Principal,
+    catalogItemId: string,
+  ): Promise<CatalogItemView | null>;
+
+  /**
+   * Define something new — the GM's.
+   *
+   * Writing the catalogue is writing the campaign's rules, which is the same
+   * kind of authority as minting a world container rather than the kind as
+   * filling one. `assertCanManageCatalog`.
+   */
+  createCatalogItem(
+    principal: Principal,
+    input: CreateCatalogItemInput,
+  ): Promise<CatalogItemView>;
+
+  /**
+   * Correct an entry, everywhere at once.
+   *
+   * This is the feature. A copy stores no name and no weight of its own, so
+   * fixing them here fixes them in every pack that holds one — no fan-out
+   * write, no migration, nothing to go stale, because nothing was duplicated
+   * in the first place.
+   */
+  updateCatalogItem(
+    principal: Principal,
+    input: UpdateCatalogItemInput,
+  ): Promise<CatalogItemView>;
+
+  /**
+   * Retire an entry. Refuses while copies of it still exist.
+   *
+   * The same answer `archiveContainer` gives for a container that still holds
+   * items, and for the same reason: archiving it would leave every copy
+   * reading from a definition no screen can reach, which is a worse outcome
+   * than a refusal a GM can act on.
+   */
+  archiveCatalogItem(principal: Principal, catalogItemId: string): Promise<void>;
+
+  /**
+   * Take a copy into a container — the player's verb.
+   *
+   * Nothing leaves the catalogue, so only the DESTINATION is authorised. The
+   * new object stores its own `qty` and `notes` and nothing else; every other
+   * field is read through the link.
+   */
+  addFromCatalog(
+    principal: Principal,
+    input: AddFromCatalogInput,
+  ): Promise<ItemView>;
 
   /** Everyone at the table, for the owner picker on a pack and for comment
    *  attribution. No longer feeds a sign-in picker — since M1 became email and

@@ -21,6 +21,7 @@ import { db, rawSql } from "./client";
 import {
   CAMPAIGN_ID,
   CAMPAIGN_NAME,
+  SEED_CATALOG,
   SEED_CHARACTERS,
   SEED_COMMENTS,
   SEED_CONTAINERS,
@@ -219,6 +220,50 @@ async function main(): Promise<void> {
     })),
   );
 
+  /**
+   * The catalogue — SCOPE.md S3.
+   *
+   * Objects with properties, types, and deliberately NO containment edge. That
+   * absence is the whole definition: a thing that is not anywhere is a
+   * definition of a thing rather than one of them, and it is what keeps these
+   * out of every container and database view without a filter.
+   */
+  await database.insert(objects).values(
+    SEED_CATALOG.map((entry) => ({ id: entry.id, campaignId: CAMPAIGN_ID })),
+  );
+
+  const catalogProperties = SEED_CATALOG.flatMap((entry) =>
+    (
+      [
+        ["name", entry.name],
+        ["weight", entry.weight],
+        ["value", entry.value],
+        ["tags", entry.tags],
+        ["notes", entry.notes],
+      ] as const
+    )
+      .map(([name, value]) => {
+        const id = propertyId.get(name);
+        return id
+          ? { objectId: entry.id, propertyDefinitionId: id, value }
+          : null;
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null),
+  );
+  await database.insert(objectProperties).values(catalogProperties);
+
+  const catalogMemberships = SEED_CATALOG.flatMap((entry) =>
+    entry.types
+      .map((t) => {
+        const id = typeId.get(t);
+        return id ? { objectId: entry.id, typeId: id } : null;
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null),
+  );
+  if (catalogMemberships.length > 0) {
+    await database.insert(objectTypeMemberships).values(catalogMemberships);
+  }
+
   await database.insert(comments).values(
     SEED_COMMENTS.map((c) => ({
       id: c.id,
@@ -231,7 +276,8 @@ async function main(): Promise<void> {
   );
 
   console.log(
-    `Done. ${SEED_CONTAINERS.length} containers, ${SEED_ITEMS.length} items, ${SEED_TYPE_NAMES.length} types.`,
+    `Done. ${SEED_CONTAINERS.length} containers, ${SEED_ITEMS.length} items, ` +
+      `${SEED_CATALOG.length} catalogue entries, ${SEED_TYPE_NAMES.length} types.`,
   );
   await rawSql().end();
 }
