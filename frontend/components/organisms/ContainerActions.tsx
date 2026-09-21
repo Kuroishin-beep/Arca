@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Icon } from "@frontend/components/atoms/Icon";
 import { RevealToggle } from "@frontend/components/organisms/RevealToggle";
 import type { ContainerView, Principal } from "@backend/domain/view";
-import { canRetireContainer } from "@backend/lib/permissions";
+import { canCreateItem, canRetireContainer } from "@backend/lib/permissions";
 
 /**
  * Share, and the overflow menu — the right-hand end of Wireframe.png's strip
@@ -70,9 +70,15 @@ export function ContainerActions({
             <MenuLink href={`${base}?dialog=edit-container`} icon="filter">
               Edit container
             </MenuLink>
-            <MenuLink href={`${base}?dialog=add`} icon="plus">
-              Add item
-            </MenuLink>
+            {canCreateItem(principal) ? (
+              <MenuLink href={`${base}?dialog=add`} icon="plus">
+                Add item
+              </MenuLink>
+            ) : (
+              <MenuLink href={`${base}?dialog=catalog`} icon="table">
+                From catalogue
+              </MenuLink>
+            )}
             {/* Retiring is inside the edit dialog, which is where the
                 confirmation and the "still has items" refusal already live.
                 Linking straight to a destructive action from a menu would put
@@ -95,7 +101,7 @@ function MenuLink({
   children,
 }: {
   href: string;
-  icon: "filter" | "plus" | "trash";
+  icon: "filter" | "plus" | "table" | "trash";
   children: string;
 }) {
   return (

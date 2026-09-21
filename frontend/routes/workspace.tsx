@@ -35,6 +35,7 @@ import {
 } from "@backend/domain/view";
 import {
   PermissionError,
+  canCreateItem,
   canRetireContainer,
   canWrite,
   creatableContainerTypes,
@@ -177,6 +178,8 @@ export default async function WorkspacePage({
 
   const drawerOpen = sp.nav === "1";
   const isGm = principal.role === "gm";
+  // From scratch is GM-only; players take from the catalogue (`canCreateItem`).
+  const canCreate = editable && canCreateItem(principal);
 
   // The Databases section of the sidebar. Derived from the types on objects
   // this principal can reach, so it is a per-viewer list by construction —
@@ -337,7 +340,7 @@ export default async function WorkspacePage({
                   </ButtonLink>
                 ) : null}
 
-                {editable ? (
+                {canCreate ? (
                   <ButtonLink
                     href={`/c/${containerId}?dialog=add`}
                     variant="primary"
@@ -416,6 +419,7 @@ export default async function WorkspacePage({
                 sort={sort}
                 selectedId={selected?.id}
                 canEdit={editable}
+                canCreate={canCreate}
                 query={query}
               />
             </div>
@@ -442,7 +446,7 @@ export default async function WorkspacePage({
         />
       ) : null}
 
-      {sp.dialog === "add" && editable ? (
+      {sp.dialog === "add" && canCreate ? (
         <ItemEditorDialog container={container} closeHref={closeHref} />
       ) : null}
 

@@ -240,4 +240,20 @@ test.describe("the catalogue", () => {
     await expect(row(gm, name)).toContainText("5 gp");
     await gm.context().close();
   });
+  test("only the GM can type an item in from scratch", async ({ browser }) => {
+    const player = await signInAs(browser, "Kova");
+    await player.goto(`/c/${KOVA_CONTAINER_ID}`);
+    await expect(player.getByRole("link", { name: /from catalogue/i }).first()).toBeVisible();
+    await expect(player.getByRole("link", { name: /^add item$/i })).toHaveCount(0);
+    // The URL is not a way round it: the dialog does not open for a player.
+    await player.goto(`/c/${KOVA_CONTAINER_ID}?dialog=add`);
+    await expect(player.getByRole("dialog")).toHaveCount(0);
+    await player.context().close();
+
+    const gm = await signInAs(browser, "Ravna");
+    await gm.goto(`/c/${PARTY_WAGON_ID}`);
+    await gm.getByRole("link", { name: /^add item$/i }).first().click();
+    await expect(gm.getByRole("dialog", { name: /add item/i })).toBeVisible();
+    await gm.context().close();
+  });
 });

@@ -36,6 +36,7 @@ import {
 import { campaignId } from "@backend/lib/campaign";
 import {
   assertCanEditContainer,
+  assertCanCreateItem,
   assertCanManageCatalog,
   assertCanManageContainer,
   assertCanManageRoster,
@@ -1077,6 +1078,7 @@ export const postgresRepository: ArcaRepository = {
   },
 
   async createItem(principal, input: CreateItemInput) {
+    assertCanCreateItem(principal);
     assertCanWrite(principal, await requireContainer(input.containerId));
 
     const inserted = await db()

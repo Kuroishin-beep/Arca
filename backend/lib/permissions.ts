@@ -308,6 +308,27 @@ export function assertCanManageCatalog(principal: Principal): void {
   }
 }
 
+/**
+ * Who may type an item in from scratch — the GM only.
+ *
+ * Players stock their packs from the catalogue instead, so what an item is
+ * stays defined in one place: a correction by the GM reaches every copy, and
+ * a player cannot invent a 0 kg plate armour. Moving, splitting, editing the
+ * quantity and notes of what they already hold are unaffected — those are
+ * `canWrite`. This replaces SCOPE.md M4's "anyone who can write may add".
+ */
+export function canCreateItem(principal: Principal): boolean {
+  return principal.role === "gm";
+}
+
+export function assertCanCreateItem(principal: Principal): void {
+  if (!canCreateItem(principal)) {
+    throw new PermissionError(
+      "Only the GM can create new items. Take one from the catalogue instead, or ask the GM to add it there.",
+    );
+  }
+}
+
 /* ------------------------------------------------------------------ *
  * The roster
  * ------------------------------------------------------------------ */

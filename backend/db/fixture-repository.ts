@@ -35,6 +35,7 @@ import {
 } from "@backend/domain/view";
 import {
   assertCanEditContainer,
+  assertCanCreateItem,
   assertCanManageCatalog,
   assertCanManageContainer,
   assertCanManageRoster,
@@ -565,6 +566,7 @@ export const fixtureRepository: ArcaRepository = {
   },
 
   async createItem(principal, input: CreateItemInput) {
+    assertCanCreateItem(principal);
     assertCanWrite(principal, findContainer(input.containerId));
     const item = {
       id: randomUUID() as ItemView["id"],

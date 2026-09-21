@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { fixtureRepository, resetFixtureStore } from "@backend/db/fixture-repository";
 import {
+  GM_ID,
   KOVA_CONTAINER_ID,
   KOVA_EMAIL,
   KOVA_ID,
@@ -32,6 +33,13 @@ const kova: Principal = {
   displayName: "Kova",
   email: KOVA_EMAIL,
   role: "player",
+};
+
+const gm: Principal = {
+  userId: GM_ID as Principal["userId"],
+  displayName: "Ravna",
+  email: "ravna@ravenholt.example",
+  role: "gm",
 };
 
 const id = (name: string) => SEED_CONTAINERS.find((c) => c.name === name)!.id;
@@ -80,11 +88,26 @@ describe("create", () => {
     expect(parsed.data.weight).toBe(1.5);
     expect(parsed.data.tags).toEqual(["gear", "climbing"]);
 
-    const created = await fixtureRepository.createItem(kova, parsed.data);
+    const created = await fixtureRepository.createItem(gm, parsed.data);
     expect(created.name).toBe("Grappling hook");
 
     const items = await fixtureRepository.listItems(kova, WAGON);
     expect(items.map((i) => i.name)).toContain("Grappling hook");
+  });
+
+  it("refuses a player typing an item in from scratch, even where they can write", async () => {
+    const parsed = CreateItemInput.parse({
+      containerId: KOVAS_PACK,
+      name: "Plate armour",
+      qty: "1",
+      weight: "0",
+    });
+
+    await expect(fixtureRepository.createItem(kova, parsed)).rejects.toThrow(
+      PermissionError,
+    );
+    const items = await fixtureRepository.listItems(kova, KOVAS_PACK);
+    expect(items.map((i) => i.name)).not.toContain("Plate armour");
   });
 
   it("rejects an empty name with a message aimed at the field", () => {
