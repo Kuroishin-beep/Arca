@@ -29,6 +29,8 @@ import {
   type Principal,
   type UpdateItemInput,
   carriedWeight,
+  changedInheritedFields,
+  inheritedFieldsMessage,
   ownershipProblem,
 } from "@backend/domain/view";
 import { campaignId } from "@backend/lib/campaign";
@@ -258,6 +260,23 @@ async function itemsIn(containerId: string): Promise<ItemView[]> {
       ),
     );
 
+  return resolveItems(rows, containerId);
+}
+
+/**
+ * Objects in a container, as the ItemViews a screen reads — following each
+ * one's catalogue link where it has one.
+ *
+ * THE one place a copy becomes readable. It used to live inline in `itemsIn`,
+ * which meant every other path that read a single item — `getItem`, the move
+ * result, the edit result — read a copy's own properties instead, and a copy
+ * owns no name. The fix was not four patches but one door: anything that turns
+ * an object into an ItemView comes through here.
+ */
+async function resolveItems(
+  rows: { objectId: string; updatedAt: Date }[],
+  containerId: string,
+): Promise<ItemView[]> {
   const ids = rows.map((r) => r.objectId);
   const [props, types, links] = await Promise.all([
     propertiesFor(ids),
@@ -958,17 +977,14 @@ export const postgresRepository: ArcaRepository = {
     const container = await containerOf(itemId);
     assertCanRead(principal, container);
 
-    const [props, types] = await Promise.all([
-      propertiesFor([itemId]),
-      typeNamesFor([itemId]),
-    ]);
-    return project(
-      itemId,
+    // Through the resolver, not straight off the object's own properties: a
+    // catalogue copy stores no name, so reading it directly returned "Unnamed"
+    // with its link dropped.
+    const [item] = await resolveItems(
+      [{ objectId: itemId, updatedAt: row[0].updatedAt }],
       container.id,
-      row[0].updatedAt,
-      props.get(itemId),
-      types.get(itemId),
     );
+    return item ?? null;
   },
 
   async listComments(principal, containerId) {
@@ -1104,15 +1120,33 @@ export const postgresRepository: ArcaRepository = {
     const container = await containerOf(input.id);
     assertCanWrite(principal, container);
 
+    const current = await postgresRepository.getItem(principal, input.id);
+    if (!current) throw new NotFoundError("That item is no longer here.");
+
+    // A catalogue copy owns its quantity and notes and nothing else. Writing
+    // its name here would store a value the next read overwrites from the
+    // entry — an edit that appears to save and silently does not. So a CHANGE
+    // to an inherited field is refused with directions; an unchanged one (the
+    // form round-trips what it displayed) is simply dropped.
+    const isCopy = current.catalogItemId !== null;
+    if (isCopy) {
+      const changed = changedInheritedFields(current, input);
+      if (changed.length > 0) {
+        throw new ConflictError(inheritedFieldsMessage(changed));
+      }
+    }
+
     await setProperties(input.id, {
-      name: input.name,
+      name: isCopy ? undefined : input.name,
       qty: input.qty,
-      weight: input.weight,
-      value: input.value,
-      tags: input.tags,
+      weight: isCopy ? undefined : input.weight,
+      value: isCopy ? undefined : input.value,
+      tags: isCopy ? undefined : input.tags,
       notes: input.notes,
     });
-    if (input.types !== undefined) await setTypes(input.id, input.types);
+    if (!isCopy && input.types !== undefined) {
+      await setTypes(input.id, input.types);
+    }
 
     await db()
       .update(objects)
@@ -1143,7 +1177,12 @@ export const postgresRepository: ArcaRepository = {
 
     const props = (await propertiesFor([input.itemId])).get(input.itemId);
     const currentQty = Math.max(1, Math.trunc(asNumber(props?.qty, 1)));
-    const itemName = asString(props?.name, "Item");
+
+    // The name from the RESOLVED item, not the object's own properties. A
+    // catalogue copy stores no name, so reading props directly announced a move
+    // of "Item" to the whole table.
+    const resolved = await postgresRepository.getItem(principal, input.itemId);
+    const itemName = resolved?.name ?? "Item";
 
     if (input.qty > currentQty) {
       throw new ConflictError(
@@ -1207,6 +1246,34 @@ export const postgresRepository: ArcaRepository = {
         await tx
           .insert(objectTypeMemberships)
           .values(typeRows.map((t) => ({ objectId: newId, typeId: t.typeId })));
+      }
+
+      /**
+       * And its relations — which is the half this used to miss.
+       *
+       * A split produces two stacks of the SAME thing, so whatever the stack
+       * meant beyond its properties, both halves still mean it. For a
+       * catalogue copy that is not a nicety: its name, weight and value live
+       * on the entry, reached only through this relation, so a clone that
+       * copied the properties and not the link arrived as an "Unnamed" 0 kg
+       * item — the moved half silently stopped being what it was.
+       *
+       * Every OUTGOING relation, not just `instance_of`: "crafted by the
+       * blacksmith" is equally true of both halves of a split stack, and
+       * special-casing one relation kind is how the next one gets dropped.
+       */
+      const relationRows = await tx
+        .select({
+          relationTypeId: objectRelations.relationTypeId,
+          targetObjectId: objectRelations.targetObjectId,
+          metadata: objectRelations.metadata,
+        })
+        .from(objectRelations)
+        .where(eq(objectRelations.sourceObjectId, input.itemId));
+      if (relationRows.length > 0) {
+        await tx
+          .insert(objectRelations)
+          .values(relationRows.map((r) => ({ ...r, sourceObjectId: newId })));
       }
 
       await tx

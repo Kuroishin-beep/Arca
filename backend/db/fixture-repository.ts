@@ -29,6 +29,8 @@ import {
   type UpdateCharacterInput,
   type UpdateItemInput,
   carriedWeight,
+  changedInheritedFields,
+  inheritedFieldsMessage,
   ownershipProblem,
 } from "@backend/domain/view";
 import {
@@ -588,6 +590,22 @@ export const fixtureRepository: ArcaRepository = {
     const item = findItem(input.id);
     assertCanWrite(principal, findContainer(item.containerId));
 
+    // A catalogue copy owns only its quantity and notes. See the same guard in
+    // the Postgres repository: a CHANGED inherited field is refused with
+    // directions, an unchanged one (the form round-tripping what it showed)
+    // is dropped, and either way nothing is written that the next read would
+    // silently overwrite from the entry.
+    if (item.catalogItemId !== null) {
+      const changed = changedInheritedFields(stripInternal(item), input);
+      if (changed.length > 0) {
+        throw new ConflictError(inheritedFieldsMessage(changed));
+      }
+      if (input.qty !== undefined) item.qty = input.qty;
+      if (input.notes !== undefined) item.notes = input.notes;
+      item.updatedAt = new Date();
+      return stripInternal(item);
+    }
+
     // `undefined` means "leave this alone" — a patch, not a replacement.
     if (input.name !== undefined) item.name = input.name;
     if (input.qty !== undefined) item.qty = input.qty;
@@ -657,7 +675,9 @@ export const fixtureRepository: ArcaRepository = {
       split,
       fromContainerId: from.id,
       toContainerId: to.id,
-      itemName: item.name,
+      // Resolved, not raw: a catalogue copy's stored name is empty, and this
+      // string is announced to the whole table.
+      itemName: stripInternal(item).name,
     };
   },
 

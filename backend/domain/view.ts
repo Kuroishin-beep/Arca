@@ -379,6 +379,60 @@ export type MoveItemInput = z.infer<typeof MoveItemInput>;
  */
 export const INSTANCE_OF = "instance_of";
 
+/**
+ * The fields a copy INHERITS from its entry rather than owning.
+ *
+ * Everything except `qty` and `notes`. Declared once because two places have
+ * to agree on it exactly — the read that resolves a copy, and the edit that
+ * refuses to change one — and a field on one list but not the other is a copy
+ * that silently discards an edit.
+ */
+export const INHERITED_FIELDS = [
+  "name",
+  "weight",
+  "value",
+  "tags",
+  "types",
+] as const;
+export type InheritedField = (typeof INHERITED_FIELDS)[number];
+
+/**
+ * Which inherited fields a patch would actually CHANGE on a copy.
+ *
+ * Not simply "which ones are present". The edit form round-trips every value
+ * it displayed, so a patch saving a copy's notes arrives carrying its name and
+ * weight too — unchanged. Refusing those would make a copy's own notes
+ * uneditable; ignoring a CHANGED one would be the silent discard this exists to
+ * prevent. So the rule is the difference, not the presence.
+ */
+export function changedInheritedFields(
+  current: Pick<ItemView, InheritedField>,
+  patch: Partial<Pick<ItemView, InheritedField>>,
+): InheritedField[] {
+  const same = (a: unknown, b: unknown): boolean =>
+    Array.isArray(a) && Array.isArray(b)
+      ? a.length === b.length && a.every((v, i) => v === b[i])
+      : a === b;
+
+  return INHERITED_FIELDS.filter(
+    (field) => patch[field] !== undefined && !same(patch[field], current[field]),
+  );
+}
+
+/** The refusal, phrased once so both backends say the same thing. */
+export function inheritedFieldsMessage(fields: readonly InheritedField[]): string {
+  const list =
+    fields.length === 1
+      ? fields[0]
+      : `${fields.slice(0, -1).join(", ")} and ${fields.at(-1)}`;
+  const one = fields.length === 1;
+  return (
+    `This item's ${list} ${one ? "comes" : "come"} from the catalogue, so ` +
+    `${one ? "it changes" : "they change"} for every copy at once. Edit the ` +
+    "catalogue entry instead — here, only the quantity and notes are its own."
+  );
+}
+
 export const CatalogItemView = z.object({
   id: ItemId,
   name: z.string(),

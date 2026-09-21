@@ -273,3 +273,75 @@ describe("retiring an entry", () => {
     ).toBe(false);
   });
 });
+
+/**
+ * The side paths — every way to reach a copy OTHER than listing a container.
+ *
+ * The list was the only path the original tests exercised, and it was the only
+ * one that resolved links; getting, moving and editing a copy all read its own
+ * properties instead. Mirrored in `catalog.postgres.test.ts`, where the same
+ * gaps turned a split stack into an "Unnamed" 0 kg item.
+ */
+describe("a copy reached some other way", () => {
+  it("is resolved when read on its own", async () => {
+    const copy = await fixtureRepository.addFromCatalog(kova, {
+      catalogItemId: ROPE,
+      containerId: KOVAS_PACK,
+      qty: 1,
+    });
+    const read = await fixtureRepository.getItem(kova, copy.id);
+    expect(read?.name).toBe(SEED_CATALOG[0]!.name);
+    expect(read?.catalogItemId).toBe(ROPE);
+  });
+
+  it("is named correctly in the move the whole table is told about", async () => {
+    const copy = await fixtureRepository.addFromCatalog(gm, {
+      catalogItemId: ROPE,
+      containerId: WAGON,
+      qty: 3,
+    });
+
+    const partial = await fixtureRepository.moveItem(gm, {
+      itemId: copy.id,
+      toContainerId: KOVAS_PACK,
+      qty: 1,
+    });
+    expect(partial.itemName).toBe(SEED_CATALOG[0]!.name);
+
+    const arrived = (await fixtureRepository.listItems(gm, KOVAS_PACK)).find(
+      (i) => i.catalogItemId === ROPE,
+    );
+    expect(arrived?.name).toBe(SEED_CATALOG[0]!.name);
+  });
+
+  it("refuses a rename, pointing at the catalogue", async () => {
+    const copy = await fixtureRepository.addFromCatalog(kova, {
+      catalogItemId: ROPE,
+      containerId: KOVAS_PACK,
+      qty: 1,
+    });
+    await expect(
+      fixtureRepository.updateItem(kova, { id: copy.id, name: "Mine now" }),
+    ).rejects.toThrow(/catalogue/i);
+  });
+
+  it("accepts the unchanged values an edit form round-trips", async () => {
+    const copy = await fixtureRepository.addFromCatalog(kova, {
+      catalogItemId: ROPE,
+      containerId: KOVAS_PACK,
+      qty: 1,
+    });
+
+    const updated = await fixtureRepository.updateItem(kova, {
+      id: copy.id,
+      name: SEED_CATALOG[0]!.name,
+      weight: SEED_CATALOG[0]!.weight,
+      tags: [...SEED_CATALOG[0]!.tags],
+      types: [...SEED_CATALOG[0]!.types],
+      qty: 4,
+    });
+
+    expect(updated.qty).toBe(4);
+    expect(updated.catalogItemId).toBe(ROPE);
+  });
+});

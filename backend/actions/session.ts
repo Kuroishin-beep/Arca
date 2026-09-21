@@ -14,6 +14,7 @@ import {
   recordFailure,
 } from "@backend/lib/password";
 import { SESSION_COOKIE } from "@backend/lib/session";
+import { sessionSecret, signSession } from "@backend/lib/session-token";
 
 /**
  * Sign in and out.
@@ -46,7 +47,9 @@ function text(raw: FormDataEntryValue | null): string {
 /** Everything after a successful sign-in, shared by both paths below. */
 async function land(principal: Principal): Promise<never> {
   const jar = await cookies();
-  jar.set(SESSION_COOKIE, principal.userId, {
+  // Signed — see `session-token.ts`. The bare id this used to write was a
+  // cookie anyone could forge by reading the public seed file.
+  jar.set(SESSION_COOKIE, signSession(principal.userId, sessionSecret()), {
     httpOnly: true,
     sameSite: "lax",
     // The Symbiote loads Arca in an iframe, so a secure cookie is required in

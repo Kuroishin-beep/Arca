@@ -99,7 +99,11 @@ export function CatalogPickerDialog({
           </p>
         ) : null}
 
-        <div>
+        {/* Pinned to the top of the Modal's scroll region, so the search is
+            still in reach after scrolling down a long catalogue. The list has
+            no scroll region of its own any more — a second one nested inside
+            the Modal's was what produced two scrollbars. */}
+        <div className="sticky top-0 z-10 -mx-4 -mt-3 bg-surface px-4 pb-2 pt-3">
           <label htmlFor="catalog-search" className="sr-only">
             Search the catalogue
           </label>
@@ -124,14 +128,19 @@ export function CatalogPickerDialog({
             Nothing in the catalogue matches “{query.trim()}”.
           </p>
         ) : (
-          <ul className="flex max-h-[50vh] flex-col gap-1 overflow-y-auto">
+          <ul className="flex flex-col gap-1">
             {matches.map((entry) => (
               <li
                 key={entry.id}
                 className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-surface2 p-2"
               >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-base text-text">{entry.name}</p>
+                {/* `basis-full` puts the name on a line of its own. Sharing a
+                    row with a 128px stepper and the Add button left it about
+                    110px inside the dialog, and "Healing Pot…" is not a name
+                    anyone can pick from — the one thing on this row a person
+                    actually reads was the thing being cut. */}
+                <div className="min-w-0 basis-full">
+                  <p className="text-base text-text">{entry.name}</p>
                   <p className="flex flex-wrap items-center gap-1 text-xs text-faint">
                     <span className="font-mono tabular-nums">
                       {entry.weight.toFixed(1)} kg
@@ -162,6 +171,7 @@ export function CatalogPickerDialog({
                   size="sm"
                   variant="primary"
                   icon="plus"
+                  className="ml-auto"
                   disabled={pending}
                   onClick={() => take(entry)}
                 >
