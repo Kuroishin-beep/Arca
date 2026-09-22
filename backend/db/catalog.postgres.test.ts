@@ -249,4 +249,73 @@ describe.skipIf(!enabled)("the catalogue on Postgres", () => {
     });
     expect((await repo.getItem(gm, made.id))?.stats).toEqual({ damage: "D6" });
   });
+  /**
+   * Concurrency, against a real database — the only place these two bugs
+   * could be seen, and both of them cost loot.
+   *
+   * 1. `propertyIdsByName()` ran on a POOLED connection from inside the move's
+   *    transaction. Five concurrent moves (the pool holds five) each held a
+   *    connection and each waited for a sixth: a deadlock Postgres cannot
+   *    detect and no query times out of, so the whole app hung.
+   * 2. The quantity was read BEFORE the transaction and the remainder computed
+   *    from it, so serialised writes all stored the same stale arithmetic.
+   *    Twelve single-unit splits of a stack of fourteen left twenty-five.
+   */
+  it("keeps the count exact under concurrent splits, and does not deadlock", async () => {
+    const stack = (await repo.listItems(gm, WAGON)).find((i) => i.qty >= 12);
+    expect(stack, "the seed needs a stack of at least 12").toBeDefined();
+    if (!stack) return;
+
+    const total = async () => {
+      let n = 0;
+      for (const containerId of [WAGON, KOVAS_PACK]) {
+        for (const item of await repo.listItems(gm, containerId)) {
+          if (item.name === stack.name) n += item.qty;
+        }
+      }
+      return n;
+    };
+
+    const before = await total();
+
+    // More moves at once than the pool has connections: the deadlock needed
+    // exactly that, so a smaller number would pass against the broken code.
+    const settled = await Promise.race([
+      Promise.allSettled(
+        Array.from({ length: 12 }, () =>
+          repo.moveItem(gm, { itemId: stack.id, toContainerId: KOVAS_PACK, qty: 1 }),
+        ),
+      ),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("moves deadlocked")), 20_000),
+      ),
+    ]);
+
+    expect(settled.every((s) => s.status === "fulfilled")).toBe(true);
+    expect(await total()).toBe(before);
+  }, 30_000);
+
+  it("refuses to move more than is there, however many ask at once", async () => {
+    const stack = (await repo.listItems(gm, WAGON)).find((i) => i.qty >= 3);
+    if (!stack) return;
+
+    const settled = await Promise.allSettled(
+      Array.from({ length: 6 }, () =>
+        repo.moveItem(gm, {
+          itemId: stack.id,
+          toContainerId: KOVAS_PACK,
+          qty: stack.qty,
+        }),
+      ),
+    );
+    expect(settled.some((s) => s.status === "fulfilled")).toBe(true);
+
+    let total = 0;
+    for (const containerId of [WAGON, KOVAS_PACK]) {
+      for (const item of await repo.listItems(gm, containerId)) {
+        if (item.name === stack.name) total += item.qty;
+      }
+    }
+    expect(total).toBe(stack.qty);
+  }, 30_000);
 });

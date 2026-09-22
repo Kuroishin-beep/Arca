@@ -10,6 +10,7 @@ import {
 } from "@backend/db/seed-data";
 import {
   CreateItemInput,
+  itemWeight,
   MoveItemInput,
   UpdateItemInput,
   type Principal,
@@ -224,5 +225,55 @@ describe("update", () => {
     expect(updated.qty).toBe(7);
     expect(updated.name).toBe(rope.name);
     expect(updated.notes).toBe(rope.notes);
+  });
+});
+
+describe("numbers that would break the arithmetic", () => {
+  /**
+   * 1e308 is a finite number, so `.finite()` let it through — and then
+   * `qty * weight` is `Infinity`, which the encumbrance meter and every
+   * container total render as-is. One item was enough to poison a container's
+   * numbers for everyone looking at it.
+   */
+  it("refuses a weight past the ceiling", () => {
+    const parsed = CreateItemInput.safeParse({
+      containerId: WAGON,
+      name: "Neutron star",
+      qty: "1",
+      weight: "1e308",
+    });
+    expect(parsed.success).toBe(false);
+    if (parsed.success) return;
+    expect(parsed.error.issues[0]?.path[0]).toBe("weight");
+  });
+
+  it("refuses a quantity past the ceiling", () => {
+    const parsed = CreateItemInput.safeParse({
+      containerId: WAGON,
+      name: "Arrows",
+      qty: "999999999999999999999",
+      weight: "0",
+    });
+    expect(parsed.success).toBe(false);
+    if (parsed.success) return;
+    expect(parsed.error.issues[0]?.path[0]).toBe("qty");
+  });
+
+  it("still accepts everything a campaign actually weighs", async () => {
+    const parsed = CreateItemInput.parse({
+      containerId: WAGON,
+      name: "Anvil",
+      qty: "2",
+      weight: "300",
+    });
+    const created = await fixtureRepository.createItem(gm, parsed);
+    expect(itemWeight(created)).toBe(600);
+  });
+
+  it("keeps a container's total a real number", async () => {
+    const before = (await fixtureRepository.listContainers(gm)).find(
+      (c) => c.id === WAGON,
+    )!;
+    expect(Number.isFinite(before.carriedWeight)).toBe(true);
   });
 });

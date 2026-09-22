@@ -187,14 +187,35 @@ export const DEFAULT_SORT: Sort = { column: "name", direction: "asc" };
  * "I only changed the quantity" into "clear the notes and tags", because the
  * repository reads `undefined` as leave-alone and got `""` instead.
  */
+/**
+ * Ceilings on the two numbers that get multiplied together.
+ *
+ * `.finite()` is not enough: 1e308 is finite, and `qty * weight` on it is
+ * `Infinity`, which is a real state the encumbrance meter and every container
+ * total then render — one absurd item poisons the whole container's numbers,
+ * and nothing in the UI can undo it except deleting the item.
+ *
+ * The values are far past anything a campaign has (a wagon is a few hundred
+ * kilos; a quiver is twenty arrows) and far below where the arithmetic stops
+ * being exact, which is the only property being defended here.
+ */
+export const MAX_WEIGHT = 100_000;
+export const MAX_QTY = 1_000_000;
+export const MAX_CAPACITY = 1_000_000;
+
 const ItemFields = z.object({
   containerId: ContainerId,
   name: z.string().trim().min(1, "A name is required.").max(120),
   qty: z.coerce
     .number()
     .int("Quantity must be a whole number.")
-    .positive("Quantity must be at least 1."),
-  weight: z.coerce.number().nonnegative("Weight cannot be negative.").finite(),
+    .positive("Quantity must be at least 1.")
+    .max(MAX_QTY, `A quantity is at most ${MAX_QTY.toLocaleString("en")}.`),
+  weight: z.coerce
+    .number()
+    .nonnegative("Weight cannot be negative.")
+    .finite()
+    .max(MAX_WEIGHT, `A weight is at most ${MAX_WEIGHT.toLocaleString("en")} kg.`),
   value: z.string().trim().max(40),
   tags: z.array(z.string().trim().min(1)),
   notes: z.string().max(2000),
@@ -266,6 +287,7 @@ export const CreateContainerInput = z
     capacity: z
       .number()
       .positive("Capacity must be more than zero.")
+      .max(MAX_CAPACITY, "That capacity is not a capacity.")
       .nullable()
       .default(null),
     /** World containers start hidden: the GM reveals a chest when the party
@@ -313,6 +335,7 @@ export const UpdateContainerInput = z.object({
   capacity: z
     .number()
     .positive("Capacity must be more than zero.")
+    .max(MAX_CAPACITY, "That capacity is not a capacity.")
     .nullable()
     .optional(),
   revealed: z.boolean().optional(),
@@ -345,7 +368,7 @@ export type CreateCommentInput = z.infer<typeof CreateCommentInput>;
 export const MoveItemInput = z.object({
   itemId: ItemId,
   toContainerId: ContainerId,
-  qty: z.coerce.number().int().positive(),
+  qty: z.coerce.number().int().positive().max(MAX_QTY),
 });
 export type MoveItemInput = z.infer<typeof MoveItemInput>;
 
@@ -463,7 +486,11 @@ export type CatalogItemView = z.infer<typeof CatalogItemView>;
 
 const CatalogFields = z.object({
   name: z.string().trim().min(1, "A name is required.").max(120),
-  weight: z.coerce.number().nonnegative("Weight cannot be negative.").finite(),
+  weight: z.coerce
+    .number()
+    .nonnegative("Weight cannot be negative.")
+    .finite()
+    .max(MAX_WEIGHT, `A weight is at most ${MAX_WEIGHT.toLocaleString("en")} kg.`),
   value: z.string().trim().max(40),
   tags: z.array(z.string().trim().min(1)),
   types: z.array(z.string().trim().min(1)),

@@ -88,8 +88,24 @@ import {
 
 type PropertyMap = Map<string, Record<string, unknown>>;
 
-async function propertyIdsByName(): Promise<Map<string, string>> {
-  const rows = await db()
+/**
+ * Anything that can run a query: the pool, or one transaction on it.
+ *
+ * The distinction is not cosmetic. A helper that hard-codes `db()` takes a
+ * DIFFERENT connection from the pool, so calling it from inside a transaction
+ * means holding that transaction's locks while queueing for a second
+ * connection. With a pool of five, five concurrent moves each held one
+ * connection and each waited for a sixth that could never come free: a
+ * deadlock the database cannot detect and no query times out of. The whole
+ * app hung, not just the moves.
+ */
+type Executor = ReturnType<typeof db>;
+type Transaction = Parameters<Parameters<Executor["transaction"]>[0]>[0];
+
+async function propertyIdsByName(
+  on: Executor | Transaction = db(),
+): Promise<Map<string, string>> {
+  const rows = await on
     .select({ id: propertyDefinitions.id, name: propertyDefinitions.name })
     .from(propertyDefinitions)
     .where(eq(propertyDefinitions.campaignId, campaignId()));
@@ -1202,7 +1218,6 @@ export const postgresRepository: ArcaRepository = {
     assertCanMove(principal, from, to);
 
     const props = (await propertiesFor([input.itemId])).get(input.itemId);
-    const currentQty = Math.max(1, Math.trunc(asNumber(props?.qty, 1)));
 
     // The name from the RESOLVED item, not the object's own properties. A
     // catalogue copy stores no name, so reading props directly announced a move
@@ -1210,13 +1225,9 @@ export const postgresRepository: ArcaRepository = {
     const resolved = await postgresRepository.getItem(principal, input.itemId);
     const itemName = resolved?.name ?? "Item";
 
-    if (input.qty > currentQty) {
-      throw new ConflictError(
-        `Only ${currentQty} left — someone may have moved the rest.`,
-      );
-    }
-
-    const split = input.qty < currentQty;
+    // Decided INSIDE the transaction, below, from the quantity as it is under
+    // the lock. Read out here it is a guess about the past.
+    let split = false;
 
     // One transaction. A move that half-applied would put an item in two
     // places or none, and at a table both look like the app losing loot.
@@ -1228,6 +1239,40 @@ export const postgresRepository: ArcaRepository = {
             where ${containerObjects.objectId} = ${input.itemId}
             for update`,
       );
+
+      /**
+       * The quantity, re-read under the lock — and this is the whole point of
+       * taking one.
+       *
+       * It used to be read before the transaction, and the remainder computed
+       * from that. The lock then serialised writes that had all decided what
+       * to write from the SAME stale number: twelve concurrent single-unit
+       * splits of a stack of fourteen each stored "fourteen minus one" and
+       * each added a new stack of one, turning fourteen rations into
+       * twenty-five. Locking without re-reading is not a lock, it is a queue.
+       */
+      const live = await tx
+        .select({ value: objectProperties.value })
+        .from(objectProperties)
+        .innerJoin(
+          propertyDefinitions,
+          eq(propertyDefinitions.id, objectProperties.propertyDefinitionId),
+        )
+        .where(
+          and(
+            eq(objectProperties.objectId, input.itemId),
+            eq(propertyDefinitions.name, "qty"),
+          ),
+        )
+        .limit(1);
+
+      const currentQty = Math.max(1, Math.trunc(asNumber(live[0]?.value, 1)));
+      if (input.qty > currentQty) {
+        throw new ConflictError(
+          `Only ${currentQty} left — someone may have moved the rest.`,
+        );
+      }
+      split = input.qty < currentQty;
 
       if (!split) {
         // The whole stack: ONE column changes. Identity, properties, notes and
@@ -1252,7 +1297,9 @@ export const postgresRepository: ArcaRepository = {
       const newId = created[0]?.id;
       if (!newId) throw new Error("Insert returned no row.");
 
-      const ids = await propertyIdsByName();
+      // `tx`, not the pool — see the note on `Executor`. This one call is
+      // what deadlocked five concurrent moves.
+      const ids = await propertyIdsByName(tx);
       const clone = { ...(props ?? {}), qty: input.qty };
       const rows = Object.entries(clone)
         .map(([name, value]) => {
