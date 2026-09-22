@@ -35,6 +35,7 @@ export function ItemTable({
   sort,
   selectedId,
   canEdit,
+  canCreate,
   query,
 }: {
   items: ItemView[];
@@ -42,6 +43,9 @@ export function ItemTable({
   sort: Sort;
   selectedId?: string;
   canEdit: boolean;
+  /** Typing an item in from scratch is the GM's (`canCreateItem`); a player
+   *  who can write here fills it from the catalogue instead. */
+  canCreate: boolean;
   query: string;
 }) {
   // A move or an archive in flight is reflected here before the server answers
@@ -66,9 +70,9 @@ export function ItemTable({
     ) : (
       <EmptyState
         title="Nothing stowed here"
-        body="This container is empty. Add an item, or move one in from another container."
+        body="This container is empty. Add an item from the catalogue, or move one in from another container."
         action={
-          canEdit ? (
+          canCreate ? (
             <ButtonLink
               href={`/c/${containerId}?dialog=add`}
               variant="primary"
@@ -76,6 +80,15 @@ export function ItemTable({
               icon="plus"
             >
               Add item
+            </ButtonLink>
+          ) : canEdit ? (
+            <ButtonLink
+              href={`/c/${containerId}?dialog=catalog`}
+              variant="primary"
+              size="sm"
+              icon="table"
+            >
+              From catalogue
             </ButtonLink>
           ) : undefined
         }

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { ButtonLink } from "@frontend/components/atoms/Button";
 import { Chip, ContainerBadge, ContainerDot } from "@frontend/components/atoms/Chip";
 import { Icon } from "@frontend/components/atoms/Icon";
+import { CatalogPickerDialog } from "@frontend/components/organisms/CatalogPickerDialog";
 import { ContainerActions } from "@frontend/components/organisms/ContainerActions";
 import { ContainerEditorDialog } from "@frontend/components/organisms/ContainerEditorDialog";
 import { DetailPanel } from "@frontend/components/organisms/DetailPanel";
@@ -34,6 +35,7 @@ import {
 } from "@backend/domain/view";
 import {
   PermissionError,
+  canCreateItem,
   canRetireContainer,
   canWrite,
   creatableContainerTypes,
@@ -176,6 +178,8 @@ export default async function WorkspacePage({
 
   const drawerOpen = sp.nav === "1";
   const isGm = principal.role === "gm";
+  // From scratch is GM-only; players take from the catalogue (`canCreateItem`).
+  const canCreate = editable && canCreateItem(principal);
 
   // The Databases section of the sidebar. Derived from the types on objects
   // this principal can reach, so it is a per-viewer list by construction —
@@ -308,8 +312,35 @@ export default async function WorkspacePage({
                 ) : null}
               </div>
 
-              {editable ? (
-                <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2">
+                {/* The sheet was reachable only by typing its URL until now.
+                    A character container IS a character, so the way to its
+                    sheet belongs beside the container's own name. */}
+                {container.type === "character" ? (
+                  <ButtonLink
+                    href={`/character/${containerId}`}
+                    size="sm"
+                    icon="users"
+                  >
+                    Character sheet
+                  </ButtonLink>
+                ) : null}
+
+                {/* The catalogue door — SCOPE.md S3. Placed before "Add item"
+                    because taking a rope the campaign has already defined is
+                    the commoner act, and typing one in from scratch is the
+                    fallback rather than the default. */}
+                {editable ? (
+                  <ButtonLink
+                    href={`/c/${containerId}?dialog=catalog`}
+                    size="sm"
+                    icon="table"
+                  >
+                    From catalogue
+                  </ButtonLink>
+                ) : null}
+
+                {canCreate ? (
                   <ButtonLink
                     href={`/c/${containerId}?dialog=add`}
                     variant="primary"
@@ -318,8 +349,8 @@ export default async function WorkspacePage({
                   >
                     Add item
                   </ButtonLink>
-                </div>
-              ) : null}
+                ) : null}
+              </div>
             </div>
 
             {/* Filter row: tag chips (M9) plus whatever narrowing is active.
@@ -388,6 +419,7 @@ export default async function WorkspacePage({
                 sort={sort}
                 selectedId={selected?.id}
                 canEdit={editable}
+                canCreate={canCreate}
                 query={query}
               />
             </div>
@@ -414,8 +446,18 @@ export default async function WorkspacePage({
         />
       ) : null}
 
-      {sp.dialog === "add" && editable ? (
+      {sp.dialog === "add" && canCreate ? (
         <ItemEditorDialog container={container} closeHref={closeHref} />
+      ) : null}
+
+      {/* Only fetched when the dialog is actually open — the catalogue is a
+          campaign-wide list and no other part of this screen needs it. */}
+      {sp.dialog === "catalog" && editable ? (
+        <CatalogPickerDialog
+          container={container}
+          entries={await repo.listCatalog(principal)}
+          closeHref={closeHref}
+        />
       ) : null}
 
       {/* Share is gated on READ, not write — which reaching this line already

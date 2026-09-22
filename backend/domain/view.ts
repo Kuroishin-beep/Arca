@@ -12,6 +12,15 @@
  */
 import { z } from "zod";
 
+import {
+  Attributes,
+  CharacterSheet,
+  Conditions,
+  DeathRolls,
+  Profile,
+  SkillMap,
+  Spells,
+} from "./character";
 import { ContainerId, ContainerType, ItemId, UserId, UserRole } from "./types";
 
 /* ------------------------------------------------------------------ *
@@ -77,6 +86,16 @@ export const ItemView = z.object({
   /** Names of the object types this item carries. Composable — an item is
    *  routinely several at once. */
   types: z.array(z.string()),
+  /**
+   * The catalogue entry this is a copy of, or `null` for an item typed in by
+   * hand (SCOPE.md S3).
+   *
+   * When it is set, `name`, `weight`, `value`, `tags` and `types` above were
+   * READ FROM that entry rather than from this object — so the screen can say
+   * where they come from, and refuse to let them be edited here, where the
+   * edit would be silently overwritten on the next read.
+   */
+  catalogItemId: ItemId.nullable(),
   updatedAt: z.date(),
 });
 export type ItemView = z.infer<typeof ItemView>;
@@ -323,6 +342,196 @@ export const MoveItemInput = z.object({
   qty: z.coerce.number().int().positive(),
 });
 export type MoveItemInput = z.infer<typeof MoveItemInput>;
+
+/* ------------------------------------------------------------------ *
+ * The catalogue — SCOPE.md S3
+ *
+ * "Reusable object types with default property values, so 'Rope, 10m' is not
+ * retyped." This goes one step further than the scope line: a copy does not
+ * merely START from the catalogue entry, it keeps READING from it. Correcting
+ * a rope's weight once corrects it in six packs, which is the whole reason a
+ * table wants a catalogue rather than a template.
+ *
+ * ── What a catalogue entry IS ─────────────────────────────────────────────
+ *
+ * An object with no containment edge. Not a new table, not a flag: an object
+ * that no container holds simply is not anywhere, which is exactly what a
+ * definition is. Every existing read walks `container_objects` to find items,
+ * so entries stay out of containers and out of database views for free — no
+ * filter to add and none to forget.
+ *
+ * ── What a copy is ───────────────────────────────────────────────────────
+ *
+ * An ordinary item, in an ordinary container, plus one `object_relations` row
+ * pointing back at the entry. It stores only what is genuinely its own:
+ * `qty` and `notes`. Name, weight, value, tags and types are resolved from the
+ * entry at read time and never copied — a copied value is a value that starts
+ * disagreeing with its source the moment the source is edited.
+ * ------------------------------------------------------------------ */
+
+/**
+ * The relation that links a copy to its entry.
+ *
+ * `object_relations` is the general "anything that is not containment" edge
+ * (its own comment offers `Longsword —crafted_by→ Blacksmith`), so this needed
+ * no schema change. The name is a constant because two spellings of it would
+ * be two unrelated relations that each look right in isolation.
+ */
+export const INSTANCE_OF = "instance_of";
+
+/**
+ * The fields a copy INHERITS from its entry rather than owning.
+ *
+ * Everything except `qty` and `notes`. Declared once because two places have
+ * to agree on it exactly — the read that resolves a copy, and the edit that
+ * refuses to change one — and a field on one list but not the other is a copy
+ * that silently discards an edit.
+ */
+export const INHERITED_FIELDS = [
+  "name",
+  "weight",
+  "value",
+  "tags",
+  "types",
+] as const;
+export type InheritedField = (typeof INHERITED_FIELDS)[number];
+
+/**
+ * Which inherited fields a patch would actually CHANGE on a copy.
+ *
+ * Not simply "which ones are present". The edit form round-trips every value
+ * it displayed, so a patch saving a copy's notes arrives carrying its name and
+ * weight too — unchanged. Refusing those would make a copy's own notes
+ * uneditable; ignoring a CHANGED one would be the silent discard this exists to
+ * prevent. So the rule is the difference, not the presence.
+ */
+export function changedInheritedFields(
+  current: Pick<ItemView, InheritedField>,
+  patch: Partial<Pick<ItemView, InheritedField>>,
+): InheritedField[] {
+  const same = (a: unknown, b: unknown): boolean =>
+    Array.isArray(a) && Array.isArray(b)
+      ? a.length === b.length && a.every((v, i) => v === b[i])
+      : a === b;
+
+  return INHERITED_FIELDS.filter(
+    (field) => patch[field] !== undefined && !same(patch[field], current[field]),
+  );
+}
+
+/** The refusal, phrased once so both backends say the same thing. */
+export function inheritedFieldsMessage(fields: readonly InheritedField[]): string {
+  const list =
+    fields.length === 1
+      ? fields[0]
+      : `${fields.slice(0, -1).join(", ")} and ${fields.at(-1)}`;
+  const one = fields.length === 1;
+  return (
+    `This item's ${list} ${one ? "comes" : "come"} from the catalogue, so ` +
+    `${one ? "it changes" : "they change"} for every copy at once. Edit the ` +
+    "catalogue entry instead — here, only the quantity and notes are its own."
+  );
+}
+
+export const CatalogItemView = z.object({
+  id: ItemId,
+  name: z.string(),
+  weight: z.number().nonnegative(),
+  value: z.string(),
+  tags: z.array(z.string()),
+  types: z.array(z.string()),
+  notes: z.string(),
+  /** How many copies of this entry exist, across every container. Derived, and
+   *  the number that makes "may I archive this?" answerable. */
+  copies: z.number().int().nonnegative(),
+  updatedAt: z.date(),
+});
+export type CatalogItemView = z.infer<typeof CatalogItemView>;
+
+const CatalogFields = z.object({
+  name: z.string().trim().min(1, "A name is required.").max(120),
+  weight: z.coerce.number().nonnegative("Weight cannot be negative.").finite(),
+  value: z.string().trim().max(40),
+  tags: z.array(z.string().trim().min(1)),
+  types: z.array(z.string().trim().min(1)),
+  notes: z.string().max(2000),
+});
+
+export const CreateCatalogItemInput = CatalogFields.extend({
+  weight: CatalogFields.shape.weight.default(0),
+  value: CatalogFields.shape.value.default(""),
+  tags: CatalogFields.shape.tags.default([]),
+  types: CatalogFields.shape.types.default([]),
+  notes: CatalogFields.shape.notes.default(""),
+});
+export type CreateCatalogItemInput = z.infer<typeof CreateCatalogItemInput>;
+
+/** A true patch, for the reason `UpdateItemInput` is one: a default here would
+ *  turn "correct the weight" into "correct the weight and clear the tags". */
+export const UpdateCatalogItemInput = CatalogFields.partial().extend({
+  id: ItemId,
+});
+export type UpdateCatalogItemInput = z.infer<typeof UpdateCatalogItemInput>;
+
+/**
+ * Taking a copy — the player's verb.
+ *
+ * Deliberately NOT a move: the entry stays in the catalogue and a new object
+ * appears in the container. Nothing leaves anywhere, which is why this is
+ * gated on writing to the DESTINATION only.
+ */
+export const AddFromCatalogInput = z.object({
+  catalogItemId: ItemId,
+  containerId: ContainerId,
+  qty: z.coerce.number().int().positive().default(1),
+});
+export type AddFromCatalogInput = z.infer<typeof AddFromCatalogInput>;
+
+/* ------------------------------------------------------------------ *
+ * Characters — SCOPE.md S1
+ * ------------------------------------------------------------------ */
+
+/**
+ * A character sheet as a screen needs it: the stored sheet, plus the container
+ * it IS.
+ *
+ * `name` is the container's name and not a second field. A character container
+ * is the character — so the sidebar, the database's "Where" column, the move
+ * dialog and this sheet all read one string, and renaming from any of them
+ * renames everywhere. A separate `characterName` property would be a second
+ * name to keep in sync, and the two would disagree the first time somebody
+ * renamed the container instead of the sheet.
+ */
+export const CharacterView = z.object({
+  containerId: ContainerId,
+  name: z.string(),
+  ownerId: UserId.nullable(),
+  sheet: CharacterSheet,
+});
+export type CharacterView = z.infer<typeof CharacterView>;
+
+/**
+ * A true patch, for the same reason `UpdateItemInput` is one: every section
+ * optional with NO defaults, so `undefined` reaches the repository meaning
+ * "leave this property alone".
+ *
+ * Sections rather than fields is the whole point of the shape. Ticking a skill
+ * sends `skills` and nothing else, so it cannot overwrite a profile the GM is
+ * editing in another panel at the same moment — which a single `sheet` blob
+ * would do every time.
+ */
+export const UpdateCharacterInput = z.object({
+  containerId: ContainerId,
+  attributes: Attributes.optional(),
+  hp: z.coerce.number().int().min(0).optional(),
+  wp: z.coerce.number().int().min(0).optional(),
+  deathRolls: DeathRolls.optional(),
+  conditions: Conditions.optional(),
+  profile: Profile.optional(),
+  skills: SkillMap.optional(),
+  spells: Spells.optional(),
+});
+export type UpdateCharacterInput = z.infer<typeof UpdateCharacterInput>;
 
 /* ------------------------------------------------------------------ *
  * Derived values

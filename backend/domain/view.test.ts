@@ -19,6 +19,7 @@ function item(name: string, tags: string[]): ItemView {
     tags,
     notes: "",
     types: [],
+    catalogItemId: null,
     updatedAt: new Date(),
   };
 }
