@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 
+import { sharedFields } from "@backend/domain/item-fields";
+
 import { Chip } from "@frontend/components/atoms/Chip";
 import { Icon } from "@frontend/components/atoms/Icon";
 import { EmptyState } from "@frontend/components/molecules/EmptyState";
@@ -35,6 +37,7 @@ export function ItemTable({
   sort,
   selectedId,
   canEdit,
+  canCreate,
   query,
 }: {
   items: ItemView[];
@@ -42,6 +45,9 @@ export function ItemTable({
   sort: Sort;
   selectedId?: string;
   canEdit: boolean;
+  /** Typing an item in from scratch is the GM's (`canCreateItem`); a player
+   *  who can write here fills it from the catalogue instead. */
+  canCreate: boolean;
   query: string;
 }) {
   // A move or an archive in flight is reflected here before the server answers
@@ -50,6 +56,10 @@ export function ItemTable({
   // OptimisticItems.tsx for why that revert is the API's job and not ours.
   const { pending } = useOptimisticItems();
   const items = applyPending(serverItems, pending);
+  // The reference diagram's rule: a container shows only the columns every
+  // item in it shares. All weapons → the weapon columns; a dagger beside a
+  // sleeping fur → just the common ones.
+  const extra = sharedFields(items);
 
   if (items.length === 0) {
     return query.trim() !== "" ? (
@@ -66,9 +76,9 @@ export function ItemTable({
     ) : (
       <EmptyState
         title="Nothing stowed here"
-        body="This container is empty. Add an item, or move one in from another container."
+        body="This container is empty. Add an item from the catalogue, or move one in from another container."
         action={
-          canEdit ? (
+          canCreate ? (
             <ButtonLink
               href={`/c/${containerId}?dialog=add`}
               variant="primary"
@@ -76,6 +86,15 @@ export function ItemTable({
               icon="plus"
             >
               Add item
+            </ButtonLink>
+          ) : canEdit ? (
+            <ButtonLink
+              href={`/c/${containerId}?dialog=catalog`}
+              variant="primary"
+              size="sm"
+              icon="table"
+            >
+              From catalogue
             </ButtonLink>
           ) : undefined
         }
@@ -113,7 +132,18 @@ export function ItemTable({
                     <span className="font-mono tabular-nums">{item.value}</span>
                   </>
                 ) : null}
-                {item.tags[0] ? (
+                {extra.map((field) =>
+                  item.stats[field.key] ? (
+                    <span key={field.key} className="flex items-center gap-2">
+                      <span aria-hidden="true">·</span>
+                      <span className="truncate">
+                        <span className="text-faint">{field.short}</span>{" "}
+                        <span className="font-mono">{item.stats[field.key]}</span>
+                      </span>
+                    </span>
+                  ) : null,
+                )}
+                {extra.length === 0 && item.tags[0] ? (
                   <>
                     <span aria-hidden="true">·</span>
                     <span className="truncate">{item.tags[0]}</span>
@@ -164,9 +194,30 @@ export function ItemTable({
               numeric
               className="hidden w-20 px-3 md:table-cell"
             />
+            {extra.map((field) => (
+              <th
+                key={field.key}
+                scope="col"
+                title={field.label}
+                className={`hidden px-3 py-2 text-sm font-medium text-muted md:table-cell ${
+                  field.numeric ? "text-right" : ""
+                }`}
+              >
+                {field.label === field.short ? (
+                  field.label
+                ) : (
+                  <>
+                    <span aria-hidden="true">{field.short}</span>
+                    <span className="sr-only">{field.label}</span>
+                  </>
+                )}
+              </th>
+            ))}
             <th
               scope="col"
-              className="hidden px-3 py-2 text-sm font-medium text-muted md:table-cell"
+              className={`hidden px-3 py-2 text-sm font-medium text-muted ${
+                extra.length > 0 ? "xl:table-cell" : "md:table-cell"
+              }`}
             >
               Tags
             </th>
@@ -175,7 +226,9 @@ export function ItemTable({
                 crowding the name column it sits after. */}
             <th
               scope="col"
-              className="hidden px-3 py-2 text-sm font-medium text-muted lg:table-cell"
+              className={`hidden px-3 py-2 text-sm font-medium text-muted ${
+                extra.length > 0 ? "xl:table-cell" : "lg:table-cell"
+              }`}
             >
               Notes
             </th>
@@ -206,8 +259,13 @@ export function ItemTable({
                         aria-hidden="true"
                       />
                     ) : null}
+                    {/* The name IS the link to the item's full details (the
+                        reference diagram settles it: "make the item name itself
+                        a hyperlink"), so it reads as one. */}
                     <span
-                      className={`truncate ${selected ? "font-medium text-text" : "text-text"}`}
+                      className={`truncate underline decoration-border underline-offset-4 hover:text-primary hover:decoration-primary ${
+                        selected ? "font-medium text-text" : "text-text"
+                      }`}
                     >
                       {item.name}
                     </span>
@@ -222,14 +280,34 @@ export function ItemTable({
                 <td className="hidden px-3 text-right font-mono text-base tabular-nums text-muted md:table-cell">
                   {item.value || "—"}
                 </td>
-                <td className="hidden px-3 md:table-cell">
+                {extra.map((field) => (
+                  <td
+                    key={field.key}
+                    className={`hidden px-3 text-base text-text md:table-cell ${
+                      field.numeric ? "text-right font-mono tabular-nums" : ""
+                    }`}
+                  >
+                    {item.stats[field.key] ?? (
+                      <span className="text-faint">—</span>
+                    )}
+                  </td>
+                ))}
+                <td
+                  className={`hidden px-3 ${
+                    extra.length > 0 ? "xl:table-cell" : "md:table-cell"
+                  }`}
+                >
                   {item.tags[0] ? (
                     <Chip tone={item.tags[0] === "consumable" ? "success" : "neutral"}>
                       {item.tags[0]}
                     </Chip>
                   ) : null}
                 </td>
-                <td className="hidden max-w-0 px-3 text-muted lg:table-cell">
+                <td
+                  className={`hidden max-w-0 px-3 text-muted ${
+                    extra.length > 0 ? "xl:table-cell" : "lg:table-cell"
+                  }`}
+                >
                   {item.notes ? (
                     <span className="block truncate">{item.notes}</span>
                   ) : (

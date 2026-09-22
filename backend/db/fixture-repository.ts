@@ -12,19 +12,33 @@
  */
 import { randomUUID } from "node:crypto";
 
+import { normaliseStats } from "@backend/domain/item-fields";
+
 import {
+  type CharacterSheet,
+  clampSheet,
+  emptySheet,
+} from "@backend/domain/character";
+import {
+  type CatalogItemView,
+  type CharacterView,
   type CommentView,
   type ContainerView,
   type CreateItemInput,
   type ItemView,
   type MoveItemInput,
   type Principal,
+  type UpdateCharacterInput,
   type UpdateItemInput,
   carriedWeight,
+  changedInheritedFields,
+  inheritedFieldsMessage,
   ownershipProblem,
 } from "@backend/domain/view";
 import {
   assertCanEditContainer,
+  assertCanCreateItem,
+  assertCanManageCatalog,
   assertCanManageContainer,
   assertCanManageRoster,
   assertCanMove,
@@ -47,6 +61,8 @@ import {
   NotFoundError,
 } from "./repository";
 import {
+  SEED_CATALOG,
+  SEED_CHARACTERS,
   SEED_COMMENTS,
   SEED_CONTAINERS,
   SEED_ITEMS,
@@ -62,6 +78,20 @@ interface Store {
   containers: Omit<ContainerView, "itemCount" | "carriedWeight">[];
   items: (ItemView & { archivedAt: Date | null })[];
   comments: CommentView[];
+  /**
+   * Sheets by container id, and only for the containers that have one. A
+   * character container with no entry gets `emptySheet()` on read, which is the
+   * same thing the Postgres side does when the eight properties are absent —
+   * so "never filled in" behaves identically on both backends.
+   */
+  characters: Record<string, CharacterSheet>;
+  /**
+   * Catalogue entries — SCOPE.md S3. Objects no container holds, which is why
+   * they are their own list here rather than items with a flag: the Postgres
+   * side distinguishes them by the absence of a containment edge, and a list
+   * nothing joins to is the in-memory shape of that.
+   */
+  catalog: (Omit<CatalogItemView, "copies"> & { archivedAt: Date | null })[];
 }
 
 const STORE_KEY = Symbol.for("arca.fixture.store");
@@ -98,9 +128,32 @@ function freshStore(): Store {
       tags: [...item.tags],
       notes: item.notes,
       types: [...item.types],
+      stats: normaliseStats(item.types, item.stats),
+      // The seed's items are typed in by hand, not taken from the catalogue —
+      // they predate it, and leaving them free-standing keeps the seed a
+      // worked example of BOTH kinds of item.
+      catalogItemId: null,
       updatedAt: now,
       archivedAt: null,
     })),
+    catalog: SEED_CATALOG.map((entry) => ({
+      id: entry.id as ItemView["id"],
+      name: entry.name,
+      weight: entry.weight,
+      value: entry.value,
+      tags: [...entry.tags],
+      types: [...entry.types],
+      stats: normaliseStats(entry.types, entry.stats),
+      notes: entry.notes,
+      updatedAt: now,
+      archivedAt: null,
+    })),
+    characters: Object.fromEntries(
+      Object.entries(SEED_CHARACTERS).map(([id, sheet]) => [
+        id,
+        structuredClone(sheet),
+      ]),
+    ),
     comments: SEED_COMMENTS.map((c) => {
       const author = SEED_USERS.find((u) => u.id === c.authorId);
       return {
@@ -141,9 +194,40 @@ function liveItemsIn(containerId: string): ItemView[] {
     .map(stripInternal);
 }
 
+/**
+ * Drop the internal column and resolve the catalogue link (SCOPE.md S3).
+ *
+ * A copy stores only `qty` and `notes`. Everything else is read from its
+ * entry HERE, on the way out, rather than copied in on the way in — which is
+ * the difference between "the rope's weight was corrected" and "the rope's
+ * weight was corrected in the catalogue and in none of the six packs holding
+ * one".
+ *
+ * An entry that has been archived out from under a copy falls back to
+ * whatever the copy itself holds, so a broken link degrades to a nameless row
+ * rather than to a crash. `archiveCatalogItem` refuses to create that
+ * situation; this is the belt to its braces.
+ */
 function stripInternal(item: ItemView & { archivedAt: Date | null }): ItemView {
-  const { archivedAt: _archivedAt, ...rest } = item;
-  return rest;
+  const { archivedAt: _archivedAt, ...stored } = item;
+  // Normalised on read as well as on write: see `normaliseStats`.
+  const rest = { ...stored, stats: normaliseStats(stored.types, stored.stats) };
+  if (rest.catalogItemId === null) return rest;
+
+  const entry = store().catalog.find(
+    (c) => c.id === rest.catalogItemId && c.archivedAt === null,
+  );
+  if (!entry) return rest;
+
+  return {
+    ...rest,
+    name: entry.name,
+    weight: entry.weight,
+    value: entry.value,
+    tags: [...entry.tags],
+    types: [...entry.types],
+    stats: normaliseStats(entry.types, entry.stats),
+  };
 }
 
 /** Containers carry their derived counts; nothing is stored. */
@@ -162,6 +246,33 @@ function findContainer(containerId: string): ContainerView {
   const raw = store().containers.find((c) => c.id === containerId);
   if (!raw) throw new NotFoundError("No such container.");
   return hydrate(raw);
+}
+
+/** Live copies of one catalogue entry, across every container. Derived, which
+ *  is why archiving can ask the question without a stored counter to trust. */
+function copyCount(catalogItemId: string): number {
+  return store().items.filter(
+    (i) => i.catalogItemId === catalogItemId && i.archivedAt === null,
+  ).length;
+}
+
+function withCopyCount(
+  entry: Store["catalog"][number],
+): CatalogItemView {
+  const { archivedAt: _archivedAt, ...rest } = entry;
+  return {
+    ...rest,
+    stats: normaliseStats(rest.types, rest.stats),
+    copies: copyCount(entry.id),
+  };
+}
+
+function findCatalogItem(catalogItemId: string) {
+  const entry = store().catalog.find(
+    (c) => c.id === catalogItemId && c.archivedAt === null,
+  );
+  if (!entry) throw new NotFoundError("No such catalogue entry.");
+  return entry;
 }
 
 function findItem(itemId: string) {
@@ -263,6 +374,54 @@ export const fixtureRepository: ArcaRepository = {
     if (at >= 0) all.splice(at, 1);
   },
 
+  async getCharacter(principal, containerId): Promise<CharacterView | null> {
+    const container = findContainer(containerId);
+    assertCanRead(principal, container);
+    if (container.type !== "character") return null;
+
+    return {
+      containerId: container.id,
+      name: container.name,
+      ownerId: container.ownerId,
+      // Clamped on the way out, not only on the way in: a sheet whose CON was
+      // lowered while HP sat at the old maximum has to render legally.
+      sheet: clampSheet(store().characters[containerId] ?? emptySheet()),
+    };
+  },
+
+  async updateCharacter(
+    principal,
+    input: UpdateCharacterInput,
+  ): Promise<CharacterView> {
+    const container = findContainer(input.containerId);
+    assertCanWrite(principal, container);
+    if (container.type !== "character") {
+      throw new NotFoundError("That container is not a character.");
+    }
+
+    const { containerId, ...patch } = input;
+    const current = store().characters[containerId] ?? emptySheet();
+
+    // Only the sections actually present are replaced; `undefined` means leave
+    // it alone, which is what makes ticking a skill safe while someone else is
+    // editing the profile.
+    const next = clampSheet({
+      ...current,
+      ...(Object.fromEntries(
+        Object.entries(patch).filter(([, v]) => v !== undefined),
+      ) as Partial<CharacterSheet>),
+    });
+
+    store().characters[containerId] = next;
+
+    return {
+      containerId: container.id,
+      name: container.name,
+      ownerId: container.ownerId,
+      sheet: next,
+    };
+  },
+
   async listItems(principal, containerId) {
     // Read the container first so an unauthorised caller never reaches the
     // item list at all — the contents of a sealed vault must not be assembled
@@ -277,6 +436,112 @@ export const fixtureRepository: ArcaRepository = {
     );
     if (!item) return null;
     assertCanRead(principal, findContainer(item.containerId));
+    return stripInternal(item);
+  },
+
+  /* ---------------------------------------------------------------- *
+   * The catalogue — SCOPE.md S3
+   * ---------------------------------------------------------------- */
+
+  async listCatalog(): Promise<CatalogItemView[]> {
+    // Unfiltered by principal on purpose: a catalogue says what a rope
+    // weighs, never who has one. See `listCatalog` on the interface.
+    return store()
+      .catalog.filter((entry) => entry.archivedAt === null)
+      .map(withCopyCount)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  },
+
+  async getCatalogItem(_principal, catalogItemId) {
+    const entry = store().catalog.find(
+      (c) => c.id === catalogItemId && c.archivedAt === null,
+    );
+    return entry ? withCopyCount(entry) : null;
+  },
+
+  async createCatalogItem(principal, input) {
+    assertCanManageCatalog(principal);
+
+    const entry = {
+      id: randomUUID() as ItemView["id"],
+      name: input.name,
+      weight: input.weight,
+      value: input.value,
+      tags: [...input.tags],
+      types: [...input.types],
+      stats: normaliseStats(input.types, input.stats),
+      notes: input.notes,
+      updatedAt: new Date(),
+      archivedAt: null,
+    };
+    store().catalog.push(entry);
+    return withCopyCount(entry);
+  },
+
+  async updateCatalogItem(principal, input) {
+    assertCanManageCatalog(principal);
+
+    const entry = findCatalogItem(input.id);
+    const { id: _id, ...patch } = input;
+    for (const [key, value] of Object.entries(patch)) {
+      if (value !== undefined) {
+        // Only the keys actually present; `undefined` means leave it alone,
+        // the same patch discipline `updateItem` follows.
+        (entry as Record<string, unknown>)[key] = value;
+      }
+    }
+    if (input.stats !== undefined) {
+      entry.stats = normaliseStats(entry.types, input.stats);
+    }
+    entry.updatedAt = new Date();
+
+    // Nothing fans out. Every copy reads these fields through the link, so
+    // correcting them here has already corrected them everywhere.
+    return withCopyCount(entry);
+  },
+
+  async archiveCatalogItem(principal, catalogItemId) {
+    assertCanManageCatalog(principal);
+
+    const entry = findCatalogItem(catalogItemId);
+    const copies = copyCount(entry.id);
+    if (copies > 0) {
+      throw new ConflictError(
+        `${copies} ${copies === 1 ? "copy" : "copies"} of that still ` +
+          `${copies === 1 ? "exists" : "exist"}. Archiving it would leave ` +
+          `${copies === 1 ? "it" : "them"} reading a definition nothing can open.`,
+      );
+    }
+    entry.archivedAt = new Date();
+  },
+
+  async addFromCatalog(principal, input) {
+    const container = findContainer(input.containerId);
+    // The destination only. Nothing leaves the catalogue, so there is no
+    // source to authorise — this is a copy, not a move.
+    assertCanWrite(principal, container);
+
+    const entry = findCatalogItem(input.catalogItemId);
+
+    const item: ItemView & { archivedAt: Date | null } = {
+      id: randomUUID() as ItemView["id"],
+      containerId: container.id,
+      // Stored empty, and read through the link. Writing the entry's values
+      // in here would make this a copy in the bad sense: a snapshot that
+      // stops agreeing with its source the moment the source is corrected.
+      name: "",
+      weight: 0,
+      value: "",
+      tags: [],
+      types: [],
+      stats: {},
+      qty: input.qty,
+      notes: "",
+      catalogItemId: entry.id,
+      updatedAt: new Date(),
+      archivedAt: null,
+    };
+    store().items.push(item);
     return stripInternal(item);
   },
 
@@ -317,6 +582,7 @@ export const fixtureRepository: ArcaRepository = {
   },
 
   async createItem(principal, input: CreateItemInput) {
+    assertCanCreateItem(principal);
     assertCanWrite(principal, findContainer(input.containerId));
     const item = {
       id: randomUUID() as ItemView["id"],
@@ -328,6 +594,10 @@ export const fixtureRepository: ArcaRepository = {
       tags: input.tags,
       notes: input.notes,
       types: input.types,
+      stats: normaliseStats(input.types, input.stats),
+      // Typed in by hand, so it owns its own fields. `addFromCatalog` is the
+      // other door, and the one that sets a link.
+      catalogItemId: null,
       updatedAt: new Date(),
       archivedAt: null,
     };
@@ -339,6 +609,22 @@ export const fixtureRepository: ArcaRepository = {
     const item = findItem(input.id);
     assertCanWrite(principal, findContainer(item.containerId));
 
+    // A catalogue copy owns only its quantity and notes. See the same guard in
+    // the Postgres repository: a CHANGED inherited field is refused with
+    // directions, an unchanged one (the form round-tripping what it showed)
+    // is dropped, and either way nothing is written that the next read would
+    // silently overwrite from the entry.
+    if (item.catalogItemId !== null) {
+      const changed = changedInheritedFields(stripInternal(item), input);
+      if (changed.length > 0) {
+        throw new ConflictError(inheritedFieldsMessage(changed));
+      }
+      if (input.qty !== undefined) item.qty = input.qty;
+      if (input.notes !== undefined) item.notes = input.notes;
+      item.updatedAt = new Date();
+      return stripInternal(item);
+    }
+
     // `undefined` means "leave this alone" — a patch, not a replacement.
     if (input.name !== undefined) item.name = input.name;
     if (input.qty !== undefined) item.qty = input.qty;
@@ -347,6 +633,9 @@ export const fixtureRepository: ArcaRepository = {
     if (input.tags !== undefined) item.tags = input.tags;
     if (input.notes !== undefined) item.notes = input.notes;
     if (input.types !== undefined) item.types = input.types;
+    if (input.stats !== undefined) {
+      item.stats = normaliseStats(item.types, input.stats);
+    }
     item.updatedAt = new Date();
 
     return stripInternal(item);
@@ -408,7 +697,9 @@ export const fixtureRepository: ArcaRepository = {
       split,
       fromContainerId: from.id,
       toContainerId: to.id,
-      itemName: item.name,
+      // Resolved, not raw: a catalogue copy's stored name is empty, and this
+      // string is announced to the whole table.
+      itemName: stripInternal(item).name,
     };
   },
 

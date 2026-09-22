@@ -7,10 +7,13 @@ import {
 import {
   GM_EMAIL,
   GM_ID,
+  KOVA_CONTAINER_ID,
   KOVA_EMAIL,
   KOVA_ID,
   MILO_EMAIL,
   MILO_ID,
+  PARTY_WAGON_ID,
+  SEED_CATALOG,
   SEED_CONTAINERS,
   SEED_ITEMS,
 } from "@backend/db/seed-data";
@@ -19,7 +22,7 @@ import {
   readDatabase,
   slugifyType,
 } from "@backend/domain/database";
-import type { Principal } from "@backend/domain/view";
+import type { ItemView, Principal } from "@backend/domain/view";
 
 /**
  * A database view is the first thing in Arca that reads across containers, so
@@ -73,11 +76,34 @@ describe("listDatabases", () => {
     expect([...names].sort((a, b) => a.localeCompare(b))).toEqual(names);
   });
 
-  it("counts an object once in each of its types", async () => {
+  it("counts each definition once in each of its types", async () => {
     const databases = await listDatabases(repo, gm);
     const total = databases.reduce((sum, d) => sum + d.itemCount, 0);
-    const expected = SEED_ITEMS.reduce((sum, i) => sum + i.types.length, 0);
+    // The seed's items are all hand-made, so each is its own definition; the
+    // catalogue's entries are definitions whether or not anyone holds one.
+    const expected =
+      SEED_ITEMS.reduce((sum, i) => sum + i.types.length, 0) +
+      SEED_CATALOG.reduce((sum, e) => sum + e.types.length, 0);
     expect(total).toBe(expected);
+  });
+
+  it("lists a catalogue entry once, however many copies are held", async () => {
+    const dagger = SEED_CATALOG.find((e) => e.name === "Dagger")!;
+    for (const containerId of [KOVA_CONTAINER_ID, PARTY_WAGON_ID]) {
+      await repo.addFromCatalog(gm, {
+        catalogItemId: dagger.id as ItemView["id"],
+        containerId: containerId as ItemView["containerId"],
+        qty: 1,
+      });
+    }
+
+    const weapons = await readDatabase(repo, gm, "weapon");
+    const daggers = weapons!.rows.filter((r) => r.name === "Dagger");
+    expect(daggers).toHaveLength(1);
+    expect(daggers[0]!.holdings.map((h) => h.container.id).sort()).toEqual(
+      [KOVA_CONTAINER_ID, PARTY_WAGON_ID].sort(),
+    );
+    expect(daggers[0]!.stats.damage).toBe("1D6");
   });
 
   /**
@@ -137,7 +163,11 @@ describe("readDatabase", () => {
     for (const summary of await listDatabases(repo, kova)) {
       const read = await readDatabase(repo, kova, summary.slug);
       for (const row of read!.rows) {
-        expect(hiddenItemIds.has(row.item.id)).toBe(false);
+        expect(hiddenItemIds.has(row.id)).toBe(false);
+        for (const holding of row.holdings) {
+          expect(hiddenItemIds.has(holding.itemId)).toBe(false);
+          expect(hidden.map((c) => c.id)).not.toContain(holding.container.id);
+        }
       }
     }
   });
@@ -152,7 +182,9 @@ describe("readDatabase", () => {
     for (const summary of await listDatabases(repo, milo)) {
       const read = await readDatabase(repo, milo, summary.slug);
       for (const row of read!.rows) {
-        expect(kovasPacks).not.toContain(row.container.id);
+        for (const holding of row.holdings) {
+          expect(kovasPacks).not.toContain(holding.container.id);
+        }
       }
     }
   });

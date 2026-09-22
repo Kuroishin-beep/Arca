@@ -218,7 +218,7 @@ rule 9 of the schema doc. There is no `total_weight` column to fall out of date.
 | M1 | **Email sign-in, sign-up and campaign membership** | A member signs in with their address and password. Anyone may create an account and join as a player (§3.1); the GM may add someone directly, at either role, and clear a forgotten password. On the sign-in form an address that is not in the campaign is refused with the same message as a wrong password, so it cannot be used to find out who is at the table. |
 | M2 | **Container list (sidebar)** | Containers are grouped My Packs / Party / World. Each row shows icon, name, item count. A player never sees an unrevealed world container in the DOM. |
 | M3 | **Item table** | Selecting a container lists its items with name, qty, weight, value, tags. Sorting by any column. Sort state announced via `aria-sort`. |
-| M4 | **Add item** | A modal creates an item in the current container. Name required, qty a positive integer, weight non-negative. Validation errors render against the field. |
+| M4 | **Add item** | GM only (players take copies from the catalogue, S3). A modal creates an item in the current container. Name required, qty a positive integer, weight non-negative. Validation errors render against the field. |
 | M5 | **Edit item** | Same modal, prefilled. Optimistic. |
 | M6 | **Delete item** | Soft delete via `archived_at`, with an undo toast for 8 seconds. Nothing is hard-deleted. |
 | M7 | **MOVE ITEM — the headline feature** | Move all or part of a stack from one container to another. Partial moves split the stack. Both containers' weight totals update. Rejected if the actor cannot write to both ends. Optimistic with rollback. |

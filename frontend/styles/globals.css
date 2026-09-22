@@ -64,7 +64,7 @@
   /* --- Colour: text ----------------------------------------------------- */
   --color-text: #f2f2f2;        /* worksheet — 15.4:1 on bg */
   --color-text-muted: #a8a8a8;  /*  7.2:1 on bg, 6.0:1 on surface-2 */
-  --color-text-faint: #6e6e6e;  /*  DISABLED STATES ONLY, never body */
+  --color-text-faint: #949494;  /*  4.7:1 on surface-2 — secondary metadata (weights, counts, hints). Was #6e6e6e (2.8:1), which failed AA wherever it carried information, and it did in ~60 places */
   --color-text-invert: #1b1b1b; /*  9.5:1 on primary — dark ink on gold */
 
   /* --- Colour: brand ---------------------------------------------------- */
@@ -150,7 +150,7 @@
 
     --color-text: #1b1b1b;
     --color-text-muted: #56524a;
-    --color-text-faint: #99948a;
+    --color-text-faint: #67625a;
     --color-text-invert: #ffffff;
 
     --color-primary: #7a6420;
@@ -191,7 +191,7 @@
 
   --color-text: #1b1b1b;        /* 16.4:1 on bg */
   --color-text-muted: #56524a;  /*  7.4:1 on bg, 6.1:1 on surface-2 */
-  --color-text-faint: #99948a;  /*  DISABLED STATES ONLY */
+  --color-text-faint: #67625a;  /*  4.8:1 on surface-2, still a step below muted. Was #99948a (2.4:1 — failed AA) */
   --color-text-invert: #ffffff; /*  5.7:1 on primary */
 
   /* Deepened: the worksheet gold is 1.7:1 on paper and cannot be the

@@ -13,7 +13,8 @@
     "test:e2e": "playwright test",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:seed": "tsx --env-file-if-exists=.env.local backend/db/seed.ts"
+    "db:seed": "tsx --env-file-if-exists=.env.local backend/db/seed.ts",
+    "db:make-gm": "tsx --env-file-if-exists=.env.local backend/db/make-gm.ts"
   },
   "repository": {
     "type": "git",

@@ -58,6 +58,9 @@ export function Sidebar({
   searchHref,
   /** The campaign name, in the switcher at the top. */
   campaignName,
+  /** True on the catalogue screen, so its row reads as current the way a
+   *  container's does. */
+  catalogOpen,
   /** Render the 48px icon rail instead of the full labelled list —
    *  `panel`-to-`md` width, where there is room to pin something but not to
    *  label it. */
@@ -78,6 +81,7 @@ export function Sidebar({
   newDatabaseHref?: string;
   searchHref?: string;
   campaignName: string;
+  catalogOpen?: boolean;
   compact?: boolean;
   drawerHref?: string;
 }) {
@@ -193,13 +197,30 @@ export function Sidebar({
           searches. It is a link rather than a second input: the real search
           box is in the top bar and already owns the `q` parameter, and two
           fields writing one piece of state is how they end up disagreeing. */}
-      <div className="px-3 pt-3">
+      <div className="flex flex-col gap-1 px-3 pt-3">
         <Link
           href={searchHref ?? "/"}
           className="flex h-8 w-full items-center gap-2 rounded-md border border-border bg-surface2 px-2 text-sm text-muted hover:text-text"
         >
           <Icon name="search" size={13} className="shrink-0" />
           Search
+        </Link>
+
+        {/* The catalogue is neither a place nor a kind, so it belongs with
+            Search rather than in either section below: it is the campaign's
+            rulebook, and every container borrows from it. */}
+        <Link
+          href="/catalog"
+          aria-current={catalogOpen ? "page" : undefined}
+          className={[
+            "flex h-8 w-full items-center gap-2 rounded-md px-2 text-sm",
+            catalogOpen
+              ? "border border-primary bg-primary-weak font-medium text-primary"
+              : "border border-border bg-surface2 text-muted hover:text-text",
+          ].join(" ")}
+        >
+          <Icon name="table" size={13} className="shrink-0" />
+          Catalogue
         </Link>
       </div>
 

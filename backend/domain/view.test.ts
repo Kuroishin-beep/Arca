@@ -19,6 +19,8 @@ function item(name: string, tags: string[]): ItemView {
     tags,
     notes: "",
     types: [],
+    stats: {},
+    catalogItemId: null,
     updatedAt: new Date(),
   };
 }

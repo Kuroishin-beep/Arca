@@ -67,8 +67,14 @@ export function FieldShell({
   );
 }
 
+/**
+ * `read-only:` restyles the field rather than leaving it identical to an
+ * editable one. A read-only input that LOOKS editable is a control that
+ * silently ignores typing — which is precisely the confusion read-only exists
+ * to avoid. Muted text on the base surface, and the not-allowed cursor.
+ */
 const BASE =
-  "h-9 w-full rounded-md border bg-surface2 px-2 text-base text-text placeholder:text-faint";
+  "h-9 w-full rounded-md border bg-surface2 px-2 text-base text-text placeholder:text-faint read-only:cursor-not-allowed read-only:bg-surface read-only:text-muted";
 
 export function TextField({
   id,

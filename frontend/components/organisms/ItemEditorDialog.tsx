@@ -10,6 +10,7 @@ import { TextAreaField, TextField } from "@frontend/components/atoms/Field";
 import { Icon } from "@frontend/components/atoms/Icon";
 import { NumberStepper } from "@frontend/components/atoms/NumberStepper";
 import { Modal } from "@frontend/components/molecules/Modal";
+import { StatFields } from "@frontend/components/molecules/StatFields";
 import type { ContainerView, ItemView } from "@backend/domain/view";
 
 /**
@@ -32,9 +33,25 @@ export function ItemEditorDialog({
   closeHref: string;
 }) {
   const editing = item !== undefined;
+  /**
+   * A catalogue copy owns its quantity and notes and nothing else (SCOPE.md
+   * S3). Its other fields are shown READ-ONLY rather than disabled: a disabled
+   * input drops out of the form data, whereas a read-only one still submits
+   * the value it displayed, which the server accepts as unchanged. Letting
+   * them be typed into would be inviting an edit the server has to refuse.
+   */
+  const isCopy = item?.catalogItemId != null;
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [qty, setQty] = useState(item?.qty ?? 1);
+  // Tracked so the type-specific inputs follow what is typed into Types.
+  const [typesText, setTypesText] = useState(
+    item?.types.join(", ") ?? "Physical Object",
+  );
+  const types = typesText
+    .split(",")
+    .map((t) => t.trim())
+    .filter((t) => t !== "");
   const [pending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -93,11 +110,27 @@ export function ItemEditorDialog({
             </p>
           ) : null}
 
+          {isCopy ? (
+            <p className="flex items-start gap-2 rounded-md border border-border bg-accent-weak p-3 text-sm text-text">
+              <Icon name="info" size={14} className="mt-0.5 shrink-0 text-accent" />
+              <span>
+                A copy from the catalogue. Its name, weight, value, tags, types
+                and stats come from the{" "}
+                <a href="/catalog" className="font-medium text-accent underline">
+                  catalogue entry
+                </a>{" "}
+                and change for every copy at once. Here, only the quantity and
+                notes are its own.
+              </span>
+            </p>
+          ) : null}
+
           <TextField
             id="name"
             name="name"
             label="Name"
             required
+            readOnly={isCopy}
             defaultValue={item?.name ?? ""}
             error={fieldErrors.name}
             placeholder="Rope, hempen (10 m)"
@@ -107,9 +140,18 @@ export function ItemEditorDialog({
             id="types"
             name="types"
             label="Types"
-            defaultValue={item?.types.join(", ") ?? "Physical Object"}
+            readOnly={isCopy}
+            value={typesText}
+            onChange={(e) => setTypesText(e.target.value)}
             error={fieldErrors.types}
             hint="Comma separated. An object may hold several types; each contributes its properties."
+          />
+
+          <StatFields
+            idPrefix="item"
+            types={types}
+            values={item?.stats ?? {}}
+            readOnly={isCopy}
           />
 
           <div className="grid grid-cols-3 gap-3">
@@ -139,6 +181,7 @@ export function ItemEditorDialog({
               id="weight"
               name="weight"
               label="Weight"
+              readOnly={isCopy}
               type="number"
               min={0}
               step={0.5}
@@ -150,6 +193,7 @@ export function ItemEditorDialog({
               id="value"
               name="value"
               label="Value"
+              readOnly={isCopy}
               numeric
               defaultValue={item?.value ?? ""}
               error={fieldErrors.value}
@@ -164,6 +208,7 @@ export function ItemEditorDialog({
             id="tags"
             name="tags"
             label="Tags"
+            readOnly={isCopy}
             defaultValue={item?.tags.join(", ") ?? ""}
             error={fieldErrors.tags}
             placeholder="gear, consumable"

@@ -41,6 +41,7 @@ export function WorkspaceShell({
   quickAccess,
   actions,
   aside,
+  catalogOpen,
   children,
 }: {
   principal: Principal;
@@ -72,6 +73,8 @@ export function WorkspaceShell({
    *  dropped. */
   closeHref: string;
   quickAccess?: QuickAccessEntry;
+  /** True on the catalogue screen, so its sidebar row reads as current. */
+  catalogOpen?: boolean;
   /** Share, and the overflow menu — the right-hand end of the wireframe's
    *  strip row. Per-screen, so the shell takes them rather than knowing what a
    *  container's actions are. */
@@ -95,6 +98,7 @@ export function WorkspaceShell({
       // the top bar's form posts to.
       searchHref={searchAction ? `${searchAction}#q` : undefined}
       campaignName={campaignName}
+      catalogOpen={catalogOpen}
     />
   );
 

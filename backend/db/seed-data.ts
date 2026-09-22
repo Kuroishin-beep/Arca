@@ -8,6 +8,7 @@
  * Names and contents match the mockups in `mockups/` so a screenshot and a
  * running screen can be compared directly.
  */
+import type { CharacterSheet } from "@backend/domain/character";
 
 export interface SeedUser {
   id: string;
@@ -40,6 +41,8 @@ export interface SeedItem {
   tags: string[];
   notes: string;
   types: string[];
+  /** Type-specific values — see `backend/domain/item-fields.ts`. */
+  stats?: Record<string, string>;
 }
 
 export interface SeedComment {
@@ -63,24 +66,64 @@ const c = (n: number) => `00000000-0000-4000-8000-00000000020${n}`;
 // every request before this was caught.
 const i = (n: string) => `00000000-0000-4000-8000-${`3${n}`.padStart(12, "0")}`;
 
+/**
+ * The campaign's real GM, as opposed to the fictional one.
+ *
+ * Ravna is a character in the seed story; Xen is the person who actually runs
+ * this deployment, and the account is seeded so a fresh database comes up with
+ * a GM who can sign in rather than one who has to be inserted by hand.
+ *
+ * ── Why the address is configuration and not a literal ────────────────────
+ *
+ * This repository is public. A real address written into a tracked file is a
+ * real address in a scraper's list, permanently — git keeps it after it is
+ * edited out, so it cannot be taken back. `ARCA_GM_EMAIL` keeps it in the
+ * deployment instead, where it belongs.
+ *
+ * The fallback is RFC 2606 reserved and can never resolve, so a deployment
+ * that has not set the variable seeds an inert placeholder rather than
+ * something that half-works.
+ *
+ * ── And why there is no password here ─────────────────────────────────────
+ *
+ * There is nowhere to put one on purpose. Arca has never shipped a password —
+ * a member arrives unenrolled and chooses their own on first sign-in
+ * (`enrolMemberPassword`) — and a hash committed to a public repository is an
+ * offline cracking target that outlives every rotation of the secret it
+ * protects. The account below is seeded UNENROLLED, exactly like every other.
+ */
+const GM_ADDRESS =
+  process.env.ARCA_GM_EMAIL?.trim().toLowerCase() || "xen@ravenholt.example";
+
 export const SEED_USERS: SeedUser[] = [
   { id: u(1), displayName: "Ravna", email: "ravna@ravenholt.example", role: "gm" },
   { id: u(2), displayName: "Kova", email: "kova@ravenholt.example", role: "player" },
   { id: u(3), displayName: "Milo", email: "milo@ravenholt.example", role: "player" },
+  // Appended, never inserted: the exports below index this array by position,
+  // and the character containers reference these ids.
+  { id: u(4), displayName: "Xen", email: GM_ADDRESS, role: "gm" },
 ];
 
 export const GM_EMAIL = SEED_USERS[0]!.email;
 export const KOVA_EMAIL = SEED_USERS[1]!.email;
 export const MILO_EMAIL = SEED_USERS[2]!.email;
+export const XEN_EMAIL = SEED_USERS[3]!.email;
 
 export const GM_ID = u(1);
 export const KOVA_ID = u(2);
 export const MILO_ID = u(3);
+export const XEN_ID = u(4);
 
 export const SEED_CONTAINERS: SeedContainer[] = [
+  // A character container is named for the CHARACTER, not for the bag. That is
+  // the whole of the naming rule: the sidebar, the database's "Where" column,
+  // the move dialog and the character sheet all read `container.name`, so one
+  // string is one identity everywhere and renaming from any of them renames in
+  // all of them. Calling this "Kova's Pack" while the sheet said "Kova" was two
+  // names for one person, and no amount of syncing makes that read well.
   {
     id: c(1),
-    name: "Kova's Pack",
+    name: "Kova",
     type: "character",
     ownerId: KOVA_ID,
     revealed: true,
@@ -88,7 +131,7 @@ export const SEED_CONTAINERS: SeedContainer[] = [
   },
   {
     id: c(2),
-    name: "Milo's Pack",
+    name: "Milo",
     type: "character",
     ownerId: MILO_ID,
     revealed: true,
@@ -131,6 +174,214 @@ export const SEED_CONTAINERS: SeedContainer[] = [
 ];
 
 export const PARTY_WAGON_ID = c(3);
+export const KOVA_CONTAINER_ID = c(1);
+export const MILO_CONTAINER_ID = c(2);
+
+/* ------------------------------------------------------------------ *
+ * The catalogue — SCOPE.md S3
+ * ------------------------------------------------------------------ */
+
+export interface SeedCatalogItem {
+  id: string;
+  name: string;
+  weight: number;
+  value: string;
+  tags: string[];
+  types: string[];
+  notes: string;
+  stats?: Record<string, string>;
+}
+
+/**
+ * What the campaign has DEFINED, as opposed to what anybody is carrying.
+ *
+ * Seeded with the ordinary adventuring kit a table reaches for twice a
+ * session, because that is the case the catalogue exists for: a rope is the
+ * same rope in every pack, and typing its weight in six times is six chances
+ * to type it differently.
+ *
+ * Note there is no `qty` here, and there cannot be. A quantity belongs to a
+ * copy in a container — "how many rope does the catalogue have" is not a
+ * question about a definition.
+ *
+ * These deliberately do NOT duplicate the seed's existing items. Those are
+ * typed in by hand and stay that way, so the seed demonstrates both kinds of
+ * item side by side rather than quietly converting one into the other.
+ */
+/** Same shape as `i` above, in a 4-prefixed block so a catalogue id is
+ *  distinguishable from an item id at a glance in a query result. */
+const k = (n: string) =>
+  `00000000-0000-4000-8000-${`4${n}`.padStart(12, "0")}`;
+
+export const SEED_CATALOG: SeedCatalogItem[] = [
+  {
+    id: k("001"),
+    name: "Rope, hempen (10 m)",
+    weight: 1,
+    value: "4 sp",
+    tags: ["gear"],
+    types: ["Physical Object", "Gear"],
+    notes: "Ten metres. Frays, but holds a person.",
+    stats: { effect: "Holds a climbing person. Ten metres long." },
+  },
+  {
+    id: k("002"),
+    name: "Torch",
+    weight: 0.5,
+    value: "1 sp",
+    tags: ["gear", "consumable"],
+    types: ["Physical Object", "Gear", "Consumable"],
+    notes: "Light in a barrow is not optional.",
+    stats: { effect: "Lights ten metres around you for about an hour." },
+  },
+  {
+    id: k("003"),
+    name: "Rations, dried (1 day)",
+    weight: 0.5,
+    value: "2 sp",
+    tags: ["consumable"],
+    types: ["Physical Object", "Consumable"],
+    notes: "",
+    stats: { effect: "One day's food for one person." },
+  },
+  {
+    id: k("004"),
+    name: "Healing Potion",
+    weight: 0.5,
+    value: "50 gp",
+    tags: ["consumable"],
+    types: ["Physical Object", "Consumable"],
+    notes: "",
+    stats: { effect: "Heals D6 hit points. One action to drink." },
+  },
+  {
+    id: k("005"),
+    name: "Longsword",
+    weight: 1.5,
+    value: "25 gp",
+    tags: ["weapon"],
+    types: ["Physical Object", "Weapon", "Equipment"],
+    notes: "Swords skill.",
+    stats: { grip: "1H", str: "12", damage: "2D8", durability: "15" },
+  },
+  {
+    id: k("006"),
+    name: "Shortbow",
+    weight: 2,
+    value: "25 gp",
+    tags: ["weapon"],
+    types: ["Physical Object", "Weapon", "Equipment"],
+    notes: "Range 30. Needs a quiver. Bows skill.",
+    stats: { grip: "2H", str: "9", damage: "D10", durability: "6" },
+  },
+  // The two worked examples from the reference diagram: a weapon and an
+  // item, so a pack holding both shows only the columns they share.
+  {
+    id: k("007"),
+    name: "Dagger",
+    weight: 1,
+    value: "1 gp",
+    tags: ["weapon"],
+    types: ["Physical Object", "Weapon"],
+    notes: "Knives skill.",
+    stats: { grip: "1H", str: "—", damage: "1D6", durability: "9", features: "Subtle" },
+  },
+  {
+    id: k("008"),
+    name: "Sleeping Fur",
+    weight: 1,
+    value: "1 sp",
+    tags: ["gear"],
+    types: ["Physical Object", "Gear"],
+    notes: "",
+    stats: { effect: "Lets you rest in the open without freezing." },
+  },
+];
+
+/* ------------------------------------------------------------------ *
+ * Character sheets — SCOPE.md S1
+ * ------------------------------------------------------------------ */
+
+/**
+ * Two filled-in sheets, keyed by the character container they belong to.
+ *
+ * Seeded with real numbers rather than left empty, for the same reason the
+ * items are: an empty sheet proves the form renders, and a filled one proves
+ * the DERIVED values do. Kova's movement of 14 is not typed in anywhere — it
+ * falls out of elf (10) plus the AGL 16 step (+4), and if that ever reads 10 on
+ * screen the derivation is broken in a way an empty sheet would have hidden.
+ *
+ * Each character's trained skills match what they are actually carrying:
+ * Kova has the longbow and the trained Bows to use it, Milo has the warhammer
+ * and Hammers. A sheet that contradicts the pack it sits on is a worked example
+ * of nothing.
+ */
+export const SEED_CHARACTERS: Record<string, CharacterSheet> = {
+  [c(1)]: {
+    attributes: { STR: 11, CON: 12, AGL: 16, INT: 14, WIL: 14, CHA: 11 },
+    hp: 12,
+    wp: 14,
+    deathRolls: { successes: 0, failures: 0 },
+    conditions: {
+      exhausted: false,
+      sickly: false,
+      dazed: false,
+      angry: false,
+      scared: false,
+      disheartened: false,
+    },
+    profile: {
+      kin: "elf",
+      profession: "Hunter",
+      age: "adult",
+      appearance: "Lean, weather-worn, green cloak that has seen three winters.",
+      weakness: "Child of the wild. Never sleeps indoors.",
+      memento: "A fletching from her first kill.",
+    },
+    skills: {
+      Awareness: { trained: true, marked: false },
+      Bushcraft: { trained: true, marked: true },
+      "Hunting & Fishing": { trained: true, marked: false },
+      Sneaking: { trained: true, marked: false },
+      Bows: { trained: true, marked: true },
+      Knives: { trained: true, marked: false },
+      Acrobatics: { trained: false, marked: true },
+    },
+    spells: [],
+  },
+  [c(2)]: {
+    // Deliberately wounded and one condition down: the sheet's warning states
+    // are worth seeing without having to injure somebody first.
+    attributes: { STR: 14, CON: 13, AGL: 12, INT: 10, WIL: 11, CHA: 13 },
+    hp: 9,
+    wp: 11,
+    deathRolls: { successes: 0, failures: 0 },
+    conditions: {
+      exhausted: true,
+      sickly: false,
+      dazed: false,
+      angry: false,
+      scared: false,
+      disheartened: false,
+    },
+    profile: {
+      kin: "halfling",
+      profession: "Artisan",
+      age: "adult",
+      appearance: "Broad for a halfling, soot under the fingernails.",
+      weakness: "Cannot leave a broken thing unmended.",
+      memento: "His grandmother's hammer.",
+    },
+    skills: {
+      Crafting: { trained: true, marked: true },
+      Bartering: { trained: true, marked: false },
+      Persuasion: { trained: true, marked: false },
+      Hammers: { trained: true, marked: false },
+      Brawling: { trained: true, marked: false },
+    },
+    spells: [],
+  },
+};
 
 export const SEED_ITEMS: SeedItem[] = [
   // ── Party Wagon ──────────────────────────────────────────────────
@@ -167,6 +418,7 @@ export const SEED_ITEMS: SeedItem[] = [
     tags: ["weapon"],
     notes: "Recovered from the barrow. Nobody has claimed it yet.",
     types: ["Physical Object", "Weapon", "Equipment"],
+    stats: { grip: "1H", str: "12", damage: "2D8+1", durability: "16", features: "Magic" },
   },
   {
     id: i("004"),
@@ -235,6 +487,7 @@ export const SEED_ITEMS: SeedItem[] = [
     tags: ["weapon"],
     notes: "",
     types: ["Physical Object", "Weapon", "Equipment"],
+    stats: { grip: "2H", str: "12", damage: "D12", durability: "6" },
   },
   {
     id: i("102"),
@@ -268,6 +521,7 @@ export const SEED_ITEMS: SeedItem[] = [
     tags: ["weapon"],
     notes: "",
     types: ["Physical Object", "Weapon", "Equipment"],
+    stats: { grip: "1H", str: "7", damage: "2D6", durability: "9", features: "Toppling" },
   },
   {
     id: i("105"),
@@ -336,6 +590,7 @@ export const SEED_ITEMS: SeedItem[] = [
     tags: ["weapon"],
     notes: "",
     types: ["Physical Object", "Weapon", "Equipment"],
+    stats: { grip: "2H", str: "13", damage: "2D8", durability: "15", features: "Toppling" },
   },
   {
     id: i("203"),

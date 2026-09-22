@@ -11,11 +11,19 @@
  * that is exactly the bug this script is designed to surface.
  */
 import { sql } from "drizzle-orm";
+import { normaliseStats } from "@backend/domain/item-fields";
+
+import {
+  CHARACTER_PROPERTY_NAMES,
+  sheetToProperties,
+} from "@backend/domain/character";
 
 import { db, rawSql } from "./client";
 import {
   CAMPAIGN_ID,
   CAMPAIGN_NAME,
+  SEED_CATALOG,
+  SEED_CHARACTERS,
   SEED_COMMENTS,
   SEED_CONTAINERS,
   SEED_ITEMS,
@@ -46,11 +54,22 @@ const PROPERTY_DEFS: { name: string; dataType: string; description: string }[] =
     { name: "value", dataType: "text", description: "Value per unit" },
     { name: "tags", dataType: "label", description: "Free tags" },
     { name: "notes", dataType: "text", description: "Notes" },
+    { name: "stats", dataType: "json", description: "Type-specific item fields" },
     {
       name: "capacity",
       dataType: "number",
       description: "Carry capacity, kg — containers only",
     },
+    // The character sheet's eight, on the character container's own object
+    // (SCOPE.md S1). `json` rather than `number`/`text` because each one holds
+    // a structured section rather than a scalar — and because splitting them
+    // into thirty-odd scalar definitions would put the whole rulebook in this
+    // table without making any of it more queryable than JSONB already is.
+    ...CHARACTER_PROPERTY_NAMES.map((name) => ({
+      name,
+      dataType: "json",
+      description: "Character sheet",
+    })),
   ];
 
 async function main(): Promise<void> {
@@ -141,6 +160,23 @@ async function main(): Promise<void> {
     await database.insert(objectProperties).values(capacityRows);
   }
 
+  // Character sheets hang off the container object itself, exactly as capacity
+  // does — no new table, which is the whole argument for the object graph.
+  const characterRows = Object.entries(SEED_CHARACTERS).flatMap(
+    ([containerId, sheet]) =>
+      Object.entries(sheetToProperties(sheet))
+        .map(([name, value]) => {
+          const id = propertyId.get(name);
+          return id
+            ? { objectId: containerId, propertyDefinitionId: id, value }
+            : null;
+        })
+        .filter((r): r is NonNullable<typeof r> => r !== null),
+  );
+  if (characterRows.length > 0) {
+    await database.insert(objectProperties).values(characterRows);
+  }
+
   // Items: one `objects` row, its property values, its type memberships, and
   // exactly one containment edge.
   await database.insert(objects).values(
@@ -156,6 +192,7 @@ async function main(): Promise<void> {
         ["value", item.value],
         ["tags", item.tags],
         ["notes", item.notes],
+        ["stats", normaliseStats(item.types, item.stats)],
       ] as const
     )
       .map(([name, value]) => {
@@ -186,6 +223,51 @@ async function main(): Promise<void> {
     })),
   );
 
+  /**
+   * The catalogue — SCOPE.md S3.
+   *
+   * Objects with properties, types, and deliberately NO containment edge. That
+   * absence is the whole definition: a thing that is not anywhere is a
+   * definition of a thing rather than one of them, and it is what keeps these
+   * out of every container and database view without a filter.
+   */
+  await database.insert(objects).values(
+    SEED_CATALOG.map((entry) => ({ id: entry.id, campaignId: CAMPAIGN_ID })),
+  );
+
+  const catalogProperties = SEED_CATALOG.flatMap((entry) =>
+    (
+      [
+        ["name", entry.name],
+        ["weight", entry.weight],
+        ["value", entry.value],
+        ["tags", entry.tags],
+        ["notes", entry.notes],
+        ["stats", normaliseStats(entry.types, entry.stats)],
+      ] as const
+    )
+      .map(([name, value]) => {
+        const id = propertyId.get(name);
+        return id
+          ? { objectId: entry.id, propertyDefinitionId: id, value }
+          : null;
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null),
+  );
+  await database.insert(objectProperties).values(catalogProperties);
+
+  const catalogMemberships = SEED_CATALOG.flatMap((entry) =>
+    entry.types
+      .map((t) => {
+        const id = typeId.get(t);
+        return id ? { objectId: entry.id, typeId: id } : null;
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null),
+  );
+  if (catalogMemberships.length > 0) {
+    await database.insert(objectTypeMemberships).values(catalogMemberships);
+  }
+
   await database.insert(comments).values(
     SEED_COMMENTS.map((c) => ({
       id: c.id,
@@ -198,7 +280,8 @@ async function main(): Promise<void> {
   );
 
   console.log(
-    `Done. ${SEED_CONTAINERS.length} containers, ${SEED_ITEMS.length} items, ${SEED_TYPE_NAMES.length} types.`,
+    `Done. ${SEED_CONTAINERS.length} containers, ${SEED_ITEMS.length} items, ` +
+      `${SEED_CATALOG.length} catalogue entries, ${SEED_TYPE_NAMES.length} types.`,
   );
   await rawSql().end();
 }

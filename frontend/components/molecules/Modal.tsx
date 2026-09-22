@@ -72,12 +72,39 @@ export function Modal({
         // Backdrop clicks land on the dialog element itself.
         if (event.target === ref.current) close();
       }}
-      className="m-0 max-h-full w-full max-w-none bg-transparent p-0 backdrop:bg-black/60 panel:m-auto panel:max-w-md panel:p-4"
+      // `overflow-hidden`: the dialog is no longer a scroll container, and
+      // must not be one. Scrolling used to live here only because nothing
+      // else bounded a long dialog; now the card below caps itself to the
+      // viewport and scrolls its own body, so there is no legitimate content
+      // outside it for the dialog to scroll TO. Leaving the dialog scrollable
+      // anyway produced a second, full-height scrollbar beside the card.
+      //
+      // `h-full` below `panel`, `h-fit` from it. The browser's own stylesheet
+      // gives <dialog> `height: fit-content`, so without this the dialog was
+      // only as tall as its card and the wrapper's `justify-end` had no room
+      // to push into — the phone "bottom sheet" rendered pinned to the TOP of
+      // the screen. Full height lets it drop to the bottom; from `panel` up it
+      // goes back to fit-content, which `m-auto` centres.
+      className="m-0 h-full max-h-full w-full max-w-none overflow-hidden bg-transparent p-0 backdrop:bg-black/60 panel:m-auto panel:h-fit panel:max-w-md panel:p-4"
       style={{ inset: 0 }}
     >
       <div className="flex min-h-full flex-col justify-end panel:min-h-0 panel:justify-center">
-        <div className="rounded-t-lg border-t border-border bg-surface panel:rounded-lg panel:border panel:shadow-modal">
-          <div className="flex items-start gap-3 border-b border-border p-4">
+        {/* Bounded by the viewport as a flex column: header and footer keep
+            their size, and the body is the ONE region that scrolls.
+
+            The body used to cap itself at 70vh on its own, which ignored the
+            header and footer around it — so a tall dialog with a footer came
+            out taller than the screen and the <dialog> scrolled as a whole,
+            with the body scrolling inside it and a stray scrollbar down the
+            right.
+
+            The cap is the dialog's own `panel:p-4` subtracted top and bottom,
+            written in the SAME token that padding comes from. Not `2rem`: this
+            app's root font size is 14px, so 2rem is 28px while the padding is
+            4 × the 4px spacing step = 32px — and a card 4px taller than its box
+            was enough to bring the second scrollbar straight back. */}
+        <div className="flex max-h-[calc(100dvh_-_var(--spacing)_*_8)] flex-col rounded-t-lg border-t border-border bg-surface panel:rounded-lg panel:border panel:shadow-modal">
+          <div className="flex shrink-0 items-start gap-3 border-b border-border p-4">
             <div className="min-w-0 flex-1">
               <h2
                 id="modal-title"
@@ -99,10 +126,13 @@ export function Modal({
             </button>
           </div>
 
-          <div className="max-h-[70vh] overflow-y-auto">{children}</div>
+          {/* `flex-auto` sizes to the content until the card hits its cap,
+              and `min-h-0` is what lets it then shrink below the content and
+              scroll instead of pushing the footer off the screen. */}
+          <div className="min-h-0 flex-auto overflow-y-auto">{children}</div>
 
           {footer ? (
-            <div className="flex items-center gap-2 border-t border-border p-4">
+            <div className="flex shrink-0 items-center gap-2 border-t border-border p-4">
               {footer}
             </div>
           ) : null}

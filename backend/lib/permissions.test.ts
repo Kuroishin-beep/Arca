@@ -5,8 +5,10 @@ import { ConflictError } from "@backend/db/repository";
 import {
   GM_EMAIL,
   GM_ID,
+  KOVA_CONTAINER_ID,
   KOVA_EMAIL,
   KOVA_ID,
+  MILO_CONTAINER_ID,
   MILO_EMAIL,
   MILO_ID,
   SEED_CONTAINERS,
@@ -48,8 +50,14 @@ const milo: Principal = {
 const id = (name: string): ContainerId =>
   SEED_CONTAINERS.find((c) => c.name === name)!.id as ContainerId;
 
-const KOVAS_PACK = id("Kova's Pack");
-const MILOS_PACK = id("Milo's Pack");
+/**
+ * The two character containers come from exported ids rather than a name
+ * lookup. They are named for the CHARACTER now, and a test that breaks when
+ * somebody renames a character is a test asserting the wrong thing — what
+ * matters here is whose pack it is, not what it is called.
+ */
+const KOVAS_PACK = KOVA_CONTAINER_ID as ContainerId;
+const MILOS_PACK = MILO_CONTAINER_ID as ContainerId;
 const PARTY_WAGON = id("Party Wagon");
 const BARROW_CHEST = id("Barrow Chest");
 const SUNKEN_VAULT = id("The Sunken Vault");

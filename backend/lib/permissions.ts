@@ -280,6 +280,56 @@ export function visibleContainers(
 }
 
 /* ------------------------------------------------------------------ *
+ * The catalogue — SCOPE.md S3
+ * ------------------------------------------------------------------ */
+
+/**
+ * Who may define what a thing IS.
+ *
+ * The GM, and deliberately not by the same rule as writing a container. Those
+ * are different kinds of authority: filling the wagon is inventory, and saying
+ * what a hempen rope weighs is the campaign's rules. A catalogue entry is read
+ * by every copy of it in every pack, so a player editing one would be editing
+ * the contents of five other people's packs at once — which is exactly the
+ * power `canWrite` was scoped to deny them.
+ *
+ * READING the catalogue is not gated at all. It is a rulebook: it says what a
+ * rope weighs, never who has one.
+ */
+export function canManageCatalog(principal: Principal): boolean {
+  return principal.role === "gm";
+}
+
+export function assertCanManageCatalog(principal: Principal): void {
+  if (!canManageCatalog(principal)) {
+    throw new PermissionError(
+      "Only the GM can change the catalogue. Ask them to add it, then take a copy.",
+    );
+  }
+}
+
+/**
+ * Who may type an item in from scratch — the GM only.
+ *
+ * Players stock their packs from the catalogue instead, so what an item is
+ * stays defined in one place: a correction by the GM reaches every copy, and
+ * a player cannot invent a 0 kg plate armour. Moving, splitting, editing the
+ * quantity and notes of what they already hold are unaffected — those are
+ * `canWrite`. This replaces SCOPE.md M4's "anyone who can write may add".
+ */
+export function canCreateItem(principal: Principal): boolean {
+  return principal.role === "gm";
+}
+
+export function assertCanCreateItem(principal: Principal): void {
+  if (!canCreateItem(principal)) {
+    throw new PermissionError(
+      "Only the GM can create new items. Take one from the catalogue instead, or ask the GM to add it there.",
+    );
+  }
+}
+
+/* ------------------------------------------------------------------ *
  * The roster
  * ------------------------------------------------------------------ */
 

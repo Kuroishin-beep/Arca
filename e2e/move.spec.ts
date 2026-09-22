@@ -60,8 +60,13 @@ async function openPartyContainer(page: Page): Promise<string> {
     .getByRole("link")
     .filter({ hasText: /wagon|party|shared|stash/i })
     .first();
+  // Wait for THIS link's destination, not merely "some /c/ page": sign-in
+  // already lands on a container, so a bare /\/c\// matches before the click
+  // has navigated anywhere and the caller reads the previous page's rows.
+  const href = await link.getAttribute("href");
   await link.click();
-  await page.waitForURL(/\/c\//);
+  await page.waitForURL((url) => href !== null && url.pathname === href.split("?")[0]);
+  await page.waitForLoadState("networkidle");
   return new URL(page.url()).pathname;
 }
 

@@ -49,10 +49,16 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <rect x="7" y="6.5" width="2" height="3" rx="0.5" fill="currentColor" stroke="none" />
     </>
   ),
+  // A backpack, and deliberately NOT an arch over a box. The old glyph was
+  // that shape — near-identical to `lock` below at 15px — so a player's own
+  // pack read as a padlock in the same sidebar that uses the real lock to mean
+  // "GM-only". Tall body, small carry loop, and a front pocket: the pocket is
+  // the part a padlock never has.
   pack: (
     <>
-      <path d="M4 6V4.5a4 4 0 0 1 8 0V6" />
-      <rect x="2.5" y="6" width="11" height="7.5" rx="1.5" />
+      <path d="M6.5 3.5V3a1.5 1.5 0 0 1 3 0v.5" />
+      <rect x="3" y="3.5" width="10" height="10.5" rx="2.5" />
+      <rect x="5.5" y="8.5" width="5" height="3.5" rx="1" />
     </>
   ),
   wagon: (

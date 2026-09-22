@@ -3,6 +3,8 @@ import { cookies } from "next/headers";
 import type { Principal } from "@backend/domain/view";
 import { repository } from "@backend/db";
 
+import { sessionSecret, verifySession } from "./session-token";
+
 /**
  * Session — where identity becomes a principal.
  *
@@ -16,8 +18,11 @@ import { repository } from "@backend/db";
  * roster is keyed by and what the UI attributes a comment to — and the password
  * is what stops anyone holding the link from sitting down as the GM.
  *
- * The cookie holds a user id and nothing else — no role, no expiry claim of its
- * own. Role is read from `campaign_members` on every request, so a GM changing
+ * The cookie holds a user id and an HMAC over it (`session-token.ts`) — no
+ * role, no expiry claim of its own. The id is not secret; the signature is what
+ * stops a visitor from writing someone else's into their own cookie, which is
+ * exactly what the unsigned version allowed. Role is read from
+ * `campaign_members` on every request, so a GM changing
  * someone's role takes effect on their next click rather than whenever a token
  * would have expired. A cookie naming someone who has since been removed from
  * the campaign resolves to no principal, which is the same closed door as never
@@ -31,7 +36,11 @@ export type SessionState =
 
 export async function currentSession(): Promise<SessionState> {
   const jar = await cookies();
-  const userId = jar.get(COOKIE)?.value;
+  // Verified, not read. This used to take the cookie's value as the user id,
+  // and a cookie is something the visitor writes — so anyone who set
+  // `arca_user` to the GM's seeded id (it is in the public seed file) WAS the
+  // GM, with no password. `verifySession` returns an id only if we signed it.
+  const userId = verifySession(jar.get(COOKIE)?.value, sessionSecret());
   if (!userId) return { kind: "anonymous" };
 
   // Re-resolved against the roster on every request rather than trusted from
