@@ -318,4 +318,39 @@ describe.skipIf(!enabled)("the catalogue on Postgres", () => {
     }
     expect(total).toBe(stack.qty);
   }, 30_000);
+  /**
+   * Deleting a stack while somebody splits it.
+   *
+   * The two used to be independent writes to different tables, so they did not
+   * serialise: a whole-stack move raced with an archive left nothing, while a
+   * PARTIAL move left the split half alive in the destination — the same
+   * instant producing two different answers, one of which resurrects part of a
+   * deleted item. Both take the containment lock now, so whoever commits first
+   * wins and the other is refused.
+   */
+  it("never leaves half of a deleted stack alive", async () => {
+    const stack = (await repo.listItems(gm, WAGON)).find((i) => i.qty >= 4);
+    if (!stack) return;
+
+    const [archived, moved] = await Promise.allSettled([
+      repo.archiveItem(gm, stack.id),
+      repo.moveItem(gm, { itemId: stack.id, toContainerId: KOVAS_PACK, qty: 2 }),
+    ]);
+
+    const halves = (await repo.listItems(gm, KOVAS_PACK)).filter(
+      (i) => i.name === stack.name,
+    );
+    const remaining = (await repo.listItems(gm, WAGON)).filter(
+      (i) => i.name === stack.name,
+    );
+
+    if (archived.status === "fulfilled" && moved.status === "rejected") {
+      expect(halves).toHaveLength(0);
+      expect(remaining).toHaveLength(0);
+    } else if (moved.status === "fulfilled") {
+      // The move won: its half is legitimately in the destination, and the
+      // remainder is whatever the archive then did to the source.
+      expect(halves.length).toBeGreaterThan(0);
+    }
+  }, 20_000);
 });

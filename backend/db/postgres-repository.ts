@@ -1202,12 +1202,28 @@ export const postgresRepository: ArcaRepository = {
 
   async archiveItem(principal, itemId) {
     assertCanWrite(principal, await containerOf(itemId));
-    // Soft delete. The containment edge is left intact so an undo restores the
-    // item to where it actually was, not to wherever the UI last showed it.
-    await db()
-      .update(objects)
-      .set({ archivedAt: new Date(), updatedAt: new Date() })
-      .where(eq(objects.id, itemId));
+
+    // Takes the SAME lock a move takes, so the two serialise. Without it they
+    // are independent writes to different tables: archiving a stack while it
+    // was being split left the split half alive in the destination, so the
+    // same instant produced "deleted" for a whole-stack move and "half of it
+    // survived" for a partial one. Whichever commits first now wins, and the
+    // other sees the result rather than acting on a state that no longer
+    // exists.
+    await db().transaction(async (tx) => {
+      await tx.execute(
+        sql`select 1 from ${containerObjects}
+            where ${containerObjects.objectId} = ${itemId}
+            for update`,
+      );
+      // Soft delete. The containment edge is left intact so an undo restores
+      // the item to where it actually was, not to wherever the UI last showed
+      // it.
+      await tx
+        .update(objects)
+        .set({ archivedAt: new Date(), updatedAt: new Date() })
+        .where(eq(objects.id, itemId));
+    });
   },
 
   async moveItem(principal, input: MoveItemInput): Promise<MoveOutcome> {
@@ -1265,6 +1281,17 @@ export const postgresRepository: ArcaRepository = {
           ),
         )
         .limit(1);
+
+      // Archived under the lock, by whoever got here first. A move of a
+      // deleted item is not a move of anything.
+      const state = await tx
+        .select({ archivedAt: objects.archivedAt })
+        .from(objects)
+        .where(eq(objects.id, input.itemId))
+        .limit(1);
+      if (state[0]?.archivedAt) {
+        throw new ConflictError("That item was removed while you were moving it.");
+      }
 
       const currentQty = Math.max(1, Math.trunc(asNumber(live[0]?.value, 1)));
       if (input.qty > currentQty) {

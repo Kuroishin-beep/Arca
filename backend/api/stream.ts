@@ -10,8 +10,10 @@
  * unauthenticated stream would be a way to watch a campaign's activity without
  * being in it, which is the leak §3 forbids in a different costume.
  */
+import { repository } from "@backend/db";
 import { currentPrincipal } from "@backend/lib/session";
 import { campaignId } from "@backend/lib/campaign";
+import { canRead } from "@backend/lib/permissions";
 import { realtime } from "@backend/realtime";
 
 /**
@@ -45,6 +47,23 @@ export async function GET(request: Request) {
 
   const encoder = new TextEncoder();
   const campaign = campaignId();
+
+  /**
+   * Which of these containers this viewer may open.
+   *
+   * Re-read per event rather than captured once, for the same reason
+   * `currentSession` re-reads the role: a container revealed, or a player
+   * removed from the table, must take effect on the next event rather than on
+   * the next reconnect. Events are rare — one per write at the table — so this
+   * is one indexed read per change, not per heartbeat.
+   */
+  const readableIds = async (ids: string[]): Promise<string[]> => {
+    const containers = await repository().listContainers(principal);
+    const allowed = new Set<string>(
+      containers.filter((c) => canRead(principal, c)).map((c) => c.id),
+    );
+    return ids.filter((id) => allowed.has(id));
+  };
 
   let unsubscribe: (() => Promise<void>) | null = null;
   let heartbeat: ReturnType<typeof setInterval> | null = null;
@@ -92,7 +111,31 @@ export async function GET(request: Request) {
 
       try {
         unsubscribe = await realtime().subscribe(campaign, (event) => {
-          send(`event: change\ndata: ${JSON.stringify(event)}\n\n`);
+          // Filtered to what THIS viewer may read, before it leaves the
+          // server. The event carries no contents — that was deliberate — but
+          // it does carry container ids, and one channel for the whole
+          // campaign meant every player was told the moment the GM moved
+          // something inside an unrevealed container, and handed its id.
+          // "Something happened in a place you cannot see" is exactly the kind
+          // of thing a table reads aloud.
+          //
+          // `canRead` is the predicate the pages already use, so this is not a
+          // second permission model; it is the existing one, one step earlier.
+          void (async () => {
+            try {
+              const visible = await readableIds(event.containerIds);
+              if (visible.length === 0) return;
+              const filtered = { ...event, containerIds: visible };
+              send(`event: change
+data: ${JSON.stringify(filtered)}
+
+`);
+            } catch (error) {
+              // Never kill the stream over this: the client re-renders from
+              // the server, which is where authorisation actually lives.
+              console.error("[arca] realtime filter failed", error);
+            }
+          })();
         });
       } catch (error) {
         console.error("[arca] realtime subscribe failed", error);
