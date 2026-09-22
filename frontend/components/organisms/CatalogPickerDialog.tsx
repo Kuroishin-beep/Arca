@@ -157,6 +157,9 @@ export function CatalogPickerDialog({
                   </p>
                 </div>
 
+                <label htmlFor={`catalog-qty-${entry.id}`} className="sr-only">
+                  Quantity of {entry.name}
+                </label>
                 <NumberStepper
                   id={`catalog-qty-${entry.id}`}
                   label={`quantity of ${entry.name}`}
