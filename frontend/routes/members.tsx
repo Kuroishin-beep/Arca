@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { addMemberAction, resetPasswordAction } from "@backend/actions/members";
+import {
+  addMemberAction,
+  resetPasswordAction,
+  setMemberRoleAction,
+} from "@backend/actions/members";
 import { Avatar } from "@frontend/components/atoms/Status";
 import { Chip } from "@frontend/components/atoms/Chip";
 import { Icon } from "@frontend/components/atoms/Icon";
@@ -37,6 +41,15 @@ const MESSAGES: Record<string, { tone: "danger" | "success"; text: string }> = {
     tone: "danger",
     text: "Clearing your own password would lock you out with nobody able to let you back in. Ask another GM.",
   },
+  "self-role": {
+    tone: "danger",
+    text: "You cannot change your own role. Ask another GM to do it.",
+  },
+  "last-gm": {
+    tone: "danger",
+    text: "That is the only GM. Make someone else a GM first, then change this one.",
+  },
+  role: { tone: "success", text: "Role changed." },
 };
 
 export default async function MembersPage({
@@ -199,6 +212,26 @@ export default async function MembersPage({
                 {member.hasPassword ? null : (
                   <Chip tone="warning">No password yet</Chip>
                 )}
+
+                {/* How an existing member becomes a GM. Rendered only for the
+                    GM and never on their own row — the action re-checks both,
+                    because a rendered form is not a permission. */}
+                {member.userId !== principal.userId ? (
+                  <form action={setMemberRoleAction}>
+                    <input type="hidden" name="userId" value={member.userId} />
+                    <input
+                      type="hidden"
+                      name="role"
+                      value={member.role === "gm" ? "player" : "gm"}
+                    />
+                    <button
+                      type="submit"
+                      className="h-8 shrink-0 rounded-md border border-border px-2 text-sm text-muted hover:border-primary hover:text-primary"
+                    >
+                      {member.role === "gm" ? "Make player" : "Make GM"}
+                    </button>
+                  </form>
+                ) : null}
 
                 {member.hasPassword && member.userId !== principal.userId ? (
                   <form action={resetPasswordAction}>

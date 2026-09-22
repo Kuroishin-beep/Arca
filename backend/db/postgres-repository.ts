@@ -58,6 +58,7 @@ import { db } from "./client";
 import {
   type ArcaRepository,
   ConflictError,
+  type Member,
   type MoveOutcome,
   NotFoundError,
 } from "./repository";
@@ -1383,20 +1384,29 @@ export const postgresRepository: ArcaRepository = {
     // this read — two simultaneous sign-ups with one address both pass a
     // prior SELECT. `onConflictDoNothing` lets the database arbitrate and
     // returns no row to the loser.
-    const inserted = await db()
-      .insert(users)
-      .values({ displayName: input.displayName, email, passwordHash: hash })
-      .onConflictDoNothing({ target: users.email })
-      .returning({ id: users.id });
+    // One transaction: an account and its seat at the table are one fact, and
+    // a user row without a membership is an account nobody can sign in to
+    // holding an address nobody can re-register. See `addMember`.
+    const row = await db().transaction(async (tx) => {
+      const inserted = await tx
+        .insert(users)
+        .values({ displayName: input.displayName, email, passwordHash: hash })
+        .onConflictDoNothing({ target: users.email })
+        .returning({ id: users.id });
 
-    const row = inserted[0];
+      const created = inserted[0];
+      if (!created) return null;
+
+      // Never from the input. Self-signup mints players and only players.
+      await tx
+        .insert(campaignMembers)
+        .values({ campaignId: campaignId(), userId: created.id, role: "player" })
+        .onConflictDoNothing();
+
+      return created;
+    });
+
     if (!row) return null;
-
-    // Never from the input. Self-signup mints players and only players.
-    await db()
-      .insert(campaignMembers)
-      .values({ campaignId: campaignId(), userId: row.id, role: "player" })
-      .onConflictDoNothing();
 
     return {
       userId: row.id as Principal["userId"],
@@ -1411,19 +1421,30 @@ export const postgresRepository: ArcaRepository = {
 
     const email = normaliseEmail(input.email);
 
-    const inserted = await db()
-      .insert(users)
-      .values({ displayName: input.displayName, email })
-      .onConflictDoNothing({ target: users.email })
-      .returning({ id: users.id });
+    // One transaction, because the two writes are one fact. As two statements,
+    // a failure between them left a user row with no membership: an account
+    // that cannot sign in (`authenticateMember` joins the membership) and
+    // whose address is now taken, so the GM cannot add them again either.
+    // Nothing in the UI can repair that state.
+    const row = await db().transaction(async (tx) => {
+      const inserted = await tx
+        .insert(users)
+        .values({ displayName: input.displayName, email })
+        .onConflictDoNothing({ target: users.email })
+        .returning({ id: users.id });
 
-    const row = inserted[0];
+      const created = inserted[0];
+      if (!created) return null;
+
+      await tx
+        .insert(campaignMembers)
+        .values({ campaignId: campaignId(), userId: created.id, role: input.role })
+        .onConflictDoNothing();
+
+      return created;
+    });
+
     if (!row) return null;
-
-    await db()
-      .insert(campaignMembers)
-      .values({ campaignId: campaignId(), userId: row.id, role: input.role })
-      .onConflictDoNothing();
 
     return {
       userId: row.id as Principal["userId"],
@@ -1432,6 +1453,66 @@ export const postgresRepository: ArcaRepository = {
       role: input.role,
       // Unenrolled: they choose their own password on first sign-in.
       hasPassword: false,
+    };
+  },
+
+  async setMemberRole(principal, userId, role) {
+    assertCanManageRoster(principal);
+    if (!UUID.test(userId)) throw new NotFoundError("No such member.");
+
+    // The membership row IS the authorisation: this campaign's GM can only
+    // change a role at this table.
+    const rows = await db()
+      .select({
+        userId: users.id,
+        displayName: users.displayName,
+        email: users.email,
+        role: campaignMembers.role,
+        passwordHash: users.passwordHash,
+      })
+      .from(users)
+      .innerJoin(campaignMembers, eq(campaignMembers.userId, users.id))
+      .where(
+        and(eq(users.id, userId), eq(campaignMembers.campaignId, campaignId())),
+      )
+      .limit(1);
+
+    const row = rows[0];
+    if (!row) throw new NotFoundError("No such member.");
+
+    if (row.role === "gm" && role !== "gm") {
+      const gms = await db()
+        .select({ userId: campaignMembers.userId })
+        .from(campaignMembers)
+        .where(
+          and(
+            eq(campaignMembers.campaignId, campaignId()),
+            eq(campaignMembers.role, "gm"),
+          ),
+        );
+      if (gms.length <= 1) {
+        throw new ConflictError(
+          "This is the only GM. Make someone else a GM first, then change this one.",
+        );
+      }
+    }
+
+    await db()
+      .update(campaignMembers)
+      .set({ role })
+      .where(
+        and(
+          eq(campaignMembers.userId, userId),
+          eq(campaignMembers.campaignId, campaignId()),
+        ),
+      );
+
+    return {
+      userId: row.userId as Member["userId"],
+      displayName: row.displayName,
+      email: row.email,
+      role,
+      hasPassword: row.passwordHash !== null,
     };
   },
 

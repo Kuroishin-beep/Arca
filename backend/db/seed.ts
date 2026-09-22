@@ -87,6 +87,17 @@ async function main(): Promise<void> {
   // which is itself a check that the foreign keys are wired correctly.
   await database.delete(campaigns).where(sql`${campaigns.id} = ${CAMPAIGN_ID}`);
 
+  // Users are not campaign rows, so the cascade above leaves them behind —
+  // and a user with no membership is a ghost: `authenticateMember` joins the
+  // membership, so the account cannot sign in, while the unique index on the
+  // address means nobody can register it again either. Anyone who signed up
+  // before a reseed was stuck in exactly that state. They are deleted here
+  // rather than re-attached: this rebuilds the campaign from the seed, so an
+  // account from the run before is not part of it.
+  await database.execute(
+    sql`delete from users where id not in (select user_id from campaign_members)`,
+  );
+
   await database.insert(campaigns).values({
     id: CAMPAIGN_ID,
     name: CAMPAIGN_NAME,

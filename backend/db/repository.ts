@@ -318,6 +318,20 @@ export interface ArcaRepository {
    * merely empty on a new row.
    */
   resetMemberPassword(principal: Principal, userId: string): Promise<void>;
+
+  /**
+   * Change what someone is — the GM's, and the only way an existing member
+   * becomes one.
+   *
+   * Refuses to remove the last GM. A campaign with no GM has no one who can
+   * put one back: every door that promotes somebody is behind this same check,
+   * so the table would be locked out of its own roster permanently.
+   */
+  setMemberRole(
+    principal: Principal,
+    userId: string,
+    role: Member["role"],
+  ): Promise<Member>;
 }
 
 /** Raised when an id simply is not there. Distinct from PermissionError, which

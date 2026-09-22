@@ -766,6 +766,26 @@ export const fixtureRepository: ArcaRepository = {
     return { ...principalOf(member), hasPassword: false };
   },
 
+  async setMemberRole(principal, userId, role) {
+    assertCanManageRoster(principal);
+
+    const member = store().users.find((u) => u.userId === userId);
+    if (!member) throw new NotFoundError("No such member.");
+
+    // The last GM cannot be demoted — see the note on the interface.
+    if (member.role === "gm" && role !== "gm") {
+      const gms = store().users.filter((u) => u.role === "gm").length;
+      if (gms <= 1) {
+        throw new ConflictError(
+          "This is the only GM. Make someone else a GM first, then change this one.",
+        );
+      }
+    }
+
+    member.role = role;
+    return { ...principalOf(member), hasPassword: member.passwordHash !== null };
+  },
+
   async resetMemberPassword(principal, userId) {
     assertCanManageRoster(principal);
 

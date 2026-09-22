@@ -114,7 +114,12 @@ export default async function SignInPage({
             demo mode.
           </p>
 
-          <SignInForm email={email ?? ""} />
+          <SignInForm
+            email={email ?? ""}
+            // Reopened on the two errors that can only come from enrolling, so
+            // the field that caused them is on screen with the message.
+            enrolling={error === "mismatch" || error === "weak-password"}
+          />
         </div>
 
         <p className="mt-6 text-center font-mono text-xs text-faint">
@@ -128,16 +133,25 @@ export default async function SignInPage({
 /**
  * One form, both cases.
  *
- * The confirm field is always rendered rather than appearing once the app knows
- * whether this address has a password. Revealing that is the whole leak the
- * combined form exists to avoid, and a field that appears in response to a
- * typed address announces the answer as loudly as a sentence would.
+ * The confirm field is ALWAYS in the document rather than appearing once the
+ * app knows whether this address has a password. Revealing that is the whole
+ * leak the combined form exists to avoid, and a field that appears in response
+ * to a typed address announces the answer as loudly as a sentence would.
  *
- * So it is labelled for what it is — needed the first time, ignored after —
- * and `backend/actions/session.ts` treats a filled confirm as "this is a first
- * sign-in" and an empty one as an ordinary attempt.
+ * What it is not is a field on the log-in form: "confirm password" belongs to
+ * signing up, and reading it here is a reasonable way to conclude the form is
+ * broken. So it is folded into a disclosure the visitor opens — which is a
+ * decision made in the browser, about nothing the server said, and therefore
+ * tells an attacker nothing. `backend/actions/session.ts` still treats a filled
+ * confirm as "this is a first sign-in" and an empty one as an ordinary attempt.
  */
-function SignInForm({ email }: { email: string }) {
+function SignInForm({
+  email,
+  enrolling,
+}: {
+  email: string;
+  enrolling: boolean;
+}) {
   return (
     <form action={signInAsAction} className="flex flex-col gap-3">
       <TextField
@@ -167,13 +181,22 @@ function SignInForm({ email }: { email: string }) {
         minLength={8}
       />
 
-      <PasswordField
-        id="confirmPassword"
-        name="confirmPassword"
-        label="Confirm password"
-        hint="Only the first time you sign in. Leave it empty after that."
-        autoComplete="new-password"
-      />
+      <details open={enrolling} className="group">
+        <summary className="cursor-pointer list-none text-sm text-muted marker:content-[''] hover:text-text [&::-webkit-details-marker]:hidden">
+          <span className="underline decoration-border underline-offset-4 group-open:no-underline">
+            First time signing in? Set your password
+          </span>
+        </summary>
+        <div className="mt-3">
+          <PasswordField
+            id="confirmPassword"
+            name="confirmPassword"
+            label="Confirm password"
+            hint="Type the password you want in both boxes. Only the first time — leave this empty afterwards."
+            autoComplete="new-password"
+          />
+        </div>
+      </details>
 
       <Button type="submit" variant="primary" fullWidth className="h-10 text-base">
         Sign in

@@ -196,3 +196,50 @@ describe("resetting a password", () => {
     ).rejects.toBeInstanceOf(PermissionError);
   });
 });
+
+/**
+ * Changing what an existing member IS.
+ *
+ * The role is the permission model, so this is the most dangerous write in the
+ * roster: a mistake here either hands the campaign to a player or takes it
+ * away from everyone.
+ */
+describe("setMemberRole", () => {
+  it("promotes a player to GM, and the promotion is what they then are", async () => {
+    const promoted = await repo.setMemberRole(gm, KOVA_ID, "gm");
+    expect(promoted.role).toBe("gm");
+
+    const members = await repo.listMembers();
+    expect(members.find((m) => m.userId === KOVA_ID)?.role).toBe("gm");
+  });
+
+  it("is the GM's alone — a player cannot promote themselves", async () => {
+    await expect(repo.setMemberRole(kova, KOVA_ID, "gm")).rejects.toBeInstanceOf(
+      PermissionError,
+    );
+    const members = await repo.listMembers();
+    expect(members.find((m) => m.userId === KOVA_ID)?.role).toBe("player");
+  });
+
+  it("refuses to remove the last GM, and allows it once there is another", async () => {
+    // The seed has two GMs (Ravna and Xen), so demote to one first.
+    const gms = (await repo.listMembers()).filter((m) => m.role === "gm");
+    for (const extra of gms.slice(1)) {
+      await repo.setMemberRole(gm, extra.userId, "player");
+    }
+
+    await expect(repo.setMemberRole(gm, GM_ID, "player")).rejects.toThrow(
+      /only GM/i,
+    );
+
+    await repo.setMemberRole(gm, KOVA_ID, "gm");
+    const demoted = await repo.setMemberRole(gm, GM_ID, "player");
+    expect(demoted.role).toBe("player");
+  });
+
+  it("does not invent a member for an id that is not one", async () => {
+    await expect(
+      repo.setMemberRole(gm, "00000000-0000-4000-8000-00000000dead", "gm"),
+    ).rejects.toThrow(/no such member/i);
+  });
+});

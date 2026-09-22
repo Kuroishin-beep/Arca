@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { repository } from "@backend/db";
+import { ConflictError } from "@backend/db/repository";
 import { AddMemberInput } from "@backend/domain/view";
 import { PermissionError } from "@backend/lib/permissions";
 import { emailProblem, normaliseEmail } from "@backend/lib/password";
@@ -83,4 +84,38 @@ export async function resetPasswordAction(formData: FormData): Promise<void> {
 
   revalidatePath(at);
   redirect(`${at}?reset=1`);
+}
+
+/**
+ * Promote or demote someone — the answer to "how do I make someone a GM?".
+ *
+ * Adding a member already takes a role, but that door is only open to someone
+ * who is not at the table yet. Without this, the only way to change what an
+ * existing member is was a script with database credentials, which is not a
+ * thing a GM at a table has.
+ *
+ * Demoting yourself is refused here rather than in the repository, for the
+ * reason the self-reset above is: another GM doing it is legitimate, and
+ * "you are doing this to yourself" is only knowable at this layer. The
+ * repository's own rule — never remove the last GM — is the one that protects
+ * the campaign rather than the person.
+ */
+export async function setMemberRoleAction(formData: FormData): Promise<void> {
+  const principal = await requirePrincipal();
+  const userId = text(formData.get("userId"));
+  const role = text(formData.get("role")) === "gm" ? "gm" : "player";
+
+  const at = "/members";
+  if (userId === principal.userId) redirect(`${at}?error=self-role`);
+
+  try {
+    await repository().setMemberRole(principal, userId, role);
+  } catch (error) {
+    if (error instanceof PermissionError) redirect(`${at}?error=forbidden`);
+    if (error instanceof ConflictError) redirect(`${at}?error=last-gm`);
+    throw error;
+  }
+
+  revalidatePath(at);
+  redirect(`${at}?role=1`);
 }

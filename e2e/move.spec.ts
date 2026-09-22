@@ -44,6 +44,9 @@ async function signInAs(browser: Browser, displayName: string): Promise<Page> {
 
   await page.locator("#email").fill(account.email);
   await page.locator("#password").fill(account.password);
+  // The confirm field lives behind a disclosure now — sign-in proper is
+  // email + password, and this is the first-time-only half.
+  await page.getByText(/first time signing in/i).click();
   await page.locator("#confirmPassword").fill(account.password);
 
   await page.getByRole("button", { name: /sign in/i }).click();

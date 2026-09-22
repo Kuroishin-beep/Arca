@@ -12,11 +12,20 @@
  *    apart from the display name;
  *  - their campaign membership, set to `gm`.
  *
+ * `ARCA_GM_PASSWORD`, if set, is hashed (scrypt, the same as a sign-in) and
+ * stored, so the account is usable immediately instead of waiting for its
+ * owner to enrol. It is read from the environment and written nowhere but the
+ * password column: this file holds no password and the repository is public.
+ * Left unset, the account arrives unenrolled, which is still the better
+ * default, since nobody has to send a secret through a group chat.
+ *
  * Nothing is deleted and no other member's role is touched. Running it twice
  * is the same as running it once. The address comes from the environment, not
  * an argument or a file, because this repository is public.
  */
 import { and, eq } from "drizzle-orm";
+
+import { hashPassword, passwordProblem } from "@backend/lib/password";
 
 import { db, rawSql } from "./client";
 import { campaignMembers, campaigns, users } from "./schema";
@@ -28,6 +37,13 @@ async function main(): Promise<void> {
     throw new Error("Set ARCA_GM_EMAIL to the address that should be GM.");
   }
   const displayName = process.argv[2]?.trim() || "Xen";
+
+  const password = process.env.ARCA_GM_PASSWORD;
+  if (password !== undefined) {
+    const problem = passwordProblem(password, email);
+    if (problem) throw new Error(`ARCA_GM_PASSWORD: ${problem}`);
+  }
+  const passwordHash = password ? await hashPassword(password) : undefined;
 
   const campaign = await db()
     .select({ id: campaigns.id, name: campaigns.name })
@@ -47,12 +63,17 @@ async function main(): Promise<void> {
     (
       await db()
         .insert(users)
-        .values({ email, displayName })
+        .values({ email, displayName, passwordHash })
         .returning({ id: users.id })
     )[0]!.id;
 
   if (existing[0]) {
-    await db().update(users).set({ displayName }).where(eq(users.id, userId));
+    // An existing account keeps its password unless one was supplied: this
+    // script hands out the GM role, it does not take accounts over.
+    await db()
+      .update(users)
+      .set(passwordHash ? { displayName, passwordHash } : { displayName })
+      .where(eq(users.id, userId));
   }
 
   await db()
@@ -75,7 +96,14 @@ async function main(): Promise<void> {
 
   process.stdout.write(
     `${displayName} is ${check[0]?.role} of "${campaign[0].name}"` +
-      `${existing[0] ? "" : " (new account — choose a password on first sign-in)"}.\n`,
+      `${
+        passwordHash
+          ? " Password set."
+          : existing[0]
+            ? "."
+            : " (new account, unenrolled: it picks a password on first sign-in)."
+      }
+`,
   );
 }
 

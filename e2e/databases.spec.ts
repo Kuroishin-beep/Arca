@@ -21,6 +21,9 @@ async function signInAsGm(browser: Browser): Promise<Page> {
   await page.goto("/signin");
   await page.locator("#email").fill(RAVNA.email);
   await page.locator("#password").fill(RAVNA.password);
+  // The confirm field lives behind a disclosure now — sign-in proper is
+  // email + password, and this is the first-time-only half.
+  await page.getByText(/first time signing in/i).click();
   await page.locator("#confirmPassword").fill(RAVNA.password);
   await page.getByRole("button", { name: /sign in/i }).click();
   await page.waitForURL(/\/c\//);
