@@ -41,6 +41,8 @@ export interface SeedItem {
   tags: string[];
   notes: string;
   types: string[];
+  /** Type-specific values — see `backend/domain/item-fields.ts`. */
+  stats?: Record<string, string>;
 }
 
 export interface SeedComment {
@@ -187,6 +189,7 @@ export interface SeedCatalogItem {
   tags: string[];
   types: string[];
   notes: string;
+  stats?: Record<string, string>;
 }
 
 /**
@@ -219,6 +222,7 @@ export const SEED_CATALOG: SeedCatalogItem[] = [
     tags: ["gear"],
     types: ["Physical Object", "Gear"],
     notes: "Ten metres. Frays, but holds a person.",
+    stats: { effect: "Holds a climbing person. Ten metres long." },
   },
   {
     id: k("002"),
@@ -227,7 +231,8 @@ export const SEED_CATALOG: SeedCatalogItem[] = [
     value: "1 sp",
     tags: ["gear", "consumable"],
     types: ["Physical Object", "Gear", "Consumable"],
-    notes: "Burns for an hour. Light in a barrow is not optional.",
+    notes: "Light in a barrow is not optional.",
+    stats: { effect: "Lights ten metres around you for about an hour." },
   },
   {
     id: k("003"),
@@ -236,7 +241,8 @@ export const SEED_CATALOG: SeedCatalogItem[] = [
     value: "2 sp",
     tags: ["consumable"],
     types: ["Physical Object", "Consumable"],
-    notes: "One day's food.",
+    notes: "",
+    stats: { effect: "One day's food for one person." },
   },
   {
     id: k("004"),
@@ -245,7 +251,8 @@ export const SEED_CATALOG: SeedCatalogItem[] = [
     value: "50 gp",
     tags: ["consumable"],
     types: ["Physical Object", "Consumable"],
-    notes: "Restores D6 hit points. One action to drink.",
+    notes: "",
+    stats: { effect: "Heals D6 hit points. One action to drink." },
   },
   {
     id: k("005"),
@@ -254,7 +261,8 @@ export const SEED_CATALOG: SeedCatalogItem[] = [
     value: "25 gp",
     tags: ["weapon"],
     types: ["Physical Object", "Weapon", "Equipment"],
-    notes: "2D8 damage, durability 15. Swords.",
+    notes: "Swords skill.",
+    stats: { grip: "1H", str: "12", damage: "2D8", durability: "15" },
   },
   {
     id: k("006"),
@@ -263,7 +271,30 @@ export const SEED_CATALOG: SeedCatalogItem[] = [
     value: "25 gp",
     tags: ["weapon"],
     types: ["Physical Object", "Weapon", "Equipment"],
-    notes: "D10 damage at range 30. Needs a quiver. Bows.",
+    notes: "Range 30. Needs a quiver. Bows skill.",
+    stats: { grip: "2H", str: "9", damage: "D10", durability: "6" },
+  },
+  // The two worked examples from the reference diagram: a weapon and an
+  // item, so a pack holding both shows only the columns they share.
+  {
+    id: k("007"),
+    name: "Dagger",
+    weight: 1,
+    value: "1 gp",
+    tags: ["weapon"],
+    types: ["Physical Object", "Weapon"],
+    notes: "Knives skill.",
+    stats: { grip: "1H", str: "—", damage: "1D6", durability: "9", features: "Subtle" },
+  },
+  {
+    id: k("008"),
+    name: "Sleeping Fur",
+    weight: 1,
+    value: "1 sp",
+    tags: ["gear"],
+    types: ["Physical Object", "Gear"],
+    notes: "",
+    stats: { effect: "Lets you rest in the open without freezing." },
   },
 ];
 
@@ -387,6 +418,7 @@ export const SEED_ITEMS: SeedItem[] = [
     tags: ["weapon"],
     notes: "Recovered from the barrow. Nobody has claimed it yet.",
     types: ["Physical Object", "Weapon", "Equipment"],
+    stats: { grip: "1H", str: "12", damage: "2D8+1", durability: "16", features: "Magic" },
   },
   {
     id: i("004"),
@@ -455,6 +487,7 @@ export const SEED_ITEMS: SeedItem[] = [
     tags: ["weapon"],
     notes: "",
     types: ["Physical Object", "Weapon", "Equipment"],
+    stats: { grip: "2H", str: "12", damage: "D12", durability: "6" },
   },
   {
     id: i("102"),
@@ -488,6 +521,7 @@ export const SEED_ITEMS: SeedItem[] = [
     tags: ["weapon"],
     notes: "",
     types: ["Physical Object", "Weapon", "Equipment"],
+    stats: { grip: "1H", str: "7", damage: "2D6", durability: "9", features: "Toppling" },
   },
   {
     id: i("105"),
@@ -556,6 +590,7 @@ export const SEED_ITEMS: SeedItem[] = [
     tags: ["weapon"],
     notes: "",
     types: ["Physical Object", "Weapon", "Equipment"],
+    stats: { grip: "2H", str: "13", damage: "2D8", durability: "15", features: "Toppling" },
   },
   {
     id: i("203"),

@@ -11,6 +11,7 @@
  * that is exactly the bug this script is designed to surface.
  */
 import { sql } from "drizzle-orm";
+import { normaliseStats } from "@backend/domain/item-fields";
 
 import {
   CHARACTER_PROPERTY_NAMES,
@@ -53,6 +54,7 @@ const PROPERTY_DEFS: { name: string; dataType: string; description: string }[] =
     { name: "value", dataType: "text", description: "Value per unit" },
     { name: "tags", dataType: "label", description: "Free tags" },
     { name: "notes", dataType: "text", description: "Notes" },
+    { name: "stats", dataType: "json", description: "Type-specific item fields" },
     {
       name: "capacity",
       dataType: "number",
@@ -190,6 +192,7 @@ async function main(): Promise<void> {
         ["value", item.value],
         ["tags", item.tags],
         ["notes", item.notes],
+        ["stats", normaliseStats(item.types, item.stats)],
       ] as const
     )
       .map(([name, value]) => {
@@ -240,6 +243,7 @@ async function main(): Promise<void> {
         ["value", entry.value],
         ["tags", entry.tags],
         ["notes", entry.notes],
+        ["stats", normaliseStats(entry.types, entry.stats)],
       ] as const
     )
       .map(([name, value]) => {

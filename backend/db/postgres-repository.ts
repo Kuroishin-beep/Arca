@@ -33,6 +33,7 @@ import {
   inheritedFieldsMessage,
   ownershipProblem,
 } from "@backend/domain/view";
+import { normaliseStats } from "@backend/domain/item-fields";
 import { campaignId } from "@backend/lib/campaign";
 import {
   assertCanEditContainer,
@@ -182,6 +183,7 @@ function project(
     tags: asStringArray(from.tags),
     notes: asString(own.notes),
     types: entry ? entry.types : (types ?? []),
+    stats: normaliseStats(entry ? entry.types : (types ?? []), from.stats),
     catalogItemId: null,
     updatedAt,
   };
@@ -418,6 +420,7 @@ function projectCatalog(
     value: asString(props?.value),
     tags: asStringArray(props?.tags),
     types: types ?? [],
+    stats: normaliseStats(types ?? [], props?.stats),
     notes: asString(props?.notes),
     copies,
     updatedAt,
@@ -499,6 +502,11 @@ async function setProperties(
   objectId: string,
   values: Record<string, unknown>,
 ): Promise<void> {
+  // `stats` arrived after databases were seeded; created on first write for
+  // the reason `ensurePropertyDefinitions` gives.
+  if (values.stats !== undefined) {
+    await ensurePropertyDefinitions(["stats"], "Type-specific item fields");
+  }
   const ids = await propertyIdsByName();
   const rows = Object.entries(values)
     .filter(([, v]) => v !== undefined)
@@ -539,6 +547,7 @@ async function setProperties(
  */
 async function ensurePropertyDefinitions(
   names: readonly string[],
+  description = "Character sheet",
 ): Promise<void> {
   if (names.length === 0) return;
 
@@ -552,7 +561,7 @@ async function ensurePropertyDefinitions(
         // than a scalar. The column is JSONB either way; this is the label a
         // human reads in the definitions table.
         dataType: "json",
-        description: "Character sheet",
+        description,
       })),
     )
     .onConflictDoNothing();
@@ -810,6 +819,7 @@ export const postgresRepository: ArcaRepository = {
       value: input.value,
       tags: input.tags,
       notes: input.notes,
+      stats: normaliseStats(input.types, input.stats),
     });
     await setTypes(created.id, input.types);
 
@@ -824,13 +834,20 @@ export const postgresRepository: ArcaRepository = {
   async updateCatalogItem(principal, input) {
     assertCanManageCatalog(principal);
 
-    const { id, types, ...fields } = input;
+    const { id, types, stats, ...fields } = input;
     const existing = await catalogRows(id);
     if (existing.length === 0) {
       throw new NotFoundError("No such catalogue entry.");
     }
 
-    await setProperties(id, fields);
+    // Normalised against the types the entry will HAVE, which is the patch's
+    // when it carries some and the stored ones otherwise.
+    const nextTypes =
+      types ?? (await postgresRepository.getCatalogItem(principal, id))?.types ?? [];
+    await setProperties(id, {
+      ...fields,
+      stats: stats === undefined ? undefined : normaliseStats(nextTypes, stats),
+    });
     if (types !== undefined) await setTypes(id, types);
     await db()
       .update(objects)
@@ -1096,6 +1113,7 @@ export const postgresRepository: ArcaRepository = {
       value: input.value,
       tags: input.tags,
       notes: input.notes,
+      stats: normaliseStats(input.types, input.stats),
     });
     await setTypes(object.id, input.types);
     await db()
@@ -1113,6 +1131,7 @@ export const postgresRepository: ArcaRepository = {
         value: input.value,
         tags: input.tags,
         notes: input.notes,
+        stats: input.stats,
       },
       input.types,
     );
@@ -1145,6 +1164,10 @@ export const postgresRepository: ArcaRepository = {
       value: isCopy ? undefined : input.value,
       tags: isCopy ? undefined : input.tags,
       notes: input.notes,
+      stats:
+        isCopy || input.stats === undefined
+          ? undefined
+          : normaliseStats(input.types ?? current.types, input.stats),
     });
     if (!isCopy && input.types !== undefined) {
       await setTypes(input.id, input.types);

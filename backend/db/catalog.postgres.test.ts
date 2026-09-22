@@ -215,4 +215,38 @@ describe.skipIf(!enabled)("the catalogue on Postgres", () => {
     expect(updated.name).toBe(ROPE_NAME);
     expect(updated.catalogItemId).toBe(ROPE);
   });
+  it("stores type stats, resolves them on copies, and follows a correction", async () => {
+    const dagger = SEED_CATALOG.find((e) => e.name === "Dagger")!.id as ItemId;
+    const copy = await repo.addFromCatalog(kova, {
+      catalogItemId: dagger,
+      containerId: KOVAS_PACK,
+      qty: 1,
+    });
+    expect(copy.stats.damage).toBe("1D6");
+
+    const entry = (await repo.getCatalogItem(gm, dagger))!;
+    await repo.updateCatalogItem(gm, {
+      id: dagger,
+      stats: { ...entry.stats, damage: "1D8" },
+    });
+    expect((await repo.getItem(kova, copy.id))?.stats.damage).toBe("1D8");
+
+    await expect(
+      repo.updateItem(kova, { id: copy.id, stats: { ...copy.stats, damage: "3D6" } }),
+    ).rejects.toThrow(/catalogue/i);
+
+    // A hand-made weapon owns its stats, and loses the ones its types drop.
+    const made = await repo.createItem(gm, {
+      containerId: WAGON,
+      name: "Walking stick",
+      qty: 1,
+      weight: 1,
+      value: "",
+      tags: [],
+      notes: "",
+      types: ["Physical Object", "Weapon"],
+      stats: { damage: "D6", effect: "not a weapon field" },
+    });
+    expect((await repo.getItem(gm, made.id))?.stats).toEqual({ damage: "D6" });
+  });
 });

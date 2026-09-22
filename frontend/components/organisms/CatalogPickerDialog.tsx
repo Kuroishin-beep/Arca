@@ -10,6 +10,7 @@ import { Chip } from "@frontend/components/atoms/Chip";
 import { Icon } from "@frontend/components/atoms/Icon";
 import { NumberStepper } from "@frontend/components/atoms/NumberStepper";
 import { Modal } from "@frontend/components/molecules/Modal";
+import { StatChips } from "@frontend/components/molecules/StatFields";
 
 /**
  * Taking a copy out of the catalogue — SCOPE.md S3, the player's half.
@@ -154,6 +155,7 @@ export function CatalogPickerDialog({
                     {entry.tags.map((tag) => (
                       <Chip key={tag}>{tag}</Chip>
                     ))}
+                    <StatChips types={entry.types} stats={entry.stats} />
                   </p>
                 </div>
 

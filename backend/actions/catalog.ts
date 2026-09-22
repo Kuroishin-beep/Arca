@@ -9,6 +9,7 @@ import {
   CreateCatalogItemInput,
   UpdateCatalogItemInput,
 } from "@backend/domain/view";
+import { statsFromForm } from "@backend/domain/item-fields";
 import { campaignId } from "@backend/lib/campaign";
 import { PermissionError } from "@backend/lib/permissions";
 import { requirePrincipal } from "@backend/lib/session";
@@ -115,6 +116,7 @@ export async function createCatalogItemAction(
       tags: splitList(formData.get("tags")),
       types: splitList(formData.get("types")),
       notes: formData.get("notes"),
+      stats: statsFromForm(formData),
     });
 
     if (!parsed.success) {
@@ -149,6 +151,7 @@ export async function updateCatalogItemAction(
       tags: splitList(formData.get("tags")),
       types: splitList(formData.get("types")),
       notes: formData.get("notes"),
+      stats: statsFromForm(formData),
     });
 
     if (!parsed.success) {

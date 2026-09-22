@@ -11,6 +11,8 @@ import {
 } from "@frontend/components/organisms/CommentComposer";
 import type { CommentView, ContainerView, ItemView } from "@backend/domain/view";
 import { itemWeight } from "@backend/domain/view";
+import { slugifyType } from "@backend/domain/database";
+import { fieldsForTypes } from "@backend/domain/item-fields";
 
 /**
  * The selected item, its properties, where it lives, and the conversation about
@@ -58,12 +60,29 @@ export function DetailPanel({
       <div className="flex items-start gap-2 border-b border-border p-4">
         <div className="min-w-0 flex-1">
           <h2 className="font-serif text-lg font-bold text-text">{item.name}</h2>
-          {/* Composable types: one object, several types at once. */}
+          {/* Composable types: one object, several types at once. Each one
+              is a database, so each chip goes to it. */}
           <div className="mt-2 flex flex-wrap gap-1">
             {item.types.map((type) => (
-              <Chip key={type}>{type}</Chip>
+              <Link
+                key={type}
+                href={`/db/${slugifyType(type)}`}
+                className="rounded-sm hover:opacity-80"
+                title={`Open the ${type} database`}
+              >
+                <Chip>{type}</Chip>
+              </Link>
             ))}
           </div>
+          {item.catalogItemId ? (
+            <p className="mt-2 text-sm text-muted">
+              A copy of a{" "}
+              <Link href="/catalog" className="text-accent underline underline-offset-2">
+                catalogue entry
+              </Link>
+              — its details below come from there.
+            </p>
+          ) : null}
         </div>
         <Link
           href={closeHref}
@@ -82,6 +101,16 @@ export function DetailPanel({
           <Row label="Quantity" value={String(item.qty)} />
           <Row label="Weight (each)" value={`${item.weight.toFixed(1)} kg`} />
           <Row label="Value (each)" value={item.value || "—"} />
+          {/* Every field its types add, filled or not — this panel is the
+              item's complete details, where a container only shows the
+              columns its contents share. */}
+          {fieldsForTypes(item.types).map((field) => (
+            <Row
+              key={field.key}
+              label={field.label}
+              value={item.stats[field.key] ?? "—"}
+            />
+          ))}
           {item.tags.length > 0 ? (
             <div className="flex items-baseline justify-between gap-3">
               <dt className="text-sm text-muted">Tags</dt>

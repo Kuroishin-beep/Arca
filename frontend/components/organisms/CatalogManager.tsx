@@ -11,6 +11,7 @@ import type { CatalogItemView } from "@backend/domain/view";
 import { Button } from "@frontend/components/atoms/Button";
 import { Chip } from "@frontend/components/atoms/Chip";
 import { TextAreaField, TextField } from "@frontend/components/atoms/Field";
+import { StatChips, StatFields } from "@frontend/components/molecules/StatFields";
 import { Icon } from "@frontend/components/atoms/Icon";
 
 /**
@@ -86,6 +87,7 @@ export function CatalogManager({
                     {entry.tags.map((tag) => (
                       <Chip key={tag}>{tag}</Chip>
                     ))}
+                    <StatChips types={entry.types} stats={entry.stats} />
                     {entry.types
                       .filter((t) => t !== "Physical Object")
                       .map((type) => (
@@ -152,6 +154,13 @@ function EntryForm({
 }) {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [pending, startTransition] = useTransition();
+  const [typesText, setTypesText] = useState(
+    entry?.types.join(", ") ?? "Physical Object",
+  );
+  const types = typesText
+    .split(",")
+    .map((t) => t.trim())
+    .filter((t) => t !== "");
 
   const submit = (formData: FormData) => {
     onError(null);
@@ -230,9 +239,16 @@ function EntryForm({
         id={`catalog-types-${entry?.id ?? "new"}`}
         name="types"
         label="Types"
-        defaultValue={entry?.types.join(", ") ?? "Physical Object"}
+        value={typesText}
+        onChange={(e) => setTypesText(e.target.value)}
         error={fieldErrors.types}
-        hint="Comma separated. These decide which databases it appears in once a copy is in a container."
+        hint="Comma separated. These decide which database it belongs to, and so which columns it has — Weapon adds Grip, STR, Damage, Durability and Features; Gear and Consumable add Effect."
+      />
+
+      <StatFields
+        idPrefix={`catalog-${entry?.id ?? "new"}`}
+        types={types}
+        values={entry?.stats ?? {}}
       />
 
       <TextField

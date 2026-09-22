@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { listDatabases } from "@backend/domain/database";
+import { readDatabase } from "@backend/domain/database";
 import type { ContainerId, ItemId } from "@backend/domain/types";
 import type { Principal } from "@backend/domain/view";
 import { PermissionError } from "@backend/lib/permissions";
@@ -68,19 +68,16 @@ describe("reading the catalogue", () => {
    * walks containment edges to find items — skips them without being told to.
    * If this fails, entries have started showing up as loot.
    */
-  it("never leaks into a container or a database view", async () => {
+  it("never appears in a container, and appears in its database once", async () => {
     const items = await fixtureRepository.listItems(kova, KOVAS_PACK);
     expect(items.some((i) => i.id === ROPE)).toBe(false);
 
-    const databases = await listDatabases(fixtureRepository, kova);
-    const gear = databases.find((d) => d.name === "Gear");
-    // Kova's pack holds gear typed in by hand; the catalogue's Gear entries
-    // must not inflate that count.
-    const handTyped = items.filter((i) => i.types.includes("Gear")).length;
-    expect(gear ? gear.itemCount : 0).toBeGreaterThanOrEqual(handTyped);
-    expect(gear?.itemCount ?? 0).toBeLessThan(
-      handTyped + SEED_CATALOG.length,
-    );
+    // The reference diagram's model: the Gear database lists the rope as a
+    // definition — once, and with no holdings until someone takes a copy.
+    const gear = await readDatabase(fixtureRepository, kova, "gear");
+    const ropes = gear!.rows.filter((r) => r.id === ROPE);
+    expect(ropes).toHaveLength(1);
+    expect(ropes[0]!.holdings).toEqual([]);
   });
 });
 
@@ -94,6 +91,7 @@ describe("writing the catalogue", () => {
         tags: [],
         types: [],
         notes: "",
+        stats: {},
       }),
     ).rejects.toBeInstanceOf(PermissionError);
 
@@ -114,10 +112,13 @@ describe("writing the catalogue", () => {
       tags: ["gear"],
       types: ["Physical Object", "Gear"],
       notes: "",
+      // `grip` is not a Gear field, so it must not survive the write.
+      stats: { effect: "Lights a room.", grip: "1H" },
     });
 
     expect(created.name).toBe("Lantern, hooded");
     expect(created.copies).toBe(0);
+    expect(created.stats).toEqual({ effect: "Lights a room." });
   });
 
   it("patches only the fields it is given", async () => {
@@ -343,5 +344,84 @@ describe("a copy reached some other way", () => {
 
     expect(updated.qty).toBe(4);
     expect(updated.catalogItemId).toBe(ROPE);
+  });
+});
+
+describe("type-specific fields", () => {
+  const DAGGER = SEED_CATALOG.find((e) => e.name === "Dagger")!.id as ItemId;
+
+  it("a copy reads its weapon stats from the entry", async () => {
+    const copy = await fixtureRepository.addFromCatalog(kova, {
+      catalogItemId: DAGGER,
+      containerId: KOVAS_PACK,
+      qty: 1,
+    });
+    expect(copy.stats).toEqual({
+      grip: "1H",
+      str: "—",
+      damage: "1D6",
+      durability: "9",
+      features: "Subtle",
+    });
+  });
+
+  it("one correction to the entry's damage reaches every copy", async () => {
+    const copy = await fixtureRepository.addFromCatalog(kova, {
+      catalogItemId: DAGGER,
+      containerId: KOVAS_PACK,
+      qty: 1,
+    });
+    const entry = (await fixtureRepository.getCatalogItem(gm, DAGGER))!;
+    await fixtureRepository.updateCatalogItem(gm, {
+      id: DAGGER,
+      stats: { ...entry.stats, damage: "1D8" },
+    });
+
+    const reread = await fixtureRepository.getItem(kova, copy.id);
+    expect(reread?.stats.damage).toBe("1D8");
+  });
+
+  it("refuses a copy's own edit to an inherited stat, accepts it round-tripped", async () => {
+    const copy = await fixtureRepository.addFromCatalog(kova, {
+      catalogItemId: DAGGER,
+      containerId: KOVAS_PACK,
+      qty: 1,
+    });
+
+    await expect(
+      fixtureRepository.updateItem(kova, {
+        id: copy.id,
+        stats: { ...copy.stats, damage: "3D6" },
+      }),
+    ).rejects.toBeInstanceOf(ConflictError);
+
+    const saved = await fixtureRepository.updateItem(kova, {
+      id: copy.id,
+      stats: { ...copy.stats },
+      notes: "Grandmother's.",
+    });
+    expect(saved.notes).toBe("Grandmother's.");
+    expect(saved.stats.damage).toBe("1D6");
+  });
+
+  it("hides a stat once the item no longer has the type that owns it", async () => {
+    const created = await fixtureRepository.createItem(gm, {
+      containerId: WAGON,
+      name: "Walking stick",
+      qty: 1,
+      weight: 1,
+      value: "",
+      tags: [],
+      notes: "",
+      types: ["Physical Object", "Weapon"],
+      stats: { damage: "D6" },
+    });
+    expect(created.stats).toEqual({ damage: "D6" });
+
+    const retyped = await fixtureRepository.updateItem(gm, {
+      id: created.id,
+      types: ["Physical Object", "Gear"],
+    });
+    expect(retyped.stats).toEqual({});
   });
 });

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { Chip, ContainerDot } from "@frontend/components/atoms/Chip";
 import { Icon } from "@frontend/components/atoms/Icon";
+import { StatChips } from "@frontend/components/molecules/StatFields";
 import { WorkspaceShell } from "@frontend/components/organisms/WorkspaceShell";
 import { repository } from "@backend/db";
 import { CAMPAIGN_NAME } from "@backend/db/seed-data";
@@ -12,6 +13,7 @@ import {
   slugifyType,
   type DatabaseRow,
 } from "@backend/domain/database";
+import { fieldsForTypes, type ItemField } from "@backend/domain/item-fields";
 import { matchesQuery } from "@backend/domain/view";
 import { canWrite, creatableContainerTypes } from "@backend/lib/permissions";
 import { currentPrincipal } from "@backend/lib/session";
@@ -129,7 +131,7 @@ export default async function DatabasePage({
   }
 
   const rows = query
-    ? database.rows.filter((row) => matchesQuery(row.item, query))
+    ? database.rows.filter((row) => matchesQuery(row, query))
     : database.rows;
 
   return (
@@ -150,7 +152,7 @@ export default async function DatabasePage({
             </h1>
             <Chip tone="neutral">
               {database.rows.length}{" "}
-              {database.rows.length === 1 ? "object" : "objects"}
+              {database.rows.length === 1 ? "item" : "items"}
             </Chip>
             <Chip tone="neutral">Read only</Chip>
           </div>
@@ -178,7 +180,7 @@ export default async function DatabasePage({
             Nothing here matches “{query}”.
           </p>
         ) : (
-          <DatabaseTable rows={rows} />
+          <DatabaseTable rows={rows} fields={fieldsForTypes([database.name])} />
         )}
       </div>
     </WorkspaceShell>
@@ -186,85 +188,134 @@ export default async function DatabasePage({
 }
 
 /**
- * The wireframe's table, with the column a container's table does not need:
- * **Where**. A database is read as "what do we have, and where is it", and
- * without that column the answer to the second half is missing.
+ * The database as the reference diagram draws it: one row per item, with the
+ * columns of THIS type — Grip, STR, Damage, Durability and Features for
+ * Weapon; Effect for Gear — plus cost and weight, which every item has.
+ *
+ * And **Where**: the containers that reference it. An item exists
+ * independently of them; this column is how you get from the definition to
+ * the places it is actually being carried.
  */
-function DatabaseTable({ rows }: { rows: DatabaseRow[] }) {
+function DatabaseTable({
+  rows,
+  fields,
+}: {
+  rows: DatabaseRow[];
+  fields: ItemField[];
+}) {
   return (
     <table className="w-full border-collapse text-base">
       <thead className="sticky top-0 z-10 bg-surface">
         <tr className="border-b border-border text-left">
-          <Th>Name</Th>
-          {/* Every object here carries `Physical Object` — that type is what
-              makes it show up in a database at all, so listing it back would
-              be noise on every single row. The types alongside it are the
-              ones worth a glance. */}
-          <Th className="hidden md:table-cell">Type</Th>
-          <Th className="hidden lg:table-cell">Tags</Th>
-          <Th className="w-[1%] text-right">Qty</Th>
+          <Th>Item</Th>
+          {fields.map((field) => (
+            <Th
+              key={field.key}
+              className={`hidden md:table-cell ${field.numeric ? "w-[1%] text-right" : ""}`}
+            >
+              {field.label}
+            </Th>
+          ))}
+          {/* A database with no columns of its own (Physical Object, Treasure)
+              has room to say what else each item is. */}
+          {fields.length === 0 ? (
+            <Th className="hidden md:table-cell">Type</Th>
+          ) : null}
+          <Th className="hidden w-[1%] text-right md:table-cell">Cost</Th>
           <Th className="hidden w-[1%] text-right md:table-cell">Weight</Th>
-          <Th className="hidden w-[1%] text-right md:table-cell">Value</Th>
           <Th className="w-[30%]">Where</Th>
         </tr>
       </thead>
       <tbody>
-        {rows.map(({ item, container }) => {
-          const types = item.types.filter((t) => t !== "Physical Object");
+        {rows.map((row) => {
+          const types = row.types.filter((t) => t !== "Physical Object");
+          const first = row.holdings[0];
+          // The name is the link to the item's complete details: the detail
+          // panel of wherever it is held, or its catalogue entry when nobody
+          // is carrying one.
+          const detailsHref = first
+            ? `/c/${first.container.id}?item=${first.itemId}`
+            : "/catalog";
           return (
             <tr
-              key={item.id}
+              key={row.id}
               className="border-b border-border last:border-0 hover:bg-surface2"
             >
-              <td className="max-w-0 px-3 py-2">
-                {/* Every row is a link INTO the container, with the item
-                    already selected. That is the edit path: this table does
-                    not write, so the useful thing it can do is take you to
-                    the screen that does. */}
+              <td className="min-w-[8rem] px-3 py-2">
                 <Link
-                  href={`/c/${container.id}?item=${item.id}`}
-                  className="block truncate font-medium text-text hover:text-primary"
+                  href={detailsHref}
+                  className="block font-medium text-text underline decoration-border underline-offset-4 hover:text-primary hover:decoration-primary"
                 >
-                  {item.name}
+                  {row.name}
                 </Link>
-              </td>
-              <td className="hidden px-3 py-2 md:table-cell">
-                {types.length > 0 ? (
-                  <div className="flex flex-wrap gap-1">
-                    {types.map((type) => (
-                      <Chip key={type} tone="primary">
-                        {type}
-                      </Chip>
-                    ))}
-                  </div>
+                {row.catalogItemId ? (
+                  <span className="text-xs text-muted">Catalogue</span>
                 ) : null}
+                {/* Below `md` the stat columns do not fit, so the same values
+                    ride under the name instead of disappearing. */}
+                <div className="mt-1 flex flex-wrap gap-1 md:hidden">
+                  <StatChips types={row.types} stats={row.stats} />
+                  {row.value ? (
+                    <span className="rounded-sm border border-border px-1 font-mono text-xs text-muted">
+                      {row.value}
+                    </span>
+                  ) : null}
+                </div>
               </td>
-              <td className="hidden px-3 py-2 lg:table-cell">
-                {item.tags.length > 0 ? (
-                  <div className="flex flex-wrap gap-1">
-                    {item.tags.map((tag) => (
-                      <Chip key={tag}>{tag}</Chip>
-                    ))}
-                  </div>
-                ) : null}
-              </td>
-              <td className="px-3 py-2 text-right font-mono tabular-nums text-text">
-                {item.qty}
+              {fields.map((field) => (
+                <td
+                  key={field.key}
+                  className={`hidden px-3 py-2 md:table-cell ${
+                    field.numeric
+                      ? "whitespace-nowrap text-right font-mono tabular-nums text-text"
+                      : "text-text"
+                  }`}
+                >
+                  {row.stats[field.key] ?? <span className="text-faint">—</span>}
+                </td>
+              ))}
+              {fields.length === 0 ? (
+                <td className="hidden px-3 py-2 md:table-cell">
+                  {types.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {types.map((type) => (
+                        <Chip key={type} tone="primary">
+                          {type}
+                        </Chip>
+                      ))}
+                    </div>
+                  ) : null}
+                </td>
+              ) : null}
+              <td className="hidden whitespace-nowrap px-3 py-2 text-right font-mono tabular-nums text-muted md:table-cell">
+                {row.value || "—"}
               </td>
               <td className="hidden px-3 py-2 text-right font-mono tabular-nums text-muted md:table-cell">
-                {(item.weight * item.qty).toFixed(1)}
-              </td>
-              <td className="hidden px-3 py-2 text-right font-mono tabular-nums text-muted md:table-cell">
-                {item.value || "—"}
+                {row.weight.toFixed(1)}
               </td>
               <td className="px-3 py-2">
-                <Link
-                  href={`/c/${container.id}`}
-                  className="flex items-center gap-2 text-muted hover:text-text"
-                >
-                  <ContainerDot type={container.type} />
-                  <span className="min-w-0 truncate">{container.name}</span>
-                </Link>
+                {row.holdings.length === 0 ? (
+                  <span className="text-sm text-muted">Not carried</span>
+                ) : (
+                  <ul className="flex flex-col gap-1">
+                    {row.holdings.map((holding) => (
+                      <li key={holding.itemId}>
+                        <Link
+                          href={`/c/${holding.container.id}?item=${holding.itemId}`}
+                          className="flex items-center gap-2 text-muted hover:text-text"
+                        >
+                          <ContainerDot type={holding.container.type} />
+                          <span className="min-w-0 truncate">
+                            {holding.container.name}
+                          </span>
+                          <span className="shrink-0 font-mono text-xs tabular-nums">
+                            ×{holding.qty}
+                          </span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </td>
             </tr>
           );

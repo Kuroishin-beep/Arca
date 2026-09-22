@@ -9,6 +9,7 @@ import {
   MoveItemInput,
   UpdateItemInput,
 } from "@backend/domain/view";
+import { statsFromForm } from "@backend/domain/item-fields";
 import { campaignId } from "@backend/lib/campaign";
 import { PermissionError } from "@backend/lib/permissions";
 import { requirePrincipal } from "@backend/lib/session";
@@ -132,6 +133,7 @@ export async function createItemAction(
       tags: splitList(formData.get("tags")),
       notes: formData.get("notes") ?? "",
       types: splitList(formData.get("types")),
+      stats: statsFromForm(formData),
     });
 
     if (!parsed.success) {
@@ -165,6 +167,7 @@ export async function updateItemAction(
       tags: splitList(formData.get("tags")),
       notes: formData.get("notes") ?? "",
       types: splitList(formData.get("types")),
+      stats: statsFromForm(formData),
     });
 
     if (!parsed.success) {

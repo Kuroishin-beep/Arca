@@ -10,6 +10,7 @@ import { TextAreaField, TextField } from "@frontend/components/atoms/Field";
 import { Icon } from "@frontend/components/atoms/Icon";
 import { NumberStepper } from "@frontend/components/atoms/NumberStepper";
 import { Modal } from "@frontend/components/molecules/Modal";
+import { StatFields } from "@frontend/components/molecules/StatFields";
 import type { ContainerView, ItemView } from "@backend/domain/view";
 
 /**
@@ -43,6 +44,14 @@ export function ItemEditorDialog({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [qty, setQty] = useState(item?.qty ?? 1);
+  // Tracked so the type-specific inputs follow what is typed into Types.
+  const [typesText, setTypesText] = useState(
+    item?.types.join(", ") ?? "Physical Object",
+  );
+  const types = typesText
+    .split(",")
+    .map((t) => t.trim())
+    .filter((t) => t !== "");
   const [pending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -105,8 +114,8 @@ export function ItemEditorDialog({
             <p className="flex items-start gap-2 rounded-md border border-border bg-accent-weak p-3 text-sm text-text">
               <Icon name="info" size={14} className="mt-0.5 shrink-0 text-accent" />
               <span>
-                A copy from the catalogue. Its name, weight, value, tags and
-                types come from the{" "}
+                A copy from the catalogue. Its name, weight, value, tags, types
+                and stats come from the{" "}
                 <a href="/catalog" className="font-medium text-accent underline">
                   catalogue entry
                 </a>{" "}
@@ -132,9 +141,17 @@ export function ItemEditorDialog({
             name="types"
             label="Types"
             readOnly={isCopy}
-            defaultValue={item?.types.join(", ") ?? "Physical Object"}
+            value={typesText}
+            onChange={(e) => setTypesText(e.target.value)}
             error={fieldErrors.types}
             hint="Comma separated. An object may hold several types; each contributes its properties."
+          />
+
+          <StatFields
+            idPrefix="item"
+            types={types}
+            values={item?.stats ?? {}}
+            readOnly={isCopy}
           />
 
           <div className="grid grid-cols-3 gap-3">

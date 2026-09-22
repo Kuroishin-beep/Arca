@@ -22,6 +22,7 @@ import {
   Spells,
 } from "./character";
 import { ContainerId, ContainerType, ItemId, UserId, UserRole } from "./types";
+import { Stats, sameStats } from "./item-fields";
 
 /* ------------------------------------------------------------------ *
  * Principal — who is asking
@@ -86,11 +87,14 @@ export const ItemView = z.object({
   /** Names of the object types this item carries. Composable — an item is
    *  routinely several at once. */
   types: z.array(z.string()),
+  /** The values of the fields its types add — Grip, Damage, Effect
+   *  (`item-fields.ts`). Only keys its current types have a field for. */
+  stats: Stats,
   /**
    * The catalogue entry this is a copy of, or `null` for an item typed in by
    * hand (SCOPE.md S3).
    *
-   * When it is set, `name`, `weight`, `value`, `tags` and `types` above were
+   * When it is set, `name`, `weight`, `value`, `tags`, `types` and `stats` were
    * READ FROM that entry rather than from this object — so the screen can say
    * where they come from, and refuse to let them be edited here, where the
    * edit would be silently overwritten on the next read.
@@ -195,6 +199,7 @@ const ItemFields = z.object({
   tags: z.array(z.string().trim().min(1)),
   notes: z.string().max(2000),
   types: z.array(z.string().trim().min(1)),
+  stats: Stats,
 });
 
 /** Creating: the optional fields get their empty defaults. */
@@ -203,6 +208,7 @@ export const CreateItemInput = ItemFields.extend({
   tags: ItemFields.shape.tags.default([]),
   notes: ItemFields.shape.notes.default(""),
   types: ItemFields.shape.types.default([]),
+  stats: ItemFields.shape.stats.default({}),
 });
 export type CreateItemInput = z.infer<typeof CreateItemInput>;
 
@@ -393,6 +399,7 @@ export const INHERITED_FIELDS = [
   "value",
   "tags",
   "types",
+  "stats",
 ] as const;
 export type InheritedField = (typeof INHERITED_FIELDS)[number];
 
@@ -409,10 +416,15 @@ export function changedInheritedFields(
   current: Pick<ItemView, InheritedField>,
   patch: Partial<Pick<ItemView, InheritedField>>,
 ): InheritedField[] {
-  const same = (a: unknown, b: unknown): boolean =>
-    Array.isArray(a) && Array.isArray(b)
-      ? a.length === b.length && a.every((v, i) => v === b[i])
-      : a === b;
+  const same = (a: unknown, b: unknown): boolean => {
+    if (Array.isArray(a) && Array.isArray(b)) {
+      return a.length === b.length && a.every((v, i) => v === b[i]);
+    }
+    if (a !== null && b !== null && typeof a === "object" && typeof b === "object") {
+      return sameStats(a as Stats, b as Stats);
+    }
+    return a === b;
+  };
 
   return INHERITED_FIELDS.filter(
     (field) => patch[field] !== undefined && !same(patch[field], current[field]),
@@ -440,6 +452,7 @@ export const CatalogItemView = z.object({
   value: z.string(),
   tags: z.array(z.string()),
   types: z.array(z.string()),
+  stats: Stats,
   notes: z.string(),
   /** How many copies of this entry exist, across every container. Derived, and
    *  the number that makes "may I archive this?" answerable. */
@@ -455,6 +468,7 @@ const CatalogFields = z.object({
   tags: z.array(z.string().trim().min(1)),
   types: z.array(z.string().trim().min(1)),
   notes: z.string().max(2000),
+  stats: Stats,
 });
 
 export const CreateCatalogItemInput = CatalogFields.extend({
@@ -463,6 +477,7 @@ export const CreateCatalogItemInput = CatalogFields.extend({
   tags: CatalogFields.shape.tags.default([]),
   types: CatalogFields.shape.types.default([]),
   notes: CatalogFields.shape.notes.default(""),
+  stats: CatalogFields.shape.stats.default({}),
 });
 export type CreateCatalogItemInput = z.infer<typeof CreateCatalogItemInput>;
 
@@ -618,7 +633,10 @@ export function tagsOf(items: readonly ItemView[]): string[] {
  * Search matches the name and the type names — the Capacities "aliases" idea,
  * so that "sword" finds "Longsword +1" (SCOPE.md M9).
  */
-export function matchesQuery(item: ItemView, query: string): boolean {
+export function matchesQuery(
+  item: Pick<ItemView, "name" | "tags" | "types">,
+  query: string,
+): boolean {
   const q = query.trim().toLowerCase();
   if (q === "") return true;
   return (

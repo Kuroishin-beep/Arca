@@ -12,6 +12,8 @@
  */
 import { randomUUID } from "node:crypto";
 
+import { normaliseStats } from "@backend/domain/item-fields";
+
 import {
   type CharacterSheet,
   clampSheet,
@@ -126,6 +128,7 @@ function freshStore(): Store {
       tags: [...item.tags],
       notes: item.notes,
       types: [...item.types],
+      stats: normaliseStats(item.types, item.stats),
       // The seed's items are typed in by hand, not taken from the catalogue —
       // they predate it, and leaving them free-standing keeps the seed a
       // worked example of BOTH kinds of item.
@@ -140,6 +143,7 @@ function freshStore(): Store {
       value: entry.value,
       tags: [...entry.tags],
       types: [...entry.types],
+      stats: normaliseStats(entry.types, entry.stats),
       notes: entry.notes,
       updatedAt: now,
       archivedAt: null,
@@ -205,7 +209,9 @@ function liveItemsIn(containerId: string): ItemView[] {
  * situation; this is the belt to its braces.
  */
 function stripInternal(item: ItemView & { archivedAt: Date | null }): ItemView {
-  const { archivedAt: _archivedAt, ...rest } = item;
+  const { archivedAt: _archivedAt, ...stored } = item;
+  // Normalised on read as well as on write: see `normaliseStats`.
+  const rest = { ...stored, stats: normaliseStats(stored.types, stored.stats) };
   if (rest.catalogItemId === null) return rest;
 
   const entry = store().catalog.find(
@@ -220,6 +226,7 @@ function stripInternal(item: ItemView & { archivedAt: Date | null }): ItemView {
     value: entry.value,
     tags: [...entry.tags],
     types: [...entry.types],
+    stats: normaliseStats(entry.types, entry.stats),
   };
 }
 
@@ -253,7 +260,11 @@ function withCopyCount(
   entry: Store["catalog"][number],
 ): CatalogItemView {
   const { archivedAt: _archivedAt, ...rest } = entry;
-  return { ...rest, copies: copyCount(entry.id) };
+  return {
+    ...rest,
+    stats: normaliseStats(rest.types, rest.stats),
+    copies: copyCount(entry.id),
+  };
 }
 
 function findCatalogItem(catalogItemId: string) {
@@ -458,6 +469,7 @@ export const fixtureRepository: ArcaRepository = {
       value: input.value,
       tags: [...input.tags],
       types: [...input.types],
+      stats: normaliseStats(input.types, input.stats),
       notes: input.notes,
       updatedAt: new Date(),
       archivedAt: null,
@@ -477,6 +489,9 @@ export const fixtureRepository: ArcaRepository = {
         // the same patch discipline `updateItem` follows.
         (entry as Record<string, unknown>)[key] = value;
       }
+    }
+    if (input.stats !== undefined) {
+      entry.stats = normaliseStats(entry.types, input.stats);
     }
     entry.updatedAt = new Date();
 
@@ -519,6 +534,7 @@ export const fixtureRepository: ArcaRepository = {
       value: "",
       tags: [],
       types: [],
+      stats: {},
       qty: input.qty,
       notes: "",
       catalogItemId: entry.id,
@@ -578,6 +594,7 @@ export const fixtureRepository: ArcaRepository = {
       tags: input.tags,
       notes: input.notes,
       types: input.types,
+      stats: normaliseStats(input.types, input.stats),
       // Typed in by hand, so it owns its own fields. `addFromCatalog` is the
       // other door, and the one that sets a link.
       catalogItemId: null,
@@ -616,6 +633,9 @@ export const fixtureRepository: ArcaRepository = {
     if (input.tags !== undefined) item.tags = input.tags;
     if (input.notes !== undefined) item.notes = input.notes;
     if (input.types !== undefined) item.types = input.types;
+    if (input.stats !== undefined) {
+      item.stats = normaliseStats(item.types, input.stats);
+    }
     item.updatedAt = new Date();
 
     return stripInternal(item);
