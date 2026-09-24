@@ -357,7 +357,14 @@ export const CreateCommentInput = z.object({
     .trim()
     .min(1, "Say something first.")
     .max(1000, "Keep it under 1000 characters."),
-  parentId: z.string().nullable().default(null),
+  // A uuid, checked here rather than left to the database: a malformed id used
+  // to reach Postgres as a cast error, which surfaced as a failed query with
+  // the SQL in its message instead of as a bad request.
+  parentId: z
+    .string()
+    .uuid("That reply has nothing to reply to.")
+    .nullable()
+    .default(null),
 });
 export type CreateCommentInput = z.infer<typeof CreateCommentInput>;
 

@@ -68,8 +68,12 @@ export function ItemEditorDialog({
         setFormError(result.error ?? "Could not save that.");
         return;
       }
+      // Push only. The action has already called `revalidatePath`, which
+      // drops the cached page, so this navigation fetches it fresh. A
+      // `router.refresh()` straight after used to race it: fired while the URL
+      // still said `?dialog=…`, it could land after the push and render the
+      // dialog again over a save that had succeeded.
       router.push(closeHref);
-      router.refresh();
     });
   };
 

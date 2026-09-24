@@ -138,4 +138,15 @@ describe("CreateCommentInput (M12)", () => {
     });
     expect(parsed.content).toBe("careful");
   });
+
+  it("refuses a parent id that is not an id, before it reaches the database", () => {
+    const parsed = CreateCommentInput.safeParse({
+      containerId: "11111111-1111-4111-8111-111111111111",
+      content: "hi",
+      parentId: "not-a-uuid",
+    });
+    expect(parsed.success).toBe(false);
+    if (parsed.success) return;
+    expect(parsed.error.issues[0]?.message).toMatch(/nothing to reply to/i);
+  });
 });

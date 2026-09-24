@@ -102,8 +102,7 @@ async function main(): Promise<void> {
           : existing[0]
             ? "."
             : " (new account, unenrolled: it picks a password on first sign-in)."
-      }
-`,
+      }\n`,
   );
 }
 
