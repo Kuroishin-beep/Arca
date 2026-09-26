@@ -247,4 +247,34 @@ test.describe("the character sheet", () => {
 
     await kova.context().close();
   });
+  /**
+   * Found by an accessibility sweep: the visible name is an editable field, so
+   * the page had no <h1>; the vitals panels were <h3> with no <h2> above them;
+   * and the Kin, Age and Profession chips stripped the focus outline the rest
+   * of the app draws, leaving a keyboard user with no idea where they were.
+   */
+  test("the sheet has a heading outline and visible keyboard focus", async ({
+    browser,
+  }) => {
+    const kova = await signInAs(browser, "Kova");
+    await openSheet(kova, KOVA_CONTAINER_ID);
+
+    await expect(kova.getByRole("heading", { level: 1 })).toHaveCount(1);
+    await expect(
+      kova.getByRole("heading", { level: 2, name: /hit points/i }),
+    ).toBeVisible();
+    await expect(
+      kova.getByRole("heading", { level: 2, name: /death rolls/i }),
+    ).toBeVisible();
+
+    for (const id of ["kin", "age", "profession"]) {
+      await kova.locator(`#${id}`).focus();
+      const outline = await kova
+        .locator(`#${id}`)
+        .evaluate((el) => getComputedStyle(el.parentElement!).outlineStyle);
+      expect(outline, `#${id} must show a focus ring`).not.toBe("none");
+    }
+
+    await kova.context().close();
+  });
 });

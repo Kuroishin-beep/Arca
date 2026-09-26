@@ -71,6 +71,12 @@ export default async function CharacterSheetPage({
 
       <main className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex max-w-5xl flex-col gap-4 p-3 md:p-6">
+          {/* The page's heading, for screen readers. The visible name is an
+              editable field rather than a heading — so it can be renamed in
+              place — which left the page with no <h1> at all, and the
+              section headings below (Attributes, Skills) with nothing to sit
+              under. */}
+          <h1 className="sr-only">Character sheet: {character.name}</h1>
           <div className="flex flex-wrap items-center gap-2">
             <ButtonLink href={`/c/${containerId}`} size="sm" icon="pack">
               Back to inventory

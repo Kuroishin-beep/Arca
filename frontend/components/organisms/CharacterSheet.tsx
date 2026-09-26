@@ -359,7 +359,7 @@ function PointsCard({
   return (
     <section className="flex flex-col rounded-lg border border-border bg-surface p-4">
       <div className="flex items-baseline justify-between gap-2">
-        <h3 className="font-serif text-lg font-bold text-text">{label}</h3>
+        <h2 className="font-serif text-lg font-bold text-text">{label}</h2>
         <span className="text-xs text-faint">{hint}</span>
       </div>
 
@@ -428,7 +428,7 @@ function DeathRollsCard({
   return (
     <section className="flex flex-col rounded-lg border border-border bg-surface p-4 md:col-span-2 lg:col-span-1">
       <div className="flex items-baseline justify-between gap-2">
-        <h3 className="font-serif text-lg font-bold text-text">Death rolls</h3>
+        <h2 className="font-serif text-lg font-bold text-text">Death rolls</h2>
         <span className="text-xs text-faint">Three ends it either way</span>
       </div>
 
@@ -1057,7 +1057,10 @@ function Select({
   onChange: (value: string) => void;
 }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-sm border border-border bg-surface2 px-1.5 py-0.5">
+    // The focus ring is drawn on the whole chip, not on the bare control
+    // inside it: the control has no border of its own, so the app's standard
+    // outline (globals.css, "never removed") goes where the edge actually is.
+    <span className="inline-flex items-center gap-1 rounded-sm border border-border bg-surface2 px-1.5 py-0.5 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-primary">
       <label htmlFor={id} className="text-xs text-faint">
         {label}
       </label>
@@ -1101,7 +1104,10 @@ function TextChip({
   const listId = `${id}-suggestions`;
 
   return (
-    <span className="inline-flex items-center gap-1 rounded-sm border border-border bg-surface2 px-1.5 py-0.5">
+    // The focus ring is drawn on the whole chip, not on the bare control
+    // inside it: the control has no border of its own, so the app's standard
+    // outline (globals.css, "never removed") goes where the edge actually is.
+    <span className="inline-flex items-center gap-1 rounded-sm border border-border bg-surface2 px-1.5 py-0.5 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-primary">
       <label htmlFor={id} className="text-xs text-faint">
         {label}
       </label>
