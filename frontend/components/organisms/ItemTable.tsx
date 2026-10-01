@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { sharedFields } from "@backend/domain/item-fields";
 
-import { Chip } from "@frontend/components/atoms/Chip";
+import { TagChip } from "@frontend/components/atoms/Chip";
 import { Icon } from "@frontend/components/atoms/Icon";
 import { EmptyState } from "@frontend/components/molecules/EmptyState";
 import { ButtonLink } from "@frontend/components/atoms/Button";
@@ -153,10 +153,7 @@ export function ItemTable({
                   ) : null,
                 )}
                 {extra.length === 0 && item.tags[0] ? (
-                  <>
-                    <span aria-hidden="true">·</span>
-                    <span className="truncate">{item.tags[0]}</span>
-                  </>
+                  <TagChip tag={item.tags[0]} className="ml-auto" />
                 ) : null}
               </div>
             </Link>
@@ -166,7 +163,7 @@ export function ItemTable({
 
       {/* ── `panel` and up: the table proper ───────────────────────── */}
       <table className="hidden w-full text-base panel:table">
-        <thead className="sticky top-0 z-10 bg-bg">
+        <thead className="sticky top-0 z-10 bg-surface">
           <tr className="border-b border-border text-left">
             <SortableHeader
               column="name"
@@ -208,7 +205,7 @@ export function ItemTable({
                 key={field.key}
                 scope="col"
                 title={field.label}
-                className={`hidden px-3 py-2 text-sm font-medium text-muted md:table-cell ${
+                className={`hidden px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted md:table-cell ${
                   field.numeric ? "text-right" : ""
                 }`}
               >
@@ -224,7 +221,7 @@ export function ItemTable({
             ))}
             <th
               scope="col"
-              className={`hidden px-3 py-2 text-sm font-medium text-muted ${
+              className={`hidden px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted ${
                 extra.length > 0 ? "xl:table-cell" : "md:table-cell"
               }`}
             >
@@ -235,7 +232,7 @@ export function ItemTable({
                 crowding the name column it sits after. */}
             <th
               scope="col"
-              className={`hidden px-3 py-2 text-sm font-medium text-muted ${
+              className={`hidden px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted ${
                 notesCell
               }`}
             >
@@ -253,7 +250,7 @@ export function ItemTable({
               <tr
                 key={item.id}
                 aria-selected={selected}
-                className={`h-9 border-b border-border ${
+                className={`group h-11 border-b border-border transition-colors ${
                   selected ? "bg-surface2" : "hover:bg-surface"
                 }`}
               >
@@ -286,8 +283,8 @@ export function ItemTable({
                 <td className="px-3 text-right font-mono text-base tabular-nums text-text">
                   {item.weight.toFixed(1)}
                 </td>
-                <td className="hidden px-3 text-right font-mono text-base tabular-nums text-muted md:table-cell">
-                  {item.value || "—"}
+                <td className="hidden whitespace-nowrap px-3 text-right font-mono text-base tabular-nums text-text md:table-cell">
+                  <Value value={item.value} />
                 </td>
                 {extra.map((field) => (
                   <td
@@ -306,11 +303,7 @@ export function ItemTable({
                     extra.length > 0 ? "xl:table-cell" : "md:table-cell"
                   }`}
                 >
-                  {item.tags[0] ? (
-                    <Chip tone={item.tags[0] === "consumable" ? "success" : "neutral"}>
-                      {item.tags[0]}
-                    </Chip>
-                  ) : null}
+                  <Tags tags={item.tags} />
                 </td>
                 <td
                   className={`hidden max-w-0 px-3 text-muted ${
@@ -326,7 +319,9 @@ export function ItemTable({
                 <td className="hidden px-2 text-right lg:table-cell">
                   <Link
                     href={rowHref(containerId, item.id, query)}
-                    className="grid h-7 w-7 place-items-center rounded-md text-muted hover:bg-surface3 hover:text-text"
+                    className={`grid h-7 w-7 place-items-center rounded-md text-muted hover:bg-surface3 hover:text-text focus-visible:opacity-100 group-hover:opacity-100 ${
+                      selected ? "opacity-100" : "opacity-0"
+                    }`}
                   >
                     <Icon name="more" size={14} />
                     <span className="sr-only">Open {item.name}</span>
@@ -338,6 +333,42 @@ export function ItemTable({
         </tbody>
       </table>
     </>
+  );
+}
+
+/** "50 gp" → the number in full ink, the coin muted after it. Free-text values
+ *  that are not "number unit" are shown as they are. */
+function Value({ value }: { value: string }) {
+  if (!value) return <span className="text-faint">—</span>;
+  const match = /^([\d.,]+)\s*([a-z]+)$/i.exec(value.trim());
+  if (!match) return <>{value}</>;
+  return (
+    <>
+      {/* A real space, not a margin: the text must still read "50 gp" to a
+          screen reader and to copy-paste, not "50gp". */}
+      {match[1]}{" "}
+      <span className="text-xs text-muted">{match[2]}</span>
+    </>
+  );
+}
+
+/** Up to two tags in their own colours, then a count — the full list is in
+ *  the detail panel, and a row of six chips is a wall, not a hint. */
+function Tags({ tags }: { tags: readonly string[] }) {
+  if (tags.length === 0) return <span className="text-faint">—</span>;
+  const shown = tags.slice(0, 2);
+  const rest = tags.length - shown.length;
+  return (
+    <span className="flex flex-wrap items-center gap-1">
+      {shown.map((tag) => (
+        <TagChip key={tag} tag={tag} />
+      ))}
+      {rest > 0 ? (
+        <span className="text-xs text-muted" title={tags.slice(2).join(", ")}>
+          +{rest}
+        </span>
+      ) : null}
+    </span>
   );
 }
 
@@ -381,7 +412,7 @@ function SortableHeader({
       aria-sort={
         active ? (sort.direction === "asc" ? "ascending" : "descending") : "none"
       }
-      className={`py-2 text-sm font-medium text-muted ${className}`}
+      className={`py-2.5 text-xs font-semibold uppercase tracking-wide text-muted ${className}`}
     >
       <Link
         href={`/c/${containerId}?${params.toString()}`}

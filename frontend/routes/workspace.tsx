@@ -115,6 +115,11 @@ export default async function WorkspacePage({
   // Chips are built from what is ACTUALLY in this container, so a tag never
   // offers itself as a filter that can only ever return nothing.
   const availableTags = tagsOf(allItems);
+  // How many items carry each tag, shown on its pill — "gear 6" says whether a
+  // filter is worth clicking before you click it.
+  const tagCounts = new Map(
+    availableTags.map((tag) => [tag, allItems.filter((i) => i.tags.includes(tag)).length]),
+  );
 
   const items = sortItems(
     allItems.filter(
@@ -357,7 +362,11 @@ export default async function WorkspacePage({
                 Chips are links, not buttons, so a filtered view is a real URL
                 and the whole row works with JavaScript off. */}
             {availableTags.length > 0 || query || selectedTags.length > 0 ? (
-              <div className="mt-3 flex flex-wrap items-center gap-2 pb-2">
+              <div className="mt-3 flex flex-wrap items-center gap-2 pb-3">
+                <span className="mr-1 inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted">
+                  <Icon name="filter" size={12} />
+                  Filter
+                </span>
                 {availableTags.map((tag) => {
                   const active = selectedTags.includes(tag);
                   return (
@@ -365,16 +374,19 @@ export default async function WorkspacePage({
                       key={tag}
                       href={tagHref(tag)}
                       aria-pressed={active}
-                      className={`inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 text-xs ${
+                      className={`inline-flex h-7 items-center gap-1.5 rounded-full border px-3 text-xs transition-colors ${
                         active
-                          ? "border-primary bg-primary-weak font-medium text-primary"
-                          : "border-border bg-surface2 text-muted hover:text-text"
+                          ? "border-primary bg-primary font-semibold text-invert"
+                          : "border-border bg-surface text-text hover:border-primary hover:text-primary"
                       }`}
                     >
+                      {active ? <Icon name="check" size={11} strokeWidth={2.2} /> : null}
                       {tag}
-                      {active ? (
-                        <Icon name="close" size={10} strokeWidth={2} />
-                      ) : null}
+                      <span
+                        className={`font-mono tabular-nums ${active ? "text-invert" : "text-muted"}`}
+                      >
+                        {tagCounts.get(tag) ?? 0}
+                      </span>
                     </Link>
                   );
                 })}
@@ -397,8 +409,16 @@ export default async function WorkspacePage({
                 ) : null}
 
                 {query || selectedTags.length > 0 ? (
-                  <span className="text-sm text-muted">
-                    {items.length} of {allItems.length}
+                  <span className="ml-auto flex items-center gap-3 text-sm text-muted">
+                    <span>
+                      {items.length} of {allItems.length}
+                    </span>
+                    <Link
+                      href={`/c/${containerId}`}
+                      className="font-medium text-primary underline-offset-4 hover:underline"
+                    >
+                      Clear
+                    </Link>
                   </span>
                 ) : null}
               </div>

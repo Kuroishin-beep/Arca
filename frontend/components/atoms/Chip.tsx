@@ -44,6 +44,46 @@ export function Chip({
 }
 
 /* ------------------------------------------------------------------ *
+ * TagChip
+ * ------------------------------------------------------------------ */
+
+/** The tags a Dragonbane table actually uses, each given its own tone so the
+ *  colour carries meaning across every screen: a weapon is gold wherever it
+ *  appears. */
+const KNOWN_TAG_TONES: Readonly<Record<string, ChipTone>> = {
+  weapon: "primary",
+  armour: "info",
+  armor: "info",
+  consumable: "success",
+  ammunition: "warning",
+  treasure: "accent",
+  magic: "accent",
+  gear: "neutral",
+};
+
+/** Tags a campaign invents get a tone too — stable, from the tag's own text,
+ *  so "quest" is the same colour on every reload rather than whichever tone
+ *  was free. Danger is left out: red reads as an error, not a category. */
+const FALLBACK_TONES: readonly ChipTone[] = ["info", "accent", "warning", "primary", "success"];
+
+export function tagTone(tag: string): ChipTone {
+  const key = tag.trim().toLowerCase();
+  const known = KNOWN_TAG_TONES[key];
+  if (known) return known;
+  let hash = 0;
+  for (const ch of key) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return FALLBACK_TONES[hash % FALLBACK_TONES.length]!;
+}
+
+export function TagChip({ tag, className = "" }: { tag: string; className?: string }) {
+  return (
+    <Chip tone={tagTone(tag)} className={className}>
+      {tag}
+    </Chip>
+  );
+}
+
+/* ------------------------------------------------------------------ *
  * ContainerBadge
  * ------------------------------------------------------------------ */
 

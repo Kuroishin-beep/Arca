@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { Chip } from "@frontend/components/atoms/Chip";
+import { Chip, TagChip } from "@frontend/components/atoms/Chip";
 import { ContainerDot } from "@frontend/components/atoms/Chip";
 import { Icon } from "@frontend/components/atoms/Icon";
 import { ButtonLink } from "@frontend/components/atoms/Button";
@@ -116,7 +116,7 @@ export function DetailPanel({
               <dt className="text-sm text-muted">Tags</dt>
               <dd className="flex flex-wrap justify-end gap-1">
                 {item.tags.map((tag) => (
-                  <Chip key={tag}>{tag}</Chip>
+                  <TagChip key={tag} tag={tag} />
                 ))}
               </dd>
             </div>

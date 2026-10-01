@@ -9,7 +9,7 @@ import {
 } from "@backend/actions/catalog";
 import type { CatalogItemView } from "@backend/domain/view";
 import { Button } from "@frontend/components/atoms/Button";
-import { Chip } from "@frontend/components/atoms/Chip";
+import { Chip, TagChip } from "@frontend/components/atoms/Chip";
 import { TextAreaField, TextField } from "@frontend/components/atoms/Field";
 import { StatChips, StatFields } from "@frontend/components/molecules/StatFields";
 import { Icon } from "@frontend/components/atoms/Icon";
@@ -85,7 +85,7 @@ export function CatalogManager({
                       </>
                     ) : null}
                     {entry.tags.map((tag) => (
-                      <Chip key={tag}>{tag}</Chip>
+                      <TagChip key={tag} tag={tag} />
                     ))}
                     <StatChips types={entry.types} stats={entry.stats} />
                     {entry.types

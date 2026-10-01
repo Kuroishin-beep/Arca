@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { addFromCatalogAction } from "@backend/actions/catalog";
 import type { CatalogItemView, ContainerView } from "@backend/domain/view";
 import { Button } from "@frontend/components/atoms/Button";
-import { Chip } from "@frontend/components/atoms/Chip";
+import { TagChip } from "@frontend/components/atoms/Chip";
 import { Icon } from "@frontend/components/atoms/Icon";
 import { NumberStepper } from "@frontend/components/atoms/NumberStepper";
 import { Modal } from "@frontend/components/molecules/Modal";
@@ -153,7 +153,7 @@ export function CatalogPickerDialog({
                       </>
                     ) : null}
                     {entry.tags.map((tag) => (
-                      <Chip key={tag}>{tag}</Chip>
+                      <TagChip key={tag} tag={tag} />
                     ))}
                     <StatChips types={entry.types} stats={entry.stats} />
                   </p>

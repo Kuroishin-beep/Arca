@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 
 import { ButtonLink } from "@frontend/components/atoms/Button";
-import { Chip } from "@frontend/components/atoms/Chip";
+import { Chip, TagChip } from "@frontend/components/atoms/Chip";
 import { Avatar } from "@frontend/components/atoms/Status";
 import { WeightMeter } from "@frontend/components/molecules/WeightMeter";
 import { CharacterSheet } from "@frontend/components/organisms/CharacterSheet";
@@ -213,7 +213,7 @@ function EquipmentTable({
                 <td className="hidden px-3 panel:table-cell">
                   <div className="flex flex-wrap gap-1">
                     {item.tags.map((tag) => (
-                      <Chip key={tag}>{tag}</Chip>
+                      <TagChip key={tag} tag={tag} />
                     ))}
                   </div>
                 </td>
