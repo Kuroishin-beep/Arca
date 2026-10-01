@@ -33,10 +33,16 @@ async function signInAsGm(browser: Browser): Promise<Page> {
 /** A fresh, empty container, so its columns depend only on what this test puts in. */
 async function newContainer(page: Page, name: string): Promise<string> {
   await page.getByRole("link", { name: /new container/i }).first().click();
-  await expect(page.getByRole("dialog")).toBeVisible();
-  await page.getByLabel("Name").fill(name);
-  await page.getByRole("radio", { name: /shared/i }).check();
-  await page.getByRole("button", { name: /^create$/i }).click();
+  // Wait for the dialog itself and type INSIDE it. Filling as soon as the
+  // link was clicked raced the navigation: with another "Name" field still on
+  // screen (the catalogue's form), the name went there, the dialog's stayed
+  // empty, and the browser's required-field check silently blocked Create.
+  await page.waitForURL(/dialog=new-container/);
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel("Name").fill(name);
+  await dialog.getByRole("radio", { name: /shared/i }).check();
+  await dialog.getByRole("button", { name: /^create$/i }).click();
   await page.waitForURL(/\/c\/[0-9a-f-]+$/);
   return new URL(page.url()).pathname;
 }

@@ -51,10 +51,7 @@ export function TopBar({
         </Link>
       ) : null}
 
-      <Link
-        href="/"
-        className="flex shrink-0 items-center gap-2 text-primary"
-      >
+      <Link href="/" className="flex shrink-0 items-center gap-2 text-primary">
         <Icon name="chest" size={18} />
         <span className="font-serif text-lg font-bold tracking-wide">Arca</span>
       </Link>
@@ -84,18 +81,21 @@ export function TopBar({
             className="h-8 w-full rounded-md border border-border bg-surface2 pl-7 pr-2 text-base text-text placeholder:text-faint"
           />
         </form>
-      ) : (
-        <div className="ml-auto" />
-      )}
+      ) : null}
 
-      {/* The only client component in the bar. It subscribes to the campaign
+      {/* Everything after the search is one group pinned to the right edge.
+          The search is width-capped from `md` up, so without this the account
+          controls trailed straight after it and stopped mid-screen, leaving the
+          right of the bar empty. */}
+      <div className="ml-auto flex shrink-0 items-center gap-3">
+        {/* The only client component in the bar. It subscribes to the campaign
           channel and reports what it actually knows, rather than the hardcoded
           "Synced" that stood in before the channel existed. */}
-      <RealtimeSync userId={principal.userId} className="hidden sm:flex" />
+        <RealtimeSync userId={principal.userId} className="hidden sm:flex" />
 
-      <ThemeToggle />
+        <ThemeToggle />
 
-      {/* Who you are, and leaving — two things, two controls.
+        {/* Who you are, and leaving — two things, two controls.
           They used to be one: the badge WAS the sign-out button, with the only
           hint an `sr-only` span. So the single most destructive control in the
           bar was also the one element people click to check which account they
@@ -104,15 +104,12 @@ export function TopBar({
           ends your session".
           The badge is now inert identity, and leaving is a labelled control
           next to it. */}
-      <UserBadge principal={principal} />
+        <UserBadge principal={principal} />
 
-      <form action={signOutAction}>
-        <IconButton
-          type="submit"
-          icon="sign-out"
-          label="Sign out"
-        />
-      </form>
+        <form action={signOutAction}>
+          <IconButton type="submit" icon="sign-out" label="Sign out" />
+        </form>
+      </div>
     </header>
   );
 }

@@ -151,7 +151,9 @@ export function ContainerEditorDialog({
         // it.
         router.push(`/c/${result.data!.containerId}`);
       }
-      router.refresh();
+      // Push only — see ItemEditorDialog. The action revalidates, so the
+      // push fetches fresh; a refresh fired straight after raced it, and could
+      // land on the old `?dialog=` URL and stall or reopen the dialog.
     });
   };
 

@@ -134,15 +134,36 @@ export function WorkspaceShell({
             (Design.md Step F). Two `<nav>`s rather than one that reflows,
             because the compact rail's markup is genuinely different (icons,
             no group headings), not the same rows at a squeezed width. */}
-        {railCollapsed ? null : (
+        <nav
+          aria-label="Containers"
+          className="hidden w-12 shrink-0 flex-col overflow-y-auto border-r border-border bg-surface panel:flex md:hidden"
+        >
+          {navCompact}
+        </nav>
+        {/* Collapsing shrinks the full list to the icon rail; it never removes
+            navigation. It used to render nothing at all, which left one 13px
+            glyph in the toolbar as the only way back — easy to lose, and with
+            the sidebar gone there was nothing else on screen to get you home.
+            The rail keeps every container one click away and puts "show the
+            sidebar" exactly where the sidebar was. */}
+        {railCollapsed ? (
           <nav
             aria-label="Containers"
-            className="hidden w-12 shrink-0 flex-col overflow-y-auto border-r border-border bg-surface panel:flex md:hidden"
+            className="hidden w-12 shrink-0 flex-col overflow-y-auto border-r border-border bg-surface md:flex"
           >
-            {navCompact}
+            <Sidebar
+              containers={containers}
+              databases={databases}
+              principal={principal}
+              selectedId={selectedId}
+              selectedDatabase={selectedDatabase}
+              campaignName={campaignName}
+              compact
+              drawerHref={railHref}
+              expandLabel="Show the sidebar"
+            />
           </nav>
-        )}
-        {railCollapsed ? null : (
+        ) : (
           <nav
             aria-label="Containers"
             className="hidden w-[var(--sidebar-w)] shrink-0 flex-col overflow-y-auto border-r border-border bg-surface md:flex"
@@ -196,7 +217,7 @@ export function WorkspaceShell({
               label={railCollapsed ? "Show the sidebar" : "Hide the sidebar"}
               size={13}
               href={railHref}
-              className="hidden h-7 w-7 panel:grid"
+              className="hidden h-7 w-7 md:grid"
             />
             <QuickAccess current={quickAccess} />
 

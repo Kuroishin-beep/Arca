@@ -22,6 +22,7 @@ export function NumberStepper({
   max,
   step = 1,
   onChange,
+  size = "md",
 }: {
   id: string;
   /** Composes the +/- buttons' accessible names ("Decrease qty") — not
@@ -34,7 +35,12 @@ export function NumberStepper({
   max?: number;
   step?: number;
   onChange: (value: number) => void;
+  /** `sm` for tight spots — the six attribute cards on the character sheet are
+   *  narrower than the 128px the default needs, and it overflowed them. */
+  size?: "md" | "sm";
 }) {
+  const sm = size === "sm";
+  const button = sm ? "w-7" : "w-9";
   const clamp = (n: number) => {
     const bounded = max !== undefined ? Math.min(max, n) : n;
     return Math.max(min, Number.isNaN(bounded) ? min : bounded);
@@ -44,12 +50,16 @@ export function NumberStepper({
   const atMax = max !== undefined && value >= max;
 
   return (
-    <div className="flex h-9 w-fit items-center rounded-md border border-border bg-surface2">
+    <div
+      className={`flex w-fit items-center rounded-md border border-border bg-surface2 ${
+        sm ? "h-8" : "h-9"
+      }`}
+    >
       <button
         type="button"
         onClick={() => onChange(clamp(value - step))}
         disabled={atMin}
-        className="grid h-full w-9 place-items-center rounded-l-md text-muted hover:bg-surface3 hover:text-text disabled:cursor-not-allowed disabled:text-faint disabled:hover:bg-transparent"
+        className={`grid h-full ${button} place-items-center rounded-l-md text-muted hover:bg-surface3 hover:text-text disabled:cursor-not-allowed disabled:text-faint disabled:hover:bg-transparent`}
       >
         <Icon name="minus" size={14} strokeWidth={2} />
         <span className="sr-only">Decrease {label.toLowerCase()}</span>
@@ -64,13 +74,15 @@ export function NumberStepper({
         step={step}
         value={value}
         onChange={(e) => onChange(clamp(Number(e.target.value)))}
-        className="h-full w-14 border-x border-border bg-transparent text-center font-mono text-base tabular-nums text-text"
+        className={`h-full border-x border-border bg-transparent text-center font-mono tabular-nums text-text ${
+          sm ? "w-10 text-sm" : "w-14 text-base"
+        }`}
       />
       <button
         type="button"
         onClick={() => onChange(clamp(value + step))}
         disabled={atMax}
-        className="grid h-full w-9 place-items-center rounded-r-md text-muted hover:bg-surface3 hover:text-text disabled:cursor-not-allowed disabled:text-faint disabled:hover:bg-transparent"
+        className={`grid h-full ${button} place-items-center rounded-r-md text-muted hover:bg-surface3 hover:text-text disabled:cursor-not-allowed disabled:text-faint disabled:hover:bg-transparent`}
       >
         <Icon name="plus" size={14} strokeWidth={2} />
         <span className="sr-only">Increase {label.toLowerCase()}</span>

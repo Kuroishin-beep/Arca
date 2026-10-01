@@ -70,6 +70,10 @@ export function Sidebar({
    *  the existing overlay rather than a second thing to build and keep in
    *  sync with it. Unused when `compact` is false. */
   drawerHref,
+  /** What the expand affordance says. The same rail serves two jobs: opening
+   *  the drawer between `panel` and `md`, and bringing a collapsed sidebar
+   *  back from `md` up — and those should not be described the same way. */
+  expandLabel = "Show the full container list",
 }: {
   containers: ContainerView[];
   databases: DatabaseSummary[];
@@ -84,6 +88,7 @@ export function Sidebar({
   catalogOpen?: boolean;
   compact?: boolean;
   drawerHref?: string;
+  expandLabel?: string;
 }) {
   if (compact) {
     return (
@@ -95,11 +100,11 @@ export function Sidebar({
         {drawerHref ? (
           <Link
             href={drawerHref}
-            aria-label="Show the full container list"
-            title="Show the full container list"
-            className="mx-auto mt-2 grid h-8 w-8 shrink-0 place-items-center rounded-md text-muted hover:bg-surface2 hover:text-text"
+            aria-label={expandLabel}
+            title={expandLabel}
+            className="mx-auto mt-2 grid h-9 w-9 shrink-0 place-items-center rounded-md border border-border bg-surface2 text-text hover:border-primary hover:text-primary"
           >
-            <Icon name="menu" size={15} />
+            <Icon name="menu" size={16} />
           </Link>
         ) : null}
 

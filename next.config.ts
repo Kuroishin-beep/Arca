@@ -16,6 +16,9 @@ const nextConfig: NextConfig = {
    * first real deploy this must be narrowed to TaleSpire's own origin — see
    * SCOPE.md §10 R2.
    */
+  // No `X-Powered-By: Next.js` on every response: it names the framework (and
+  // so which advisories to try) to anyone scanning, and tells a player nothing.
+  poweredByHeader: false,
   async headers() {
     return [
       {

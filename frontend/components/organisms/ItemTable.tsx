@@ -60,6 +60,15 @@ export function ItemTable({
   // item in it shares. All weapons → the weapon columns; a dagger beside a
   // sleeping fur → just the common ones.
   const extra = sharedFields(items);
+  // Notes is the first column to give up its width. With an item selected the
+  // detail panel is open beside the table — and it already shows that item's
+  // notes in full — so keeping the column there only squeezed the names down to
+  // "Iron spikes (bund…". Extra stat columns push it out a breakpoint too.
+  const notesCell = selectedId
+    ? "2xl:table-cell"
+    : extra.length > 0
+      ? "xl:table-cell"
+      : "lg:table-cell";
 
   if (items.length === 0) {
     return query.trim() !== "" ? (
@@ -227,7 +236,7 @@ export function ItemTable({
             <th
               scope="col"
               className={`hidden px-3 py-2 text-sm font-medium text-muted ${
-                extra.length > 0 ? "xl:table-cell" : "lg:table-cell"
+                notesCell
               }`}
             >
               Notes
@@ -305,7 +314,7 @@ export function ItemTable({
                 </td>
                 <td
                   className={`hidden max-w-0 px-3 text-muted ${
-                    extra.length > 0 ? "xl:table-cell" : "lg:table-cell"
+                    notesCell
                   }`}
                 >
                   {item.notes ? (

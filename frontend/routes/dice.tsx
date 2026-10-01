@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 
-import { Chip } from "@frontend/components/atoms/Chip";
 import { ButtonLink } from "@frontend/components/atoms/Button";
 import { DiceFinder } from "@frontend/components/organisms/DiceFinder";
 import { TopBar } from "@frontend/components/organisms/TopBar";
@@ -24,12 +23,15 @@ export default async function DicePage() {
       <TopBar principal={principal} />
       <main className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex max-w-2xl flex-col gap-5 p-4 md:p-6">
+          {/* "Stretch scope" used to sit here as a badge — a planning label from
+              SCOPE.md that told a player nothing. The page heading is the
+              label now. */}
           <div className="flex flex-wrap items-center gap-2">
-            <Chip tone="warning">Stretch scope</Chip>
-            <ButtonLink href="/" size="sm">
-              Inventory
+            <ButtonLink href="/" size="sm" icon="pack">
+              Back to inventory
             </ButtonLink>
           </div>
+          <h1 className="font-serif text-2xl font-bold text-text">DiceFinder</h1>
           <DiceFinder />
         </div>
       </main>

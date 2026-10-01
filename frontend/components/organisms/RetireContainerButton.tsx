@@ -45,8 +45,10 @@ export function RetireContainerButton({
         setConfirming(false);
         return;
       }
+      // Push only — see ItemEditorDialog. The action revalidates, so the
+      // push fetches fresh; a refresh fired straight after raced it, and could
+      // land on the old `?dialog=` URL and stall or reopen the dialog.
       router.push(fallbackHref);
-      router.refresh();
     });
   };
 

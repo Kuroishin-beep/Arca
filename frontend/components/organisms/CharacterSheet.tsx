@@ -614,6 +614,7 @@ function AttributeBox({
           min={ATTRIBUTE_MIN}
           max={ATTRIBUTE_MAX}
           onChange={onScore}
+          size="sm"
         />
       ) : (
         <p className="font-mono text-xl font-bold tabular-nums text-text">

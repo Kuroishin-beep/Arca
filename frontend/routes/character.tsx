@@ -82,7 +82,7 @@ export default async function CharacterSheetPage({
               Back to inventory
             </ButtonLink>
             <ButtonLink href="/dice" size="sm">
-              diceFinder
+              DiceFinder
             </ButtonLink>
             {!editable ? (
               <Chip tone="neutral">Read only</Chip>

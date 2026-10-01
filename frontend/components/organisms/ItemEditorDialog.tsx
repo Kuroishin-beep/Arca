@@ -158,7 +158,10 @@ export function ItemEditorDialog({
             readOnly={isCopy}
           />
 
-          <div className="grid grid-cols-3 gap-3">
+          {/* `auto` for the stepper, not a third of the row: its two buttons
+              and input need 128px, and an equal third of the dialog is less,
+              so the + button ran under the Weight field. */}
+          <div className="grid grid-cols-[auto_1fr_1fr] gap-3">
             <div>
               <label
                 htmlFor="qty"
