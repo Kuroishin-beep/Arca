@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import type { Principal } from "@backend/domain/view";
 import { repository } from "@backend/db";
 
+import { defaultCampaignId } from "./campaign";
 import { sessionSecret, verifySession } from "./session-token";
 
 /**
@@ -30,6 +31,14 @@ import { sessionSecret, verifySession } from "./session-token";
  */
 const COOKIE = "arca_user";
 
+/**
+ * Which campaign this person is working in. Plain, not signed: it names a
+ * choice, not an identity, and it grants nothing — membership of the campaign
+ * it names is checked on every request, and a campaign they are not in is
+ * simply ignored.
+ */
+const CAMPAIGN_COOKIE = "arca_campaign";
+
 export type SessionState =
   | { kind: "anonymous" }
   | { kind: "member"; principal: Principal };
@@ -44,19 +53,28 @@ export async function currentSession(): Promise<SessionState> {
   if (!userId) return { kind: "anonymous" };
 
   // Re-resolved against the roster on every request rather than trusted from
-  // the cookie: this is the check that makes removing someone from the
-  // campaign take effect immediately.
-  const members = await repository().listMembers();
-  const member = members.find((m) => m.userId === userId);
-  if (!member) return { kind: "anonymous" };
+  // the cookie: this is the check that makes removing someone from a campaign
+  // (or changing their role in it) take effect on their next click.
+  const seats = await repository().membershipsOf(userId);
+  if (seats.length === 0) return { kind: "anonymous" };
+
+  // The campaign they chose, if they are (still) in it; otherwise the
+  // deployment's default; otherwise their first.
+  const wanted = jar.get(CAMPAIGN_COOKIE)?.value;
+  const seat =
+    seats.find((m) => m.campaignId === wanted) ??
+    seats.find((m) => m.campaignId === defaultCampaignId()) ??
+    seats[0]!;
 
   return {
     kind: "member",
     principal: {
-      userId: member.userId,
-      displayName: member.displayName,
-      email: member.email,
-      role: member.role,
+      userId: userId as Principal["userId"],
+      displayName: seat.displayName,
+      email: seat.email,
+      role: seat.role,
+      campaignId: seat.campaignId,
+      campaignName: seat.campaignName,
     },
   };
 }
@@ -75,3 +93,4 @@ export async function requirePrincipal(): Promise<Principal> {
 }
 
 export const SESSION_COOKIE = COOKIE;
+export const CAMPAIGN_SESSION_COOKIE = CAMPAIGN_COOKIE;

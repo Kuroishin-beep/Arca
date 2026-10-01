@@ -90,7 +90,7 @@ export default async function DatabasePage({
     principal,
     containers,
     databases,
-    campaignName: CAMPAIGN_NAME,
+    campaignName: principal.campaignName ?? CAMPAIGN_NAME,
     selectedDatabase: database ? slugifyType(slug) : undefined,
     newContainerHref:
       writable && creatableContainerTypes(principal).length > 0

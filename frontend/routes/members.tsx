@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import {
   addMemberAction,
   resetPasswordAction,
+  removeMemberAction,
   setMemberRoleAction,
 } from "@backend/actions/members";
 import { Avatar } from "@frontend/components/atoms/Status";
@@ -50,6 +51,11 @@ const MESSAGES: Record<string, { tone: "danger" | "success"; text: string }> = {
     text: "That is the only GM. Make someone else a GM first, then change this one.",
   },
   role: { tone: "success", text: "Role changed." },
+  removed: { tone: "success", text: "Removed from this campaign. Their account and other campaigns are untouched." },
+  "self-remove": {
+    tone: "danger",
+    text: "You cannot remove yourself. Ask another GM to.",
+  },
 };
 
 export default async function MembersPage({
@@ -59,6 +65,8 @@ export default async function MembersPage({
     error?: string;
     added?: string;
     reset?: string;
+    role?: string;
+    removed?: string;
     nav?: string;
     rail?: string;
   }>;
@@ -80,7 +88,7 @@ export default async function MembersPage({
     principal,
     containers,
     databases,
-    campaignName: CAMPAIGN_NAME,
+    campaignName: principal.campaignName ?? CAMPAIGN_NAME,
     newContainerHref:
       writable && creatableContainerTypes(principal).length > 0
         ? `/c/${writable.id}?dialog=new-container`
@@ -109,7 +117,7 @@ export default async function MembersPage({
     );
   }
 
-  const members = await repo.listMembers();
+  const members = await repo.listMembers(principal);
 
   /**
    * Which character each member plays, so the roster and the sheet agree on
@@ -128,10 +136,17 @@ export default async function MembersPage({
   const notice = sp.error
     ? MESSAGES[sp.error]
     : sp.added
-      ? { tone: "success" as const, text: `${sp.added} can now sign in — they choose their own password the first time.` }
+      ? {
+          tone: "success" as const,
+          text: `${sp.added} is now at this table. Someone new chooses their own password the first time they sign in; someone with an account already uses the one they have.`,
+        }
       : sp.reset
         ? { tone: "success" as const, text: "Password cleared. They choose a new one on their next sign-in." }
-        : undefined;
+        : sp.role
+          ? MESSAGES.role
+          : sp.removed
+            ? MESSAGES.removed
+            : undefined;
 
   return (
     <WorkspaceShell {...shell}>
@@ -144,8 +159,9 @@ export default async function MembersPage({
             </h1>
           </div>
           <p className="mt-2 text-base text-muted">
-            Anyone can create their own account and join as a player. Adding
-            someone here is how you seat a GM, or save a player the sign-up.
+            Add anyone by email — someone new, or a player who already has an
+            account from another campaign — and remove them when they leave the
+            table. Adding someone here is also how you seat a GM.
           </p>
 
           {notice ? (
@@ -229,6 +245,21 @@ export default async function MembersPage({
                       className="h-8 shrink-0 rounded-md border border-border px-2 text-sm text-muted hover:border-primary hover:text-primary"
                     >
                       {member.role === "gm" ? "Make player" : "Make GM"}
+                    </button>
+                  </form>
+                ) : null}
+
+                {/* Out of this campaign only — their account and their seats
+                    at other tables stay. Never on your own row. */}
+                {member.userId !== principal.userId ? (
+                  <form action={removeMemberAction}>
+                    <input type="hidden" name="userId" value={member.userId} />
+                    <button
+                      type="submit"
+                      aria-label={`Remove ${member.displayName} from this campaign`}
+                      className="h-8 shrink-0 rounded-md border border-border px-2 text-sm text-muted hover:border-danger hover:text-danger"
+                    >
+                      Remove
                     </button>
                   </form>
                 ) : null}

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Icon } from "@frontend/components/atoms/Icon";
+import { MenuDetails } from "@frontend/components/molecules/MenuDetails";
 import { RevealToggle } from "@frontend/components/organisms/RevealToggle";
 import type { ContainerView, Principal } from "@backend/domain/view";
 import { canCreateItem, canRetireContainer } from "@backend/lib/permissions";
@@ -55,7 +56,7 @@ export function ContainerActions({
       ) : null}
 
       {editable ? (
-        <details className="relative shrink-0">
+        <MenuDetails className="relative shrink-0">
           <summary
             // `list-none` plus the marker rule kills the disclosure triangle in
             // every engine; without both, Safari keeps drawing it.
@@ -89,7 +90,7 @@ export function ContainerActions({
               </MenuLink>
             ) : null}
           </div>
-        </details>
+        </MenuDetails>
       ) : null}
     </>
   );

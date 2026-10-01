@@ -59,9 +59,11 @@ async function land(principal: Principal): Promise<never> {
     maxAge: 60 * 60 * 24 * 30,
   });
 
-  const containers = await repository().listContainers(principal);
-  const landing = containers.find((c) => c.type === "party") ?? containers[0];
-  redirect(landing ? `/c/${landing.id}` : "/signin?error=no-containers");
+  // Home picks the landing page, because only the session knows which
+  // campaign this person is working in (the one they last chose, if they are
+  // still in it). Choosing a container here would mean choosing it in the
+  // default campaign, which strands anyone whose only table is another one.
+  redirect("/");
 }
 
 export async function signInAsAction(formData: FormData): Promise<void> {

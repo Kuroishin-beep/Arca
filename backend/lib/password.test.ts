@@ -1,7 +1,17 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { fixtureRepository, resetFixtureStore } from "@backend/db/fixture-repository";
-import { GM_EMAIL, KOVA_EMAIL, KOVA_ID } from "@backend/db/seed-data";
+import { GM_EMAIL, GM_ID, KOVA_EMAIL, KOVA_ID } from "@backend/db/seed-data";
+import type { Principal } from "@backend/domain/view";
+
+/** Whose campaign the roster is read in — the default one, as every test here
+ *  assumes. */
+const SCOPE: Principal = {
+  userId: GM_ID as Principal["userId"],
+  displayName: "Ravna",
+  email: GM_EMAIL,
+  role: "gm",
+};
 import {
   clearFailures,
   emailProblem,
@@ -113,13 +123,13 @@ describe("enrolment and sign-in", () => {
   });
 
   it("starts every member unenrolled", async () => {
-    const members = await fixtureRepository.listMembers();
+    const members = await fixtureRepository.listMembers(SCOPE);
     expect(members.every((m) => !m.hasPassword)).toBe(true);
   });
 
   it("never exposes the hash on a member", async () => {
     await fixtureRepository.enrolMemberPassword(KOVA_EMAIL, "brass-lantern");
-    const members = await fixtureRepository.listMembers();
+    const members = await fixtureRepository.listMembers(SCOPE);
     for (const member of members) {
       expect(Object.keys(member)).not.toContain("passwordHash");
     }
@@ -150,7 +160,7 @@ describe("enrolment and sign-in", () => {
 
   it("marks a member enrolled once they have chosen", async () => {
     await fixtureRepository.enrolMemberPassword(KOVA_EMAIL, "brass-lantern");
-    const members = await fixtureRepository.listMembers();
+    const members = await fixtureRepository.listMembers(SCOPE);
     expect(members.find((m) => m.userId === KOVA_ID)?.hasPassword).toBe(true);
   });
 

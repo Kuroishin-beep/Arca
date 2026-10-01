@@ -1,3 +1,5 @@
+import { inCampaign } from "@backend/lib/campaign";
+
 import { fixtureRepository } from "./fixture-repository";
 import { type ArcaRepository, repositoryKind } from "./repository";
 
@@ -7,10 +9,51 @@ import { type ArcaRepository, repositoryKind } from "./repository";
  * fixture path stays a pure in-memory app.
  */
 export function repository(): ArcaRepository {
-  if (repositoryKind() === "fixtures") return fixtureRepository;
+  if (repositoryKind() === "fixtures") return scopedRepository(fixtureRepository);
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const mod = require("./postgres-repository") as typeof import("./postgres-repository");
-  return mod.postgresRepository;
+  return scopedRepository(mod.postgresRepository);
+}
+
+/**
+ * Runs every call in the caller's campaign.
+ *
+ * Each repository method that acts for someone takes their `Principal`, and
+ * the principal carries the campaign they are working in. Wrapping the call in
+ * that campaign means every query inside — however deep, however many awaits
+ * later — scopes itself through `campaignId()`, and no signature or query had
+ * to change to make the app hold more than one campaign. Calls with no
+ * principal (sign-up, sign-in) run in the deployment's default campaign, as
+ * everything did before.
+ */
+const SCOPED = new WeakMap<ArcaRepository, ArcaRepository>();
+
+function scopedRepository(repo: ArcaRepository): ArcaRepository {
+  const cached = SCOPED.get(repo);
+  if (cached) return cached;
+
+  const wrapped = new Proxy(repo, {
+    get(target, prop, receiver) {
+      const value: unknown = Reflect.get(target, prop, receiver);
+      if (typeof value !== "function") return value;
+      return (...args: unknown[]) => {
+        const principal = args.find(isScopedPrincipal);
+        const call = () => (value as (...a: unknown[]) => unknown).apply(target, args);
+        return principal ? inCampaign(principal.campaignId, call) : call();
+      };
+    },
+  });
+  SCOPED.set(repo, wrapped);
+  return wrapped;
+}
+
+function isScopedPrincipal(arg: unknown): arg is { campaignId: string } {
+  return (
+    typeof arg === "object" &&
+    arg !== null &&
+    "userId" in arg &&
+    typeof (arg as { campaignId?: unknown }).campaignId === "string"
+  );
 }
 
 /**

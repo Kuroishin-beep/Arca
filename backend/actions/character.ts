@@ -8,7 +8,8 @@ import {
   UpdateCharacterInput,
   UpdateContainerInput,
 } from "@backend/domain/view";
-import { campaignId } from "@backend/lib/campaign";
+import type { Principal } from "@backend/domain/view";
+import { campaignOf } from "@backend/lib/campaign";
 import { PermissionError } from "@backend/lib/permissions";
 import { requirePrincipal } from "@backend/lib/session";
 import { realtime } from "@backend/realtime";
@@ -36,12 +37,13 @@ import type { ActionResult } from "./items";
  * actions' version is: the write has already committed, and a failure here
  * costs other panels a refresh, not the change.
  */
-async function announce(actorId: string, containerId: string): Promise<void> {
+async function announce(
+  principal: Principal, containerId: string): Promise<void> {
   try {
-    await realtime().publish(campaignId(), {
+    await realtime().publish(campaignOf(principal), {
       kind: "items-changed",
       containerIds: [containerId],
-      actorId,
+      actorId: principal.userId,
       at: new Date().toISOString(),
     });
   } catch (error) {
@@ -106,7 +108,7 @@ export async function updateCharacterAction(
     // whose header and encumbrance meter sit on the same container.
     revalidatePath("/character/[containerId]", "page");
     revalidatePath("/c/[containerId]", "page");
-    await announce(principal.userId, containerId);
+    await announce(principal, containerId);
 
     return { ok: true };
   } catch (error) {
@@ -153,7 +155,7 @@ export async function renameCharacterAction(
     revalidatePath("/c/[containerId]", "page");
     revalidatePath("/db/[slug]", "page");
     revalidatePath("/members", "page");
-    await announce(principal.userId, containerId);
+    await announce(principal, containerId);
 
     return { ok: true };
   } catch (error) {

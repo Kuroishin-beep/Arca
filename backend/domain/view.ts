@@ -45,9 +45,36 @@ export const Principal = z.object({
    * one string that is on every screen is a query the session already made.
    */
   email: z.string().min(1),
+  /** Their role IN THIS CAMPAIGN — the same person can be GM of one campaign
+   *  and a player in another. */
   role: UserRole,
+  /**
+   * The campaign they are working in, chosen with the campaign menu. Every
+   * repository call runs inside it. Optional so that a principal built without
+   * one (tests, scripts) means the deployment's default campaign.
+   */
+  campaignId: z.string().optional(),
+  campaignName: z.string().optional(),
 });
 export type Principal = z.infer<typeof Principal>;
+
+/** One campaign a person belongs to, and what they are in it. */
+export const CampaignMembership = z.object({
+  campaignId: z.string(),
+  campaignName: z.string(),
+  role: UserRole,
+});
+export type CampaignMembership = z.infer<typeof CampaignMembership>;
+
+/** Starting a campaign: just its name. Whoever starts it is its GM. */
+export const CreateCampaignInput = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "A campaign needs a name.")
+    .max(80, "Keep the name under 80 characters."),
+});
+export type CreateCampaignInput = z.infer<typeof CreateCampaignInput>;
 
 /* ------------------------------------------------------------------ *
  * Containers

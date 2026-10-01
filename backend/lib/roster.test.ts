@@ -69,7 +69,7 @@ describe("self-signup", () => {
 
     expect(principal?.role).toBe("player");
 
-    const members = await repo.listMembers();
+    const members = await repo.listMembers(gm);
     expect(members.find((m) => m.userId === principal!.userId)?.role).toBe(
       "player",
     );
@@ -118,7 +118,7 @@ describe("self-signup", () => {
     ).resolves.toBeNull();
 
     // Still a GM, still unenrolled, still theirs to claim.
-    const members = await repo.listMembers();
+    const members = await repo.listMembers(gm);
     const seat = members.find((m) => m.email === "newcomer@elsewhere.example");
     expect(seat?.role).toBe("gm");
     expect(seat?.hasPassword).toBe(false);
@@ -176,7 +176,7 @@ describe("resetting a password", () => {
     await repo.enrolMemberPassword(KOVA_EMAIL, "brass-lantern");
     await repo.resetMemberPassword(gm, KOVA_ID);
 
-    const members = await repo.listMembers();
+    const members = await repo.listMembers(gm);
     expect(members.find((m) => m.userId === KOVA_ID)?.hasPassword).toBe(false);
 
     // The old one is genuinely gone, not merely hidden.
@@ -209,7 +209,7 @@ describe("setMemberRole", () => {
     const promoted = await repo.setMemberRole(gm, KOVA_ID, "gm");
     expect(promoted.role).toBe("gm");
 
-    const members = await repo.listMembers();
+    const members = await repo.listMembers(gm);
     expect(members.find((m) => m.userId === KOVA_ID)?.role).toBe("gm");
   });
 
@@ -217,13 +217,13 @@ describe("setMemberRole", () => {
     await expect(repo.setMemberRole(kova, KOVA_ID, "gm")).rejects.toBeInstanceOf(
       PermissionError,
     );
-    const members = await repo.listMembers();
+    const members = await repo.listMembers(gm);
     expect(members.find((m) => m.userId === KOVA_ID)?.role).toBe("player");
   });
 
   it("refuses to remove the last GM, and allows it once there is another", async () => {
     // The seed has two GMs (Ravna and Xen), so demote to one first.
-    const gms = (await repo.listMembers()).filter((m) => m.role === "gm");
+    const gms = (await repo.listMembers(gm)).filter((m) => m.role === "gm");
     for (const extra of gms.slice(1)) {
       await repo.setMemberRole(gm, extra.userId, "player");
     }

@@ -13,6 +13,7 @@
 import { randomUUID } from "node:crypto";
 
 import { normaliseStats } from "@backend/domain/item-fields";
+import { campaignId, defaultCampaignId, inCampaign } from "@backend/lib/campaign";
 
 import {
   type CharacterSheet,
@@ -68,15 +69,39 @@ import {
   SEED_COMMENTS,
   SEED_CONTAINERS,
   SEED_ITEMS,
+  CAMPAIGN_NAME,
   SEED_USERS,
 } from "./seed-data";
 
+/** An account, plus the enrolled password hash. `passwordHash` lives here and
+ *  NOT on `Member`: it is compared inside this module and never handed to a
+ *  caller. Null means "has not chosen one yet". Accounts are global: the same
+ *  person can sit at several campaigns' tables. */
+interface Account {
+  userId: Principal["userId"];
+  displayName: string;
+  email: string;
+  passwordHash: string | null;
+}
+
+/** A seat at one campaign's table, and what the person is there. */
+interface Membership {
+  campaignId: string;
+  userId: Principal["userId"];
+  role: Principal["role"];
+}
+
+/** Everything, across campaigns. Campaign data lives in one `Store` per
+ *  campaign, so one campaign's containers simply do not exist from another's,
+ *  the in-memory shape of every Postgres query filtering on campaign_id. */
+interface World {
+  campaigns: { id: string; name: string }[];
+  accounts: Account[];
+  memberships: Membership[];
+  stores: Record<string, Store>;
+}
+
 interface Store {
-  /** The roster, plus the enrolled password hash. `passwordHash` is
-   *  deliberately part of the store and NOT of `Member`: it is compared inside
-   *  this module and is never handed to a caller. Null means "has not chosen
-   *  one yet". */
-  users: (Principal & { passwordHash: string | null })[];
   containers: Omit<ContainerView, "itemCount" | "carriedWeight">[];
   items: (ItemView & { archivedAt: Date | null })[];
   comments: CommentView[];
@@ -96,22 +121,38 @@ interface Store {
   catalog: (Omit<CatalogItemView, "copies"> & { archivedAt: Date | null })[];
 }
 
-const STORE_KEY = Symbol.for("arca.fixture.store");
+const STORE_KEY = Symbol.for("arca.fixture.world");
 
-function freshStore(): Store {
-  const now = new Date();
+function emptyStore(): Store {
+  return { containers: [], items: [], comments: [], characters: {}, catalog: [] };
+}
+
+function freshWorld(): World {
+  const home = defaultCampaignId();
   return {
+    campaigns: [{ id: home, name: CAMPAIGN_NAME }],
     // Seeded unenrolled. Fixture mode is the no-database mode, so a password
     // set here would survive only until the dev server restarts; starting every
     // member at "choose a password" exercises the real first-run flow every
     // time rather than once.
-    users: SEED_USERS.map((u) => ({
+    accounts: SEED_USERS.map((u) => ({
       userId: u.id as Principal["userId"],
       displayName: u.displayName,
       email: u.email,
-      role: u.role,
       passwordHash: null,
     })),
+    memberships: SEED_USERS.map((u) => ({
+      campaignId: home,
+      userId: u.id as Principal["userId"],
+      role: u.role,
+    })),
+    stores: { [home]: seededStore() },
+  };
+}
+
+function seededStore(): Store {
+  const now = new Date();
+  return {
     containers: SEED_CONTAINERS.map((c) => ({
       id: c.id as ContainerView["id"],
       name: c.name,
@@ -174,20 +215,35 @@ function freshStore(): Store {
   };
 }
 
+function world(): World {
+  const g = globalThis as unknown as Record<symbol, World | undefined>;
+  return (g[STORE_KEY] ??= freshWorld());
+}
+
+/** The current campaign's data; see `campaignId()`. */
 function store(): Store {
-  const g = globalThis as unknown as Record<symbol, Store | undefined>;
-  let s = g[STORE_KEY];
-  if (!s) {
-    s = freshStore();
-    g[STORE_KEY] = s;
-  }
-  return s;
+  return (world().stores[campaignId()] ??= emptyStore());
 }
 
 /** Test helper. Not exported through the repository interface. */
 export function resetFixtureStore(): void {
-  (globalThis as unknown as Record<symbol, Store | undefined>)[STORE_KEY] =
-    freshStore();
+  (globalThis as unknown as Record<symbol, World | undefined>)[STORE_KEY] = freshWorld();
+}
+
+/** The people at the current campaign's table, with their role there. */
+function members(): (Account & { role: Principal["role"] })[] {
+  const here = campaignId();
+  return world()
+    .memberships.filter((m) => m.campaignId === here)
+    .flatMap((m) => {
+      const account = world().accounts.find((a) => a.userId === m.userId);
+      return account ? [{ ...account, role: m.role }] : [];
+    });
+}
+
+function membershipHere(userId: string): Membership | undefined {
+  const here = campaignId();
+  return world().memberships.find((m) => m.campaignId === here && m.userId === userId);
 }
 
 /* ------------------------------------------------------------------ */
@@ -330,7 +386,7 @@ export const fixtureRepository: ArcaRepository = {
       );
     }
     if (memberIds !== null) {
-      const known = new Set(store().users.map((u) => u.userId));
+      const known = new Set(members().map((u) => u.userId));
       const unknown = memberIds.find((id) => !known.has(id as Principal["userId"]));
       if (unknown) throw new NotFoundError("That is not someone at this table.");
     }
@@ -731,7 +787,7 @@ export const fixtureRepository: ArcaRepository = {
     // Projected, not returned: `passwordHash` lives on the store rows and must
     // not travel with them. Spreading the row and deleting the field would
     // leave the hash one forgotten `...member` away from a client component.
-    return store().users.map(
+    return members().map(
       ({ userId, displayName, email, role, passwordHash }) => ({
         userId,
         displayName,
@@ -748,9 +804,12 @@ export const fixtureRepository: ArcaRepository = {
     // see the note on the interface. Nothing here distinguishes them.
     if (!member?.passwordHash) return null;
     if (!(await verifyPassword(password, member.passwordHash))) return null;
+    // An account with no seat at any table is not someone who can sign in.
+    const seat = homeSeat(member.userId);
+    if (!seat) return null;
 
     clearFailures(email);
-    return principalOf(member);
+    return principalOf(member, seat.role);
   },
 
   async registerMember(input) {
@@ -760,45 +819,55 @@ export const fixtureRepository: ArcaRepository = {
     // claim somebody else's invited seat by guessing their address.
     if (byEmail(email)) return null;
 
-    const member = {
+    const member: Account = {
       userId: randomUUID() as Principal["userId"],
       displayName: input.displayName,
       email,
-      // Never from the input. Self-signup mints players and only players.
-      role: "player" as const,
       passwordHash: await hashPassword(input.password),
     };
-    store().users.push(member);
-    return principalOf(member);
+    world().accounts.push(member);
+    // The default campaign, and never from the input: self-signup mints
+    // players and only players.
+    world().memberships.push({ campaignId: campaignId(), userId: member.userId, role: "player" });
+    return principalOf(member, "player");
   },
 
   async addMember(principal, input) {
     assertCanManageRoster(principal);
 
     const email = normaliseEmail(input.email);
-    if (byEmail(email)) return null;
+    const existing = byEmail(email);
 
-    const member = {
+    // Someone with an account already (from another campaign) gets a seat
+    // here on that same account. Only someone already at THIS table is refused.
+    if (existing) {
+      if (membershipHere(existing.userId)) return null;
+      world().memberships.push({ campaignId: campaignId(), userId: existing.userId, role: input.role });
+      return { ...principalOf(existing, input.role), hasPassword: existing.passwordHash !== null };
+    }
+
+    const member: Account = {
       userId: randomUUID() as Principal["userId"],
       displayName: input.displayName,
       email,
-      role: input.role,
       // Unenrolled: they choose their own password on first sign-in.
       passwordHash: null,
     };
-    store().users.push(member);
-    return { ...principalOf(member), hasPassword: false };
+    world().accounts.push(member);
+    world().memberships.push({ campaignId: campaignId(), userId: member.userId, role: input.role });
+    return { ...principalOf(member, input.role), hasPassword: false };
   },
 
   async setMemberRole(principal, userId, role) {
     assertCanManageRoster(principal);
 
-    const member = store().users.find((u) => u.userId === userId);
-    if (!member) throw new NotFoundError("No such member.");
+    const seat = membershipHere(userId);
+    const account = world().accounts.find((a) => a.userId === userId);
+    if (!seat || !account) throw new NotFoundError("No such member.");
 
-    // The last GM cannot be demoted — see the note on the interface.
-    if (member.role === "gm" && role !== "gm") {
-      const gms = store().users.filter((u) => u.role === "gm").length;
+    // The last GM cannot be demoted; see the note on the interface.
+    if (seat.role === "gm" && role !== "gm") {
+      const gms = members().filter((u) => u.role === "gm").length;
       if (gms <= 1) {
         throw new ConflictError(
           "This is the only GM. Make someone else a GM first, then change this one.",
@@ -806,16 +875,67 @@ export const fixtureRepository: ArcaRepository = {
       }
     }
 
-    member.role = role;
-    return { ...principalOf(member), hasPassword: member.passwordHash !== null };
+    seat.role = role;
+    return { ...principalOf(account, role), hasPassword: account.passwordHash !== null };
+  },
+
+  async removeMember(principal, userId) {
+    assertCanManageRoster(principal);
+    if (userId === principal.userId) {
+      throw new ConflictError("You cannot remove yourself. Ask another GM to.");
+    }
+    const seat = membershipHere(userId);
+    if (!seat) throw new NotFoundError("No such member.");
+    if (seat.role === "gm" && members().filter((u) => u.role === "gm").length <= 1) {
+      throw new ConflictError("That is the only GM. Make someone else a GM first.");
+    }
+    world().memberships = world().memberships.filter((m) => m !== seat);
+  },
+
+  async membershipsOf(userId) {
+    const account = world().accounts.find((a) => a.userId === userId);
+    if (!account) return [];
+    return world()
+      .memberships.filter((m) => m.userId === userId)
+      .map((m) => ({
+        campaignId: m.campaignId,
+        campaignName: world().campaigns.find((c) => c.id === m.campaignId)?.name ?? "Campaign",
+        role: m.role,
+        displayName: account.displayName,
+        email: account.email,
+      }));
+  },
+
+  async createCampaign(principal, input) {
+    const id = randomUUID();
+    world().campaigns.push({ id, name: input.name });
+    world().memberships.push({ campaignId: id, userId: principal.userId, role: "gm" });
+    world().stores[id] = emptyStore();
+
+    // Somewhere to land: a campaign with no container has no page to open.
+    const gm = { ...principal, role: "gm" as const, campaignId: id, campaignName: input.name };
+    // Somewhere for the whole table, open to everyone who joins: a stash
+    // only the GM could see would leave every new player an empty sidebar.
+    await inCampaign(id, async () => {
+      const stash = await fixtureRepository.createContainer(gm, {
+        name: "Party Stash",
+        type: "party",
+        ownerId: null,
+        capacity: null,
+        revealed: true,
+      });
+      await fixtureRepository.setContainerMembers(gm, stash.id, null);
+    });
+    return { campaignId: id, campaignName: input.name, role: "gm" };
   },
 
   async resetMemberPassword(principal, userId) {
     assertCanManageRoster(principal);
 
-    const member = store().users.find((u) => u.userId === userId);
-    if (!member) throw new NotFoundError("No such member.");
-    member.passwordHash = null;
+    const member = members().find((u) => u.userId === userId);
+    const account = world().accounts.find((a) => a.userId === userId);
+    if (!member || !account) throw new NotFoundError("No such member.");
+    account.passwordHash = null;
     // The throttle is keyed by address, so a reset that did not clear it would
     // leave a locked-out member locked out with a brand new password.
     clearFailures(member.email);
@@ -826,26 +946,36 @@ export const fixtureRepository: ArcaRepository = {
     // Refusing when a password already exists is what keeps this a first-run
     // step rather than a way to overwrite somebody else's.
     if (!member || member.passwordHash !== null) return null;
+    const seat = homeSeat(member.userId);
+    if (!seat) return null;
 
     member.passwordHash = await hashPassword(password);
-    return principalOf(member);
+    return principalOf(member, seat.role);
   },
 };
 
 /** Normalised on the way in, so `Kova@…` and `kova@…` find the same member —
  *  the store holds already-normalised addresses. */
-function byEmail(email: string) {
+function byEmail(email: string): Account | null {
   const wanted = normaliseEmail(email);
-  return store().users.find((u) => u.email === wanted) ?? null;
+  return world().accounts.find((u) => u.email === wanted) ?? null;
+}
+
+/** The seat a fresh sign-in lands on: the default campaign if they have one
+ *  there, otherwise their first. The session then honours whatever campaign
+ *  they last chose. */
+function homeSeat(userId: string): Membership | undefined {
+  const seats = world().memberships.filter((m) => m.userId === userId);
+  return seats.find((m) => m.campaignId === defaultCampaignId()) ?? seats[0];
 }
 
 /** Strips `passwordHash` by naming the fields that may leave, rather than by
  *  removing the one that may not. */
-function principalOf(member: Store["users"][number]): Principal {
+function principalOf(account: Account, role: Principal["role"]): Principal {
   return {
-    userId: member.userId,
-    displayName: member.displayName,
-    email: member.email,
-    role: member.role,
+    userId: account.userId,
+    displayName: account.displayName,
+    email: account.email,
+    role,
   };
 }

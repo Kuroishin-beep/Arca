@@ -213,7 +213,7 @@ export default async function WorkspacePage({
   // per-member answer — so it is fetched when either is open.
   const shareOpen = sp.dialog === "share";
   const members =
-    shareOpen || (containerDialogOpen && isGm) ? await repo.listMembers() : [];
+    shareOpen || (containerDialogOpen && isGm) ? await repo.listMembers(principal) : [];
 
   // Somewhere to land after retiring, since the current container will be gone.
   const retireFallbackHref = (() => {
@@ -275,7 +275,7 @@ export default async function WorkspacePage({
         principal={principal}
         containers={containers}
         databases={databases}
-        campaignName={CAMPAIGN_NAME}
+        campaignName={principal.campaignName ?? CAMPAIGN_NAME}
         selectedId={containerId}
         newContainerHref={newContainerHref}
         newDatabaseHref={editable ? `/c/${containerId}?dialog=add` : undefined}

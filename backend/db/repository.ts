@@ -15,6 +15,8 @@
 import type {
   AddFromCatalogInput,
   AddMemberInput,
+  CampaignMembership,
+  CreateCampaignInput,
   CatalogItemView,
   CharacterView,
   CommentView,
@@ -253,7 +255,32 @@ export interface ArcaRepository {
   /** Everyone at the table, for the owner picker on a pack and for comment
    *  attribution. No longer feeds a sign-in picker — since M1 became email and
    *  password, nobody unauthenticated sees this list. */
-  listMembers(): Promise<Member[]>;
+  listMembers(principal: Principal): Promise<Member[]>;
+
+  /**
+   * Every campaign this person belongs to, with their role in each and the
+   * account details the session needs. Not scoped to a campaign — it is how
+   * the session decides which campaign to scope to. Empty for an account that
+   * belongs to none.
+   */
+  membershipsOf(userId: string): Promise<
+    (CampaignMembership & { displayName: string; email: string })[]
+  >;
+
+  /**
+   * Start a campaign. Anyone signed in may; whoever starts it is its GM. It
+   * comes with one shared container so it has somewhere to land.
+   */
+  createCampaign(
+    principal: Principal,
+    input: CreateCampaignInput,
+  ): Promise<CampaignMembership>;
+
+  /**
+   * Take someone out of this campaign — the GM's. Their account and their
+   * other campaigns are untouched. Never yourself, and never the last GM.
+   */
+  removeMember(principal: Principal, userId: string): Promise<void>;
 
   /**
    * Check a member's password and return them if it matches — SCOPE.md §4.
@@ -315,8 +342,11 @@ export interface ArcaRepository {
    * No password, deliberately. The member arrives unenrolled and chooses their
    * own on first sign-in, so no secret ever travels through the group chat.
    *
-   * Returns `null` when the address is already taken, for the same reason as
-   * above; here the caller is the GM, who is entitled to know.
+   * An address that already has an account — someone from another campaign —
+   * is added to THIS campaign as it is: same account, same password, a new
+   * seat. That is how a GM assigns an existing player to their table.
+   *
+   * Returns `null` only when the address is already at this table.
    */
   addMember(principal: Principal, input: AddMemberInput): Promise<Member | null>;
 

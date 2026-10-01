@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { ContainerDot } from "@frontend/components/atoms/Chip";
+import { CampaignMenu } from "@frontend/components/organisms/CampaignMenu";
 import { ContainerRow } from "@frontend/components/molecules/ContainerRow";
 import { Icon } from "@frontend/components/atoms/Icon";
 import type { ContainerType } from "@backend/domain/types";
@@ -170,15 +171,10 @@ export function Sidebar({
 
   return (
     <>
-      {/* Campaign switcher. One campaign exists, so the chevron is honest
-          about being inert for now rather than opening an empty menu: it is
-          rendered as a heading, not a button, and becomes a control the day
-          there is a second campaign to switch to. */}
-      <div className="flex h-[var(--topbar-h)] shrink-0 items-center gap-2 border-b border-border px-3">
-        <Icon name="chest" size={15} className="shrink-0 text-primary" />
-        <h2 className="min-w-0 flex-1 truncate font-serif text-sm font-bold text-text">
-          {campaignName}
-        </h2>
+      {/* The campaign menu: switch campaign, start one, and (for the GM) the
+          roster. See CampaignMenu. */}
+      <div className="relative flex h-[var(--topbar-h)] shrink-0 items-center gap-1 border-b border-border px-2">
+        <CampaignMenu principal={principal} campaignName={campaignName} />
 
         {/* The roster hangs off the campaign, not off a container — it is the
             one thing on this screen that belongs to the campaign itself.
@@ -194,8 +190,6 @@ export function Sidebar({
             <Icon name="users" size={14} />
           </Link>
         ) : null}
-
-        <Icon name="chevron-down" size={12} className="shrink-0 text-faint" />
       </div>
 
       {/* Search lives in the sidebar in the wireframe, next to what it

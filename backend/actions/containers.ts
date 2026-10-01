@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import { repository } from "@backend/db";
 import { ConflictError, NotFoundError } from "@backend/db/repository";
 import { CreateContainerInput, UpdateContainerInput } from "@backend/domain/view";
-import { campaignId } from "@backend/lib/campaign";
+import type { Principal } from "@backend/domain/view";
+import { campaignOf } from "@backend/lib/campaign";
 import { PermissionError } from "@backend/lib/permissions";
 import { requirePrincipal } from "@backend/lib/session";
 import { realtime } from "@backend/realtime";
@@ -88,7 +89,7 @@ export async function createContainerAction(
     revalidatePath("/c/[containerId]", "page");
     // The sidebar is rendered from the container list on every screen, so a new
     // container has to reach the other panels the same way an item does.
-    await announce(principal.userId, created.id);
+    await announce(principal, created.id);
 
     return { ok: true, data: { containerId: created.id } };
   } catch (error) {
@@ -143,7 +144,7 @@ export async function updateContainerAction(
     }
 
     revalidatePath("/c/[containerId]", "page");
-    await announce(principal.userId, parsed.data.id);
+    await announce(principal, parsed.data.id);
 
     return { ok: true };
   } catch (error) {
@@ -172,7 +173,7 @@ export async function setContainerRevealedAction(
     });
 
     revalidatePath("/c/[containerId]", "page");
-    await announce(principal.userId, containerId);
+    await announce(principal, containerId);
 
     return { ok: true };
   } catch (error) {
@@ -204,7 +205,7 @@ export async function setContainerMembersAction(
     );
 
     revalidatePath("/", "layout");
-    await announce(principal.userId, containerId);
+    await announce(principal, containerId);
     return { ok: true };
   } catch (error) {
     return toResult(error, "Could not change who is in that.");
@@ -219,7 +220,7 @@ export async function archiveContainerAction(
     await repository().archiveContainer(principal, containerId);
 
     revalidatePath("/c/[containerId]", "page");
-    await announce(principal.userId, containerId);
+    await announce(principal, containerId);
 
     return { ok: true };
   } catch (error) {
@@ -229,12 +230,13 @@ export async function archiveContainerAction(
 
 /** Non-fatal, exactly as in `items.ts`: the write has already committed, and a
  *  failed announcement means other panels notice late, not that it failed. */
-async function announce(actorId: string, containerId: string): Promise<void> {
+async function announce(
+  principal: Principal, containerId: string): Promise<void> {
   try {
-    await realtime().publish(campaignId(), {
+    await realtime().publish(campaignOf(principal), {
       kind: "items-changed",
       containerIds: [containerId],
-      actorId,
+      actorId: principal.userId,
       at: new Date().toISOString(),
     });
   } catch (error) {

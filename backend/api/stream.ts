@@ -12,7 +12,7 @@
  */
 import { repository } from "@backend/db";
 import { currentPrincipal } from "@backend/lib/session";
-import { campaignId } from "@backend/lib/campaign";
+import { campaignOf } from "@backend/lib/campaign";
 import { canRead } from "@backend/lib/permissions";
 import { realtime } from "@backend/realtime";
 
@@ -46,7 +46,8 @@ export async function GET(request: Request) {
   }
 
   const encoder = new TextEncoder();
-  const campaign = campaignId();
+  // The stream is per campaign: this viewer hears only the one they are in.
+  const campaign = campaignOf(principal);
 
   /**
    * Which of these containers this viewer may open.

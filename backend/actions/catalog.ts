@@ -10,7 +10,8 @@ import {
   UpdateCatalogItemInput,
 } from "@backend/domain/view";
 import { statsFromForm } from "@backend/domain/item-fields";
-import { campaignId } from "@backend/lib/campaign";
+import type { Principal } from "@backend/domain/view";
+import { campaignOf } from "@backend/lib/campaign";
 import { PermissionError } from "@backend/lib/permissions";
 import { requirePrincipal } from "@backend/lib/session";
 import { realtime } from "@backend/realtime";
@@ -33,12 +34,13 @@ import type { ActionResult } from "./items";
 
 /** Non-fatal, for the reason the item actions' version is: the write has
  *  committed, and a failure here costs other panels a refresh, not the change. */
-async function announce(actorId: string, containerIds: string[]): Promise<void> {
+async function announce(
+  principal: Principal, containerIds: string[]): Promise<void> {
   try {
-    await realtime().publish(campaignId(), {
+    await realtime().publish(campaignOf(principal), {
       kind: "items-changed",
       containerIds,
-      actorId,
+      actorId: principal.userId,
       at: new Date().toISOString(),
     });
   } catch (error) {
@@ -207,7 +209,7 @@ export async function addFromCatalogAction(
 
     revalidatePath("/c/[containerId]", "page");
     revalidatePath("/catalog", "page");
-    await announce(principal.userId, [parsed.data.containerId]);
+    await announce(principal, [parsed.data.containerId]);
 
     return { ok: true, data: { itemId: created.id } };
   } catch (error) {

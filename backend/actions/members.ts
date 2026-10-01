@@ -119,3 +119,27 @@ export async function setMemberRoleAction(formData: FormData): Promise<void> {
   revalidatePath(at);
   redirect(`${at}?role=1`);
 }
+
+/**
+ * Take someone out of this campaign — the GM's. Their account, password and
+ * other campaigns are untouched; they just stop being at this table, from
+ * their next click (the session re-reads membership on every request).
+ */
+export async function removeMemberAction(formData: FormData): Promise<void> {
+  const principal = await requirePrincipal();
+  const userId = text(formData.get("userId"));
+  const at = "/members";
+
+  if (userId === principal.userId) redirect(`${at}?error=self-remove`);
+
+  try {
+    await repository().removeMember(principal, userId);
+  } catch (error) {
+    if (error instanceof PermissionError) redirect(`${at}?error=forbidden`);
+    if (error instanceof ConflictError) redirect(`${at}?error=last-gm`);
+    throw error;
+  }
+
+  revalidatePath(at);
+  redirect(`${at}?removed=1`);
+}

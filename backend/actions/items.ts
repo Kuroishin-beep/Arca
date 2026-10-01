@@ -10,7 +10,8 @@ import {
   UpdateItemInput,
 } from "@backend/domain/view";
 import { statsFromForm } from "@backend/domain/item-fields";
-import { campaignId } from "@backend/lib/campaign";
+import type { Principal } from "@backend/domain/view";
+import { campaignOf } from "@backend/lib/campaign";
 import { PermissionError } from "@backend/lib/permissions";
 import { requirePrincipal } from "@backend/lib/session";
 import { realtime } from "@backend/realtime";
@@ -42,14 +43,14 @@ import { realtime } from "@backend/realtime";
  * `toResult` exists to prevent.
  */
 async function announce(
-  actorId: string,
+  principal: Principal,
   containerIds: string[],
 ): Promise<void> {
   try {
-    await realtime().publish(campaignId(), {
+    await realtime().publish(campaignOf(principal), {
       kind: "items-changed",
       containerIds: containerIds.filter((id, i, all) => all.indexOf(id) === i),
-      actorId,
+      actorId: principal.userId,
       at: new Date().toISOString(),
     });
   } catch (error) {
@@ -146,7 +147,7 @@ export async function createItemAction(
 
     await repository().createItem(principal, parsed.data);
     revalidatePath("/c/[containerId]", "page");
-    await announce(principal.userId, [parsed.data.containerId]);
+    await announce(principal, [parsed.data.containerId]);
     return { ok: true };
   } catch (error) {
     return toResult(error);
@@ -180,7 +181,7 @@ export async function updateItemAction(
 
     const updated = await repository().updateItem(principal, parsed.data);
     revalidatePath("/c/[containerId]", "page");
-    await announce(principal.userId, [updated.containerId]);
+    await announce(principal, [updated.containerId]);
     return { ok: true };
   } catch (error) {
     return toResult(error);
@@ -198,7 +199,7 @@ export async function archiveItemAction(
     const doomed = await repository().getItem(principal, itemId);
     await repository().archiveItem(principal, itemId);
     revalidatePath("/c/[containerId]", "page");
-    if (doomed) await announce(principal.userId, [doomed.containerId]);
+    if (doomed) await announce(principal, [doomed.containerId]);
     return { ok: true };
   } catch (error) {
     return toResult(error);
@@ -238,7 +239,7 @@ export async function moveItemAction(
     // BOTH ends. A move is the one operation that invalidates two containers,
     // and a panel showing only the source would keep displaying an item that
     // is no longer there.
-    await announce(principal.userId, [
+    await announce(principal, [
       outcome.fromContainerId,
       outcome.toContainerId,
     ]);

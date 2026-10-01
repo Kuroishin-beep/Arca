@@ -34,7 +34,7 @@ import {
   ownershipProblem,
 } from "@backend/domain/view";
 import { normaliseStats } from "@backend/domain/item-fields";
-import { campaignId } from "@backend/lib/campaign";
+import { campaignId, defaultCampaignId, inCampaign } from "@backend/lib/campaign";
 import {
   assertCanEditContainer,
   assertCanCreateItem,
@@ -57,6 +57,7 @@ import {
 } from "@backend/lib/password";
 
 import { db } from "./client";
+import { PROPERTY_DEFS } from "./property-defs";
 import {
   type ArcaRepository,
   ConflictError,
@@ -67,6 +68,7 @@ import {
 import { pluralise } from "./seed-data";
 import {
   campaignMembers,
+  campaigns,
   comments,
   containerObjects,
   containers,
@@ -722,7 +724,9 @@ export const postgresRepository: ArcaRepository = {
     } else {
       // Only people at this table — an id from anywhere else is refused rather
       // than stored as a member nobody can resolve.
-      const roster = new Set<string>((await postgresRepository.listMembers()).map((m) => m.userId));
+      const roster = new Set<string>(
+        (await postgresRepository.listMembers(principal)).map((m) => m.userId),
+      );
       if (memberIds.some((id) => !roster.has(id))) {
         throw new NotFoundError("That is not someone at this table.");
       }
@@ -1554,6 +1558,34 @@ export const postgresRepository: ArcaRepository = {
 
     const email = normaliseEmail(input.email);
 
+    // Someone with an account already (from another campaign) gets a seat here
+    // on that same account and password. Only someone already at THIS table is
+    // refused, which is what `null` means to the caller.
+    const existing = await db()
+      .select({
+        id: users.id,
+        displayName: users.displayName,
+        hasPassword: sql<boolean>`${users.passwordHash} is not null`,
+      })
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
+    if (existing[0]) {
+      const seat = await db()
+        .insert(campaignMembers)
+        .values({ campaignId: campaignId(), userId: existing[0].id, role: input.role })
+        .onConflictDoNothing()
+        .returning({ userId: campaignMembers.userId });
+      if (seat.length === 0) return null;
+      return {
+        userId: existing[0].id as Principal["userId"],
+        displayName: existing[0].displayName,
+        email,
+        role: input.role,
+        hasPassword: existing[0].hasPassword,
+      };
+    }
+
     // One transaction, because the two writes are one fact. As two statements,
     // a failure between them left a user row with no membership: an account
     // that cannot sign in (`authenticateMember` joins the membership) and
@@ -1587,6 +1619,95 @@ export const postgresRepository: ArcaRepository = {
       // Unenrolled: they choose their own password on first sign-in.
       hasPassword: false,
     };
+  },
+
+  async removeMember(principal, userId) {
+    assertCanManageRoster(principal);
+    if (userId === principal.userId) {
+      throw new ConflictError("You cannot remove yourself. Ask another GM to.");
+    }
+    if (!UUID.test(userId)) throw new NotFoundError("No such member.");
+
+    const here = campaignId();
+    const seat = await db()
+      .select({ role: campaignMembers.role })
+      .from(campaignMembers)
+      .where(and(eq(campaignMembers.campaignId, here), eq(campaignMembers.userId, userId)))
+      .limit(1);
+    if (!seat[0]) throw new NotFoundError("No such member.");
+
+    if (seat[0].role === "gm") {
+      const gms = await db()
+        .select({ userId: campaignMembers.userId })
+        .from(campaignMembers)
+        .where(and(eq(campaignMembers.campaignId, here), eq(campaignMembers.role, "gm")));
+      if (gms.length <= 1) {
+        throw new ConflictError("That is the only GM. Make someone else a GM first.");
+      }
+    }
+
+    // The seat only. Their account, their password and their other campaigns
+    // are theirs; this table just stops including them.
+    await db()
+      .delete(campaignMembers)
+      .where(and(eq(campaignMembers.campaignId, here), eq(campaignMembers.userId, userId)));
+  },
+
+  async membershipsOf(userId) {
+    if (!UUID.test(userId)) return [];
+    const rows = await db()
+      .select({
+        campaignId: campaignMembers.campaignId,
+        campaignName: campaigns.name,
+        role: campaignMembers.role,
+        displayName: users.displayName,
+        email: users.email,
+      })
+      .from(campaignMembers)
+      .innerJoin(campaigns, eq(campaigns.id, campaignMembers.campaignId))
+      .innerJoin(users, eq(users.id, campaignMembers.userId))
+      .where(eq(campaignMembers.userId, userId))
+      .orderBy(campaigns.name);
+    return rows;
+  },
+
+  async createCampaign(principal, input) {
+    const created = await db().transaction(async (tx) => {
+      const [campaign] = await tx
+        .insert(campaigns)
+        .values({ name: input.name })
+        .returning({ id: campaigns.id });
+      if (!campaign) throw new Error("Insert returned no row.");
+
+      await tx
+        .insert(campaignMembers)
+        .values({ campaignId: campaign.id, userId: principal.userId, role: "gm" });
+
+      // Without these the campaign cannot hold an item: `setProperties`
+      // refuses names it has no definition for.
+      await tx
+        .insert(propertyDefinitions)
+        .values(PROPERTY_DEFS.map((d) => ({ ...d, campaignId: campaign.id })));
+
+      return campaign.id;
+    });
+
+    // Somewhere to land: a campaign with no container has no page to open.
+    const gm = { ...principal, role: "gm" as const, campaignId: created, campaignName: input.name };
+    // Somewhere for the whole table, open to everyone who joins: a stash
+    // only the GM could see would leave every new player an empty sidebar.
+    await inCampaign(created, async () => {
+      const stash = await postgresRepository.createContainer(gm, {
+        name: "Party Stash",
+        type: "party",
+        ownerId: null,
+        capacity: null,
+        revealed: true,
+      });
+      await postgresRepository.setContainerMembers(gm, stash.id, null);
+    });
+
+    return { campaignId: created, campaignName: input.name, role: "gm" };
   },
 
   async setMemberRole(principal, userId, role) {
@@ -1730,12 +1851,11 @@ async function memberWithHash(email: string) {
     })
     .from(users)
     .innerJoin(campaignMembers, eq(campaignMembers.userId, users.id))
-    .where(
-      and(
-        eq(users.email, wanted),
-        eq(campaignMembers.campaignId, campaignId()),
-      ),
-    )
+    .where(eq(users.email, wanted))
+    // Any seat at any table makes an account one that can sign in; the default
+    // campaign's seat first, so a fresh sign-in lands there. The session then
+    // honours whichever campaign they last chose.
+    .orderBy(sql`${campaignMembers.campaignId} = ${defaultCampaignId()} desc`)
     .limit(1);
 
   return rows[0] ?? null;

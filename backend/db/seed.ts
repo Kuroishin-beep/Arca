@@ -13,12 +13,10 @@
 import { sql } from "drizzle-orm";
 import { normaliseStats } from "@backend/domain/item-fields";
 
-import {
-  CHARACTER_PROPERTY_NAMES,
-  sheetToProperties,
-} from "@backend/domain/character";
+import { sheetToProperties } from "@backend/domain/character";
 
 import { db, rawSql } from "./client";
+import { PROPERTY_DEFS } from "./property-defs";
 import {
   CAMPAIGN_ID,
   CAMPAIGN_NAME,
@@ -44,33 +42,6 @@ import {
   propertyDefinitions,
   users,
 } from "./schema";
-
-/** The property definitions every item uses. Schema metadata, not values. */
-const PROPERTY_DEFS: { name: string; dataType: string; description: string }[] =
-  [
-    { name: "name", dataType: "text", description: "Display name" },
-    { name: "qty", dataType: "number", description: "How many in this stack" },
-    { name: "weight", dataType: "number", description: "Weight per unit, kg" },
-    { name: "value", dataType: "text", description: "Value per unit" },
-    { name: "tags", dataType: "label", description: "Free tags" },
-    { name: "notes", dataType: "text", description: "Notes" },
-    { name: "stats", dataType: "json", description: "Type-specific item fields" },
-    {
-      name: "capacity",
-      dataType: "number",
-      description: "Carry capacity, kg — containers only",
-    },
-    // The character sheet's eight, on the character container's own object
-    // (SCOPE.md S1). `json` rather than `number`/`text` because each one holds
-    // a structured section rather than a scalar — and because splitting them
-    // into thirty-odd scalar definitions would put the whole rulebook in this
-    // table without making any of it more queryable than JSONB already is.
-    ...CHARACTER_PROPERTY_NAMES.map((name) => ({
-      name,
-      dataType: "json",
-      description: "Character sheet",
-    })),
-  ];
 
 async function main(): Promise<void> {
   if (!process.env.DATABASE_URL) {

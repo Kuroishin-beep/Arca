@@ -50,7 +50,7 @@ export default async function CatalogPage({
     principal,
     containers,
     databases,
-    campaignName: CAMPAIGN_NAME,
+    campaignName: principal.campaignName ?? CAMPAIGN_NAME,
     newContainerHref:
       writable && creatableContainerTypes(principal).length > 0
         ? `/c/${writable.id}?dialog=new-container`
