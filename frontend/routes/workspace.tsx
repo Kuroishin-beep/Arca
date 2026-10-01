@@ -488,6 +488,7 @@ export default async function WorkspacePage({
           container={container}
           members={members}
           closeHref={`/c/${containerId}`}
+          canManage={isGm}
         />
       ) : null}
 

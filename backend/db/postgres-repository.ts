@@ -38,6 +38,8 @@ import { campaignId } from "@backend/lib/campaign";
 import {
   assertCanEditContainer,
   assertCanCreateItem,
+  assertCanManageAccess,
+  initialMembers,
   assertCanManageCatalog,
   assertCanManageContainer,
   assertCanManageRoster,
@@ -474,6 +476,7 @@ async function loadContainers(): Promise<ContainerView[]> {
     rows.map(async (r) => {
       const items = await itemsIn(r.id);
       const capacityValue = props.get(r.id)?.capacity;
+      const membersValue = props.get(r.id)?.members;
       return {
         id: r.id as ContainerView["id"],
         name: r.name,
@@ -485,6 +488,13 @@ async function loadContainers(): Promise<ContainerView[]> {
         capacity:
           typeof capacityValue === "number" && capacityValue > 0
             ? capacityValue
+            : null,
+        // Absent = everyone at the table: every shared container that existed
+        // before the GM could choose has no such property, and must keep
+        // meaning what it meant.
+        memberIds:
+          r.type === "party" && Array.isArray(membersValue)
+            ? (membersValue.filter((v) => typeof v === "string") as ContainerView["memberIds"])
             : null,
       } satisfies ContainerView;
     }),
@@ -523,6 +533,9 @@ async function setProperties(
   // the reason `ensurePropertyDefinitions` gives.
   if (values.stats !== undefined) {
     await ensurePropertyDefinitions(["stats"], "Type-specific item fields");
+  }
+  if (values.members !== undefined) {
+    await ensurePropertyDefinitions(["members"], "Who is in a shared container");
   }
   const ids = await propertyIdsByName();
   const rows = Object.entries(values)
@@ -670,7 +683,53 @@ export const postgresRepository: ArcaRepository = {
       await setProperties(objectId, { capacity: input.capacity });
     }
 
+    const members = initialMembers(principal, input.type);
+    if (members !== null) await setProperties(objectId, { members });
+
     return requireContainer(objectId);
+  },
+
+  async setContainerMembers(principal, containerId, memberIds) {
+    assertCanManageAccess(principal);
+    const container = await requireContainer(containerId);
+    if (container.type !== "party") {
+      throw new ConflictError(
+        "Only a shared container has a member list. A pack is its owner's; a world container is yours.",
+      );
+    }
+
+    if (memberIds === null) {
+      // Back to "everyone at the table": the property's absence IS that state.
+      await db()
+        .delete(objectProperties)
+        .where(
+          and(
+            eq(objectProperties.objectId, containerId),
+            inArray(
+              objectProperties.propertyDefinitionId,
+              db()
+                .select({ id: propertyDefinitions.id })
+                .from(propertyDefinitions)
+                .where(
+                  and(
+                    eq(propertyDefinitions.campaignId, campaignId()),
+                    eq(propertyDefinitions.name, "members"),
+                  ),
+                ),
+            ),
+          ),
+        );
+    } else {
+      // Only people at this table — an id from anywhere else is refused rather
+      // than stored as a member nobody can resolve.
+      const roster = new Set<string>((await postgresRepository.listMembers()).map((m) => m.userId));
+      if (memberIds.some((id) => !roster.has(id))) {
+        throw new NotFoundError("That is not someone at this table.");
+      }
+      await setProperties(containerId, { members: [...new Set(memberIds)] });
+    }
+
+    return requireContainer(containerId);
   },
 
   async updateContainer(principal, input) {

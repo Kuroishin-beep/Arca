@@ -2,6 +2,7 @@ import { Avatar } from "@frontend/components/atoms/Status";
 import { Chip } from "@frontend/components/atoms/Chip";
 import { Icon } from "@frontend/components/atoms/Icon";
 import { Modal } from "@frontend/components/molecules/Modal";
+import { SharedMembersForm } from "@frontend/components/organisms/SharedMembersForm";
 import type { Member } from "@backend/db/repository";
 import type { ContainerView } from "@backend/domain/view";
 import { canRead, canWrite } from "@backend/lib/permissions";
@@ -26,10 +27,13 @@ export function ShareDialog({
   container,
   members,
   closeHref,
+  canManage = false,
 }: {
   container: ContainerView;
   members: Member[];
   closeHref: string;
+  /** The GM, on a shared container: show the member editor. */
+  canManage?: boolean;
 }) {
   const rows = members
     .map((member) => ({
@@ -81,18 +85,27 @@ export function ShareDialog({
         ))}
       </ul>
 
-      {/* Stated plainly rather than implied by a missing button. Someone who
+      {container.type === "party" && canManage ? (
+        <SharedMembersForm
+          container={container}
+          players={members.filter((m) => m.role === "player")}
+          closeHref={closeHref}
+        />
+      ) : (
+        /* Stated plainly rather than implied by a missing button. Someone who
           opens Share is looking for the control that changes this, and the
-          useful answer is where that control actually is. */}
-      <p className="mt-4 flex items-start gap-2 rounded-md border border-border bg-surface2 p-3 text-sm text-muted">
-        <Icon name="info" size={13} className="mt-0.5 shrink-0" />
-        <span>
-          Access follows the container&rsquo;s kind and the campaign roster, not
-          a per-person setting. To change who can reach this, change its kind or
-          its owner in <strong className="text-text">Edit container</strong> — or
-          ask the GM to.
-        </span>
-      </p>
+          useful answer is where that control actually is. */
+        <p className="mt-4 flex items-start gap-2 rounded-md border border-border bg-surface2 p-3 text-sm text-muted">
+          <Icon name="info" size={13} className="mt-0.5 shrink-0" />
+          <span>
+            Access follows the container&rsquo;s kind and the campaign roster,
+            not a per-person setting. To change who can reach this, change its
+            kind or its owner in{" "}
+            <strong className="text-text">Edit container</strong> — or ask the
+            GM to.
+          </span>
+        </p>
+      )}
     </Modal>
   );
 }
@@ -100,7 +113,7 @@ export function ShareDialog({
 /** Why the answer above is what it is, in the language of the table. */
 const REASON: Record<ContainerView["type"], string> = {
   character: "A pack is its owner's. The GM can see every pack.",
-  party: "A shared container is the whole table's, to read and to write.",
+  party: "Shared with the players the GM puts in it.",
   world:
     "A world container is the GM's. Players can see it once it is revealed, and never take from it.",
 };

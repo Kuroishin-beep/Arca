@@ -26,7 +26,7 @@ export function canRead(
     case "character":
       return container.ownerId === principal.userId;
     case "party":
-      return true;
+      return inShared(principal, container);
     case "world":
       return container.revealed;
   }
@@ -47,9 +47,47 @@ export function canWrite(
     case "character":
       return container.ownerId === principal.userId;
     case "party":
-      return true;
+      return inShared(principal, container);
     case "world":
       return false;
+  }
+}
+
+/**
+ * Whether a player is in a shared container. `memberIds` is the GM's list;
+ * `null` is "everyone at the table" — every shared container's meaning before
+ * the GM could choose, so containers nobody has restricted behave as they did.
+ * Reading and writing share the rule: being in a shared container means both.
+ */
+function inShared(principal: Principal, container: ContainerView): boolean {
+  return (
+    container.memberIds === null ||
+    container.memberIds.includes(principal.userId)
+  );
+}
+
+/**
+ * Who a new container starts with. A shared container the GM creates starts
+ * empty — the GM then puts people in, which is the point. One a player creates
+ * starts with just them: they can use what they made, and the GM decides who
+ * joins it. Packs and world containers have no list.
+ */
+export function initialMembers(
+  principal: Principal,
+  type: ContainerView["type"],
+): ContainerView["memberIds"] {
+  if (type !== "party") return null;
+  return principal.role === "gm" ? [] : [principal.userId];
+}
+
+/** Choosing who is in a shared container is the GM's call alone. */
+export function canManageAccess(principal: Principal): boolean {
+  return principal.role === "gm";
+}
+
+export function assertCanManageAccess(principal: Principal): void {
+  if (!canManageAccess(principal)) {
+    throw new PermissionError("Only the GM can choose who is in a shared container.");
   }
 }
 
@@ -70,6 +108,8 @@ export function writeDeniedReason(
       return `${container.name} belongs to another player.`;
     case "world":
       return `${container.name} is GM-only.`;
+    case "party":
+      return `You are not in ${container.name}. The GM chooses who is.`;
     default:
       return `You cannot edit ${container.name}.`;
   }

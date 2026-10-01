@@ -180,6 +180,37 @@ export async function setContainerRevealedAction(
   }
 }
 
+/**
+ * Who is in a shared container — the GM putting players in and taking them
+ * out. `everyone` clears the list back to the whole table; otherwise the
+ * ticked players are the list (possibly none, leaving it GM-only).
+ */
+export async function setContainerMembersAction(
+  formData: FormData,
+): Promise<ActionResult> {
+  try {
+    const principal = await requirePrincipal();
+    const raw = formData.get("containerId");
+    const containerId = typeof raw === "string" ? raw : "";
+    const everyone = formData.get("mode") === "everyone";
+    const memberIds = formData
+      .getAll("memberIds")
+      .filter((v): v is string => typeof v === "string");
+
+    await repository().setContainerMembers(
+      principal,
+      containerId,
+      everyone ? null : memberIds,
+    );
+
+    revalidatePath("/", "layout");
+    await announce(principal.userId, containerId);
+    return { ok: true };
+  } catch (error) {
+    return toResult(error, "Could not change who is in that.");
+  }
+}
+
 export async function archiveContainerAction(
   containerId: string,
 ): Promise<ActionResult> {

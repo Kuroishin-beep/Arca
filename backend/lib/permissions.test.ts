@@ -108,10 +108,52 @@ describe("reads", () => {
       revealed: false,
     });
 
-    // Shared means shared: it has to reach the other player, not just its
-    // author.
+    // The GM decides who is in a shared container. The player who made it is
+    // in it; nobody else is until the GM puts them there.
+    const forKova = await fixtureRepository.listContainers(kova);
+    expect(forKova.map((c) => c.id)).toContain(created.id);
     const forMilo = await fixtureRepository.listContainers(milo);
-    expect(forMilo.map((c) => c.id)).toContain(created.id);
+    expect(forMilo.map((c) => c.id)).not.toContain(created.id);
+
+    const gmView = await fixtureRepository.listContainers(gm);
+    expect(gmView.map((c) => c.id)).toContain(created.id);
+  });
+
+  it("puts players in a shared container and takes them out — the GM's alone", async () => {
+    const wagon = (await fixtureRepository.listContainers(gm)).find(
+      (c) => c.type === "party",
+    )!;
+    // An unrestricted shared container is the whole table's, as it always was.
+    expect(wagon.memberIds).toBeNull();
+    expect((await fixtureRepository.listContainers(milo)).map((c) => c.id)).toContain(wagon.id);
+
+    // A player cannot change the list, not even to add themselves.
+    await expect(
+      fixtureRepository.setContainerMembers(kova, wagon.id, [kova.userId]),
+    ).rejects.toThrow(/only the GM/i);
+
+    // The GM takes Milo out: Kova keeps it, Milo loses read AND write.
+    await fixtureRepository.setContainerMembers(gm, wagon.id, [kova.userId]);
+    expect((await fixtureRepository.listContainers(milo)).map((c) => c.id)).not.toContain(wagon.id);
+    await expect(fixtureRepository.listItems(milo, wagon.id)).rejects.toThrow();
+    expect((await fixtureRepository.listContainers(kova)).map((c) => c.id)).toContain(wagon.id);
+
+    // And puts him back.
+    await fixtureRepository.setContainerMembers(gm, wagon.id, [kova.userId, milo.userId]);
+    expect((await fixtureRepository.listContainers(milo)).map((c) => c.id)).toContain(wagon.id);
+
+    // "Everyone" again.
+    const reopened = await fixtureRepository.setContainerMembers(gm, wagon.id, null);
+    expect(reopened.memberIds).toBeNull();
+  });
+
+  it("refuses a member list on a pack or a world container", async () => {
+    const pack = (await fixtureRepository.listContainers(gm)).find(
+      (c) => c.type === "character",
+    )!;
+    await expect(
+      fixtureRepository.setContainerMembers(gm, pack.id, []),
+    ).rejects.toThrow(/only a shared container/i);
   });
 
   it("lets a player add a pack of their own", async () => {

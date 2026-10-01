@@ -65,6 +65,16 @@ export const ContainerView = z.object({
   carriedWeight: z.number().nonnegative(),
   /** `null` means "no limit" (a wagon is not encumbered, a person is). */
   capacity: z.number().positive().nullable(),
+  /**
+   * Shared containers only: which players are in it. The GM decides — they put
+   * people in and take them out from the Share dialog.
+   *
+   * `null` means everyone at the table, which is what every shared container
+   * meant before this existed, so existing ones keep working unchanged. A list
+   * means only those players (and the GM, who sees everything). Ignored for
+   * packs and world containers, whose access comes from their kind.
+   */
+  memberIds: z.array(UserId).nullable(),
 });
 export type ContainerView = z.infer<typeof ContainerView>;
 

@@ -110,6 +110,18 @@ export interface ArcaRepository {
   archiveContainer(principal: Principal, containerId: string): Promise<void>;
 
   /**
+   * Who is in a shared container — the GM's to decide, putting players in and
+   * taking them out. `null` means everyone at the table (what an unrestricted
+   * shared container has always meant); a list means only those players.
+   * Refused for packs and world containers, whose access comes from their kind.
+   */
+  setContainerMembers(
+    principal: Principal,
+    containerId: string,
+    memberIds: string[] | null,
+  ): Promise<ContainerView>;
+
+  /**
    * The character sheet a character container carries — SCOPE.md S1.
    *
    * `null` when the container is not a character one, so a caller never has to

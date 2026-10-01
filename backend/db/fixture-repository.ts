@@ -38,6 +38,8 @@ import {
 import {
   assertCanEditContainer,
   assertCanCreateItem,
+  assertCanManageAccess,
+  initialMembers,
   assertCanManageCatalog,
   assertCanManageContainer,
   assertCanManageRoster,
@@ -117,6 +119,8 @@ function freshStore(): Store {
       ownerId: c.ownerId as ContainerView["ownerId"],
       revealed: c.revealed,
       capacity: c.capacity,
+      // Every seeded shared container is open to the whole table.
+      memberIds: null,
     })),
     items: SEED_ITEMS.map((item) => ({
       id: item.id as ItemView["id"],
@@ -310,9 +314,29 @@ export const fixtureRepository: ArcaRepository = {
       // Only a world container has anything to reveal.
       revealed: input.type === "world" ? input.revealed : true,
       capacity: input.capacity,
+      memberIds: initialMembers(principal, input.type),
     };
     store().containers.push(container);
     return hydrate(container);
+  },
+
+  async setContainerMembers(principal, containerId, memberIds) {
+    assertCanManageAccess(principal);
+    const raw = store().containers.find((c) => c.id === containerId);
+    if (!raw) throw new NotFoundError("No such container.");
+    if (raw.type !== "party") {
+      throw new ConflictError(
+        "Only a shared container has a member list. A pack is its owner's; a world container is yours.",
+      );
+    }
+    if (memberIds !== null) {
+      const known = new Set(store().users.map((u) => u.userId));
+      const unknown = memberIds.find((id) => !known.has(id as Principal["userId"]));
+      if (unknown) throw new NotFoundError("That is not someone at this table.");
+    }
+    raw.memberIds =
+      memberIds === null ? null : ([...new Set(memberIds)] as ContainerView["memberIds"]);
+    return hydrate(raw);
   },
 
   async updateContainer(principal, input) {
