@@ -94,9 +94,6 @@ export function WorkspaceShell({
       selectedDatabase={selectedDatabase}
       newContainerHref={newContainerHref}
       newDatabaseHref={newDatabaseHref}
-      // The search row jumps to THIS screen's input, which is the same target
-      // the top bar's form posts to.
-      searchHref={searchAction ? `${searchAction}#q` : undefined}
       campaignName={campaignName}
       catalogOpen={catalogOpen}
     />

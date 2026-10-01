@@ -15,7 +15,7 @@ import {
 } from "@backend/domain/database";
 import { fieldsForTypes, type ItemField } from "@backend/domain/item-fields";
 import { matchesQuery } from "@backend/domain/view";
-import { canWrite, creatableContainerTypes } from "@backend/lib/permissions";
+import { canCreateItem, canWrite, creatableContainerTypes } from "@backend/lib/permissions";
 import { currentPrincipal } from "@backend/lib/session";
 
 /**
@@ -96,7 +96,9 @@ export default async function DatabasePage({
       writable && creatableContainerTypes(principal).length > 0
         ? `/c/${writable.id}?dialog=new-container`
         : undefined,
-    newDatabaseHref: writable ? `/c/${writable.id}?dialog=add` : undefined,
+    // GM-only, like the dialog it opens: creating from scratch is the GM's.
+    newDatabaseHref:
+      writable && canCreateItem(principal) ? `/c/${writable.id}?dialog=add` : undefined,
     searchAction: base,
     query,
     placeholder: database ? `Search ${database.name}…` : "Search…",
@@ -196,7 +198,7 @@ export default async function DatabasePage({
  * independently of them; this column is how you get from the definition to
  * the places it is actually being carried.
  */
-function DatabaseTable({
+export function DatabaseTable({
   rows,
   fields,
 }: {

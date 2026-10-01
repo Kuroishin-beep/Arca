@@ -246,3 +246,31 @@ export async function readDatabase(
 
   return { name, rows };
 }
+
+/**
+ * Search everything this principal can see — the sidebar's search box.
+ *
+ * The top bar searches the container you are in; this answers "where is it?"
+ * across every container you may open, and the catalogue. It goes through
+ * `allRows`, so it is the same permission-checked walk as the databases: a
+ * match in a container you cannot open is never a result, and a catalogue
+ * entry is listed once with every place it is held.
+ */
+export async function searchEverything(
+  repo: ArcaRepository,
+  principal: Principal,
+  query: string,
+): Promise<DatabaseRow[]> {
+  const q = query.trim().toLowerCase();
+  if (q === "") return [];
+  const rows = await allRows(repo, principal);
+  return rows
+    .filter(
+      (row) =>
+        row.name.toLowerCase().includes(q) ||
+        row.tags.some((t) => t.toLowerCase().includes(q)) ||
+        row.types.some((t) => t.toLowerCase().includes(q)) ||
+        row.holdings.some((h) => h.container.name.toLowerCase().includes(q)),
+    )
+    .sort((a, b) => a.name.localeCompare(b.name));
+}

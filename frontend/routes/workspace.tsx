@@ -278,7 +278,7 @@ export default async function WorkspacePage({
         campaignName={principal.campaignName ?? CAMPAIGN_NAME}
         selectedId={containerId}
         newContainerHref={newContainerHref}
-        newDatabaseHref={editable ? `/c/${containerId}?dialog=add` : undefined}
+        newDatabaseHref={canCreate ? `/c/${containerId}?dialog=add` : undefined}
         searchAction={`/c/${containerId}`}
         query={query}
         placeholder={`Search ${container.name}…`}
@@ -467,7 +467,11 @@ export default async function WorkspacePage({
       ) : null}
 
       {sp.dialog === "add" && canCreate ? (
-        <ItemEditorDialog container={container} closeHref={closeHref} />
+        <ItemEditorDialog
+          container={container}
+          destinations={containers.filter((c) => canWrite(principal, c))}
+          closeHref={closeHref}
+        />
       ) : null}
 
       {/* Only fetched when the dialog is actually open — the catalogue is a

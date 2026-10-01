@@ -56,7 +56,6 @@ export function Sidebar({
    *  created, it is named. Absent when there is nowhere they may write. */
   newDatabaseHref,
   /** Where the Search row jumps — the current screen's search input. */
-  searchHref,
   /** The campaign name, in the switcher at the top. */
   campaignName,
   /** True on the catalogue screen, so its row reads as current the way a
@@ -84,7 +83,6 @@ export function Sidebar({
   lockedContainers?: ContainerView[];
   newContainerHref?: string;
   newDatabaseHref?: string;
-  searchHref?: string;
   campaignName: string;
   catalogOpen?: boolean;
   compact?: boolean;
@@ -192,18 +190,30 @@ export function Sidebar({
         ) : null}
       </div>
 
-      {/* Search lives in the sidebar in the wireframe, next to what it
-          searches. It is a link rather than a second input: the real search
-          box is in the top bar and already owns the `q` parameter, and two
-          fields writing one piece of state is how they end up disagreeing. */}
+      {/* Search everything. This used to be a link that jumped to the top
+          bar's box without focusing it — and went home on pages with no box —
+          so it looked broken. It is a real search now, with a different job
+          from the top bar's: that one filters the container you are in, this
+          one answers "where is it?" across every container and the catalogue.
+          A GET form, so it works without JavaScript and results are a URL. */}
       <div className="flex flex-col gap-1 px-3 pt-3">
-        <Link
-          href={searchHref ?? "/"}
-          className="flex h-8 w-full items-center gap-2 rounded-md border border-border bg-surface2 px-2 text-sm text-muted hover:text-text"
-        >
-          <Icon name="search" size={13} className="shrink-0" />
-          Search
-        </Link>
+        <form action="/search" method="get" role="search" className="relative">
+          <label htmlFor="sidebar-search" className="sr-only">
+            Search everything
+          </label>
+          <Icon
+            name="search"
+            size={13}
+            className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-faint"
+          />
+          <input
+            id="sidebar-search"
+            name="q"
+            type="search"
+            placeholder="Search everything…"
+            className="h-8 w-full rounded-md border border-border bg-surface2 pl-7 pr-2 text-sm text-text placeholder:text-faint"
+          />
+        </form>
 
         {/* The catalogue is neither a place nor a kind, so it belongs with
             Search rather than in either section below: it is the campaign's

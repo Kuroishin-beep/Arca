@@ -334,6 +334,16 @@
     font-weight: 700;
   }
 
+  /* Everything clickable shows it. Tailwind's reset gives buttons the default
+     arrow, which made every button in the app look like inert text until it
+     was clicked. Disabled controls say so instead. */
+  :where(button, [role="button"], summary, select, label[for], input[type="checkbox"], input[type="radio"]):not(:disabled) {
+    cursor: pointer;
+  }
+  :where(button, [role="button"], select, input):disabled {
+    cursor: not-allowed;
+  }
+
   /* One focus treatment, defined once, never removed. */
   :where(a, button, input, select, textarea, [tabindex]):focus-visible {
     outline: 2px solid var(--color-primary);

@@ -14,7 +14,12 @@ import { WorkspaceShell } from "@frontend/components/organisms/WorkspaceShell";
 import { repository } from "@backend/db";
 import { CAMPAIGN_NAME } from "@backend/db/seed-data";
 import { listDatabases } from "@backend/domain/database";
-import { canManageRoster, canWrite, creatableContainerTypes } from "@backend/lib/permissions";
+import {
+  canCreateItem,
+  canManageRoster,
+  canWrite,
+  creatableContainerTypes,
+} from "@backend/lib/permissions";
 import { currentPrincipal } from "@backend/lib/session";
 
 /**
@@ -93,7 +98,9 @@ export default async function MembersPage({
       writable && creatableContainerTypes(principal).length > 0
         ? `/c/${writable.id}?dialog=new-container`
         : undefined,
-    newDatabaseHref: writable ? `/c/${writable.id}?dialog=add` : undefined,
+    // GM-only, like the dialog it opens: creating from scratch is the GM's.
+    newDatabaseHref:
+      writable && canCreateItem(principal) ? `/c/${writable.id}?dialog=add` : undefined,
     navOpen: sp.nav === "1",
     drawerHref: "/members?nav=1",
     railCollapsed,

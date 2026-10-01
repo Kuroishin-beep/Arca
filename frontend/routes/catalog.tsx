@@ -8,6 +8,7 @@ import { repository } from "@backend/db";
 import { CAMPAIGN_NAME } from "@backend/db/seed-data";
 import { listDatabases } from "@backend/domain/database";
 import {
+  canCreateItem,
   canManageCatalog,
   canWrite,
   creatableContainerTypes,
@@ -55,7 +56,9 @@ export default async function CatalogPage({
       writable && creatableContainerTypes(principal).length > 0
         ? `/c/${writable.id}?dialog=new-container`
         : undefined,
-    newDatabaseHref: writable ? `/c/${writable.id}?dialog=add` : undefined,
+    // GM-only, like the dialog it opens: creating from scratch is the GM's.
+    newDatabaseHref:
+      writable && canCreateItem(principal) ? `/c/${writable.id}?dialog=add` : undefined,
     navOpen: sp.nav === "1",
     drawerHref: "/catalog?nav=1",
     railCollapsed,

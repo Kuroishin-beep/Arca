@@ -5,10 +5,8 @@ import { useRouter } from "next/navigation";
 
 import { createItemAction, updateItemAction } from "@backend/actions/items";
 import { Button } from "@frontend/components/atoms/Button";
-import { ContainerDot } from "@frontend/components/atoms/Chip";
 import { TextAreaField, TextField } from "@frontend/components/atoms/Field";
 import { Icon } from "@frontend/components/atoms/Icon";
-import { NumberStepper } from "@frontend/components/atoms/NumberStepper";
 import { Modal } from "@frontend/components/molecules/Modal";
 import { StatFields } from "@frontend/components/molecules/StatFields";
 import type { ContainerView, ItemView } from "@backend/domain/view";
@@ -24,10 +22,14 @@ import type { ContainerView, ItemView } from "@backend/domain/view";
  */
 export function ItemEditorDialog({
   container,
+  destinations,
   item,
   closeHref,
 }: {
   container: ContainerView;
+  /** Where a new item may go: every container this person may write to. The
+   *  one the dialog was opened from is preselected. */
+  destinations?: ContainerView[];
   /** Absent when adding. */
   item?: ItemView;
   closeHref: string;
@@ -43,7 +45,6 @@ export function ItemEditorDialog({
   const isCopy = item?.catalogItemId != null;
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
-  const [qty, setQty] = useState(item?.qty ?? 1);
   // Tracked so the type-specific inputs follow what is typed into Types.
   const [typesText, setTypesText] = useState(
     item?.types.join(", ") ?? "Physical Object",
@@ -73,7 +74,10 @@ export function ItemEditorDialog({
       // `router.refresh()` straight after used to race it: fired while the URL
       // still said `?dialog=…`, it could land after the push and render the
       // dialog again over a save that had succeeded.
-      router.push(closeHref);
+      // A new item: go to where it was put, which the container picker may
+      // have changed from the container the dialog was opened on.
+      const chosen = formData.get("containerId");
+      router.push(!editing && typeof chosen === "string" ? `/c/${chosen}` : closeHref);
     });
   };
 
@@ -86,20 +90,37 @@ export function ItemEditorDialog({
       subtitle={editing ? item.name : undefined}
     >
       <form action={onSubmit} id="item-form">
-        {editing ? (
-          <input type="hidden" name="id" value={item.id} />
-        ) : (
-          <input type="hidden" name="containerId" value={container.id} />
-        )}
-
-        {!editing ? (
-          <p className="flex items-center gap-2 border-b border-border px-4 py-2 text-sm text-muted">
-            <ContainerDot type={container.type} />
-            into {container.name}
-          </p>
-        ) : null}
+        {editing ? <input type="hidden" name="id" value={item.id} /> : null}
 
         <div className="flex flex-col gap-4 p-4">
+          {/* Which container it goes in — chosen here, rather than fixed to
+              wherever the dialog happened to be opened from. "New database"
+              in the sidebar opens this from any screen, and the item belongs
+              somewhere specific. */}
+          {!editing ? (
+            <div>
+              <label htmlFor="containerId" className="mb-1 block text-sm font-medium text-muted">
+                Container
+              </label>
+              <span className="block">
+                <select
+                  id="containerId"
+                  name="containerId"
+                  defaultValue={container.id}
+                  className="h-9 w-full rounded-md border border-border bg-surface2 px-2 text-base text-text"
+                >
+                  {(destinations && destinations.length > 0 ? destinations : [container]).map(
+                    (option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.name}
+                      </option>
+                    ),
+                  )}
+                </select>
+              </span>
+            </div>
+          ) : null}
+
           {formError ? (
             <p
               role="alert"
@@ -158,32 +179,21 @@ export function ItemEditorDialog({
             readOnly={isCopy}
           />
 
-          {/* `auto` for the stepper, not a third of the row: its two buttons
-              and input need 128px, and an equal third of the dialog is less,
-              so the + button ran under the Weight field. */}
-          <div className="grid grid-cols-[auto_1fr_1fr] gap-3">
-            <div>
-              <label
-                htmlFor="qty"
-                className="mb-1 block text-sm font-medium text-muted"
-              >
-                Qty
-              </label>
-              <NumberStepper
-                id="qty"
-                name="qty"
-                label="quantity"
-                value={qty}
-                min={1}
-                onChange={setQty}
-              />
-              {fieldErrors.qty ? (
-                <p className="mt-1 flex items-center gap-1 text-sm text-danger">
-                  <Icon name="alert" size={12} strokeWidth={1.8} />
-                  {fieldErrors.qty}
-                </p>
-              ) : null}
-            </div>
+          {/* Quantity is one plain number field — type it, or use the field's
+              own arrows. The − / value / + stepper was three controls for one
+              number, and wider than the space it was given. */}
+          <div className="grid grid-cols-3 gap-3">
+            <TextField
+              id="qty"
+              name="qty"
+              label="Qty"
+              type="number"
+              min={1}
+              step={1}
+              numeric
+              defaultValue={item?.qty ?? 1}
+              error={fieldErrors.qty}
+            />
             <TextField
               id="weight"
               name="weight"
