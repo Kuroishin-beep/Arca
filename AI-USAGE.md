@@ -188,13 +188,13 @@ tests and pushed. The details, with the commit for every claim, are below.
 > **Example entries — the format to copy.** These show how a "code I wrote
 > myself" paragraph is structured: one part per entry, the file and commit, what
 > it does, and why it is built that way, in your own voice. The fixes below were
-> in fact written by Claude (commit `a042d2c`) and are used here only as a model;
+> in fact written by Claude (commit `d8c8308`) and are used here only as a model;
 > replace them with code you wrote yourself.
 
 #### Moving an item onto the same item now makes one stack
 - **File:** `backend/domain/view.ts` (`sameStack`), `backend/db/postgres-repository.ts`
   and `backend/db/fixture-repository.ts` (`moveItem`)
-- **Commit:** [a042d2c](https://github.com/Kuroishin-beep/Arca/commit/a042d2c)
+- **Commit:** [d8c8308](https://github.com/Kuroishin-beep/Arca/commit/d8c8308)
 - **What it does:** if I move 2 rations into a backpack that already has rations,
   the backpack ends up with one bigger stack instead of two "Field Rations" rows.
   If I moved the whole stack, the old row is archived; if I moved part of it, the
@@ -211,7 +211,7 @@ tests and pushed. The details, with the commit for every claim, are below.
 
 #### A dialog no longer closes when you select its text
 - **File:** `frontend/components/molecules/Modal.tsx`
-- **Commit:** [a042d2c](https://github.com/Kuroishin-beep/Arca/commit/a042d2c)
+- **Commit:** [d8c8308](https://github.com/Kuroishin-beep/Arca/commit/d8c8308)
 - **What it does:** selecting a container's name by dragging, and letting go
   outside the dialog, used to close the dialog and lose the edit. Now it stays open.
   Clicking the dark backdrop still closes it.
@@ -224,7 +224,7 @@ tests and pushed. The details, with the commit for every claim, are below.
 #### Kin is free text
 - **File:** `backend/domain/character.ts` (`knownKin`, `movement`),
   `frontend/components/organisms/CharacterSheet.tsx`
-- **Commit:** [a042d2c](https://github.com/Kuroishin-beep/Arca/commit/a042d2c)
+- **Commit:** [d8c8308](https://github.com/Kuroishin-beep/Arca/commit/d8c8308)
 - **What it does:** Kin used to be a dropdown, so players with homebrew kin couldn't
   enter theirs. It's now a text box with the book's kin as suggestions.
 - **Why I built it that way:** movement is worked out from kin, which is why it was
