@@ -1,5 +1,9 @@
 # Arca
 
+[![Made with AI](https://img.shields.io/badge/Made_with-AI_assistance-blue)](AI-USAGE.md)
+
+Built with help from Claude (Anthropic) through Claude Code, which wrote most of the code from September 2026 on, directed and reviewed by me. Details: [AI-USAGE.md](AI-USAGE.md).
+
 TaleSpire Symbiote for our Dragonbane Westmarch campaign: a GUI database for tracking inventories across containers, with live sync and real-time collaboration. Stretch goal adds character sheets (attributes, skills, equipment, spells) plus diceFinder, parsing dice notation for one-click TaleSpire rolls.
 
 ## Run it
