@@ -315,6 +315,43 @@ describe("a copy reached some other way", () => {
     expect(arrived?.name).toBe(SEED_CATALOG[0]!.name);
   });
 
+  it("joins a matching stack at the destination instead of adding a row", async () => {
+    const here = await fixtureRepository.addFromCatalog(gm, {
+      catalogItemId: ROPE,
+      containerId: KOVAS_PACK,
+      qty: 2,
+    });
+    const there = await fixtureRepository.addFromCatalog(gm, {
+      catalogItemId: ROPE,
+      containerId: WAGON,
+      qty: 3,
+    });
+
+    const partial = await fixtureRepository.moveItem(gm, {
+      itemId: there.id,
+      toContainerId: KOVAS_PACK,
+      qty: 1,
+    });
+    expect(partial.merged).toBe(true);
+
+    const whole = await fixtureRepository.moveItem(gm, {
+      itemId: there.id,
+      toContainerId: KOVAS_PACK,
+      qty: 2,
+    });
+    expect(whole.merged).toBe(true);
+
+    const ropes = (await fixtureRepository.listItems(gm, KOVAS_PACK)).filter(
+      (i) => i.catalogItemId === ROPE,
+    );
+    expect(ropes).toHaveLength(1);
+    expect(ropes[0]?.id).toBe(here.id);
+    expect(ropes[0]?.qty).toBe(5);
+    expect(
+      (await fixtureRepository.listItems(gm, WAGON)).some((i) => i.id === there.id),
+    ).toBe(false);
+  });
+
   it("refuses a rename, pointing at the catalogue", async () => {
     const copy = await fixtureRepository.addFromCatalog(kova, {
       catalogItemId: ROPE,

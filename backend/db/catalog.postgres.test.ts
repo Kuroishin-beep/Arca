@@ -182,6 +182,36 @@ describe.skipIf(!enabled)("the catalogue on Postgres", () => {
     expect(outcome.itemName).toBe(ROPE_NAME);
   });
 
+  it("joins a matching stack at the destination instead of adding a row", async () => {
+    const here = await repo.addFromCatalog(gm, {
+      catalogItemId: ROPE,
+      containerId: KOVAS_PACK,
+      qty: 2,
+    });
+    const there = await repo.addFromCatalog(gm, {
+      catalogItemId: ROPE,
+      containerId: WAGON,
+      qty: 3,
+    });
+
+    expect(
+      (await repo.moveItem(gm, { itemId: there.id, toContainerId: KOVAS_PACK, qty: 1 }))
+        .merged,
+    ).toBe(true);
+    expect(
+      (await repo.moveItem(gm, { itemId: there.id, toContainerId: KOVAS_PACK, qty: 2 }))
+        .merged,
+    ).toBe(true);
+
+    const ropes = (await repo.listItems(gm, KOVAS_PACK)).filter(
+      (i) => i.catalogItemId === ROPE,
+    );
+    expect(ropes).toHaveLength(1);
+    expect(ropes[0]!.id).toBe(here.id);
+    expect(ropes[0]!.qty).toBe(5);
+    expect((await repo.listItems(gm, WAGON)).some((i) => i.id === there.id)).toBe(false);
+  });
+
   it("refuses to rename a copy, and says where to do it instead", async () => {
     const copy = await repo.addFromCatalog(kova, {
       catalogItemId: ROPE,

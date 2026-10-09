@@ -344,6 +344,15 @@
     cursor: not-allowed;
   }
 
+  /* A select's open list is drawn by the OS, and on Windows it keeps a white
+     background while the options inherit this theme's light text — which made
+     every dark-mode dropdown unreadable. Give the options the theme's own. */
+  option,
+  optgroup {
+    background-color: var(--color-surface-3);
+    color: var(--color-text);
+  }
+
   /* One focus treatment, defined once, never removed. */
   :where(a, button, input, select, textarea, [tabindex]):focus-visible {
     outline: 2px solid var(--color-primary);

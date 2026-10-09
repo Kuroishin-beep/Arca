@@ -1,5 +1,10 @@
-import { TextField } from "@frontend/components/atoms/Field";
-import { fieldsForTypes, type Stats } from "@backend/domain/item-fields";
+import { TextAreaField, TextField } from "@frontend/components/atoms/Field";
+import {
+  LONG_STAT_MAX,
+  SHORT_STAT_MAX,
+  type Stats,
+  fieldsForTypes,
+} from "@backend/domain/item-fields";
 
 /**
  * The inputs a type adds to an item form — Grip, STR, Damage… for a weapon,
@@ -35,20 +40,34 @@ export function StatFields({
           : "Item details"}
       </legend>
       <div className="grid grid-cols-2 gap-3 panel:grid-cols-3">
-        {fields.map((field) => (
-          <TextField
-            key={field.key}
-            id={`${idPrefix}-stat-${field.key}`}
-            name={`stat:${field.key}`}
-            label={field.label}
-            readOnly={readOnly}
-            numeric={field.numeric}
-            defaultValue={values[field.key] ?? ""}
-            placeholder={field.placeholder}
-            maxLength={80}
-            className={field.key === "effect" || field.key === "features" ? "col-span-2 panel:col-span-3" : undefined}
-          />
-        ))}
+        {fields.map((field) =>
+          field.long ? (
+            <TextAreaField
+              key={field.key}
+              id={`${idPrefix}-stat-${field.key}`}
+              name={`stat:${field.key}`}
+              label={field.label}
+              readOnly={readOnly}
+              defaultValue={values[field.key] ?? ""}
+              placeholder={field.placeholder}
+              maxLength={LONG_STAT_MAX}
+              rows={2}
+              className="col-span-2 panel:col-span-3"
+            />
+          ) : (
+            <TextField
+              key={field.key}
+              id={`${idPrefix}-stat-${field.key}`}
+              name={`stat:${field.key}`}
+              label={field.label}
+              readOnly={readOnly}
+              numeric={field.numeric}
+              defaultValue={values[field.key] ?? ""}
+              placeholder={field.placeholder}
+              maxLength={SHORT_STAT_MAX}
+            />
+          ),
+        )}
       </div>
     </fieldset>
   );

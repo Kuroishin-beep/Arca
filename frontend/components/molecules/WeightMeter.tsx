@@ -1,4 +1,8 @@
-import { encumbrance, weightPercent } from "@backend/domain/view";
+import {
+  encumbrance,
+  weightPercent,
+  formatWeight,
+} from "@backend/domain/view";
 
 /**
  * Carried vs capacity.
@@ -41,7 +45,7 @@ export function WeightMeter({
   if (capacity === null) {
     return (
       <p className="font-mono text-xs tabular-nums text-muted">
-        {carried.toFixed(1)} kg
+        {formatWeight(carried)} kg
       </p>
     );
   }
@@ -54,7 +58,7 @@ export function WeightMeter({
           <span
             className={`shrink-0 font-mono text-sm tabular-nums ${TEXT[state]}`}
           >
-            {carried.toFixed(1)} / {capacity.toFixed(1)} kg
+            {formatWeight(carried)} / {formatWeight(capacity)} kg
           </span>
         </div>
       ) : null}
@@ -78,8 +82,8 @@ export function WeightMeter({
             className={`shrink-0 font-mono text-xs tabular-nums ${TEXT[state]}`}
           >
             {compact
-              ? `${carried.toFixed(1)}kg`
-              : `${carried.toFixed(1)} / ${capacity.toFixed(1)} kg`}
+              ? `${formatWeight(carried)}kg`
+              : `${formatWeight(carried)} / ${formatWeight(capacity)} kg`}
           </span>
         ) : null}
       </div>
@@ -89,7 +93,7 @@ export function WeightMeter({
       {label && state !== "ok" ? (
         <p className={`mt-1 text-sm ${TEXT[state]}`}>
           {state === "over"
-            ? `Over by ${(carried - capacity).toFixed(1)} kg — the GM decides what that costs.`
+            ? `Over by ${formatWeight(carried - capacity)} kg — the GM decides what that costs.`
             : "At carry limit."}
         </p>
       ) : null}

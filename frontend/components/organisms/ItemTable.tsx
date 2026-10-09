@@ -17,6 +17,7 @@ import {
   type Sort,
   type SortColumn,
   itemWeight,
+  formatWeight,
 } from "@backend/domain/view";
 
 /**
@@ -133,7 +134,7 @@ export function ItemTable({
               </div>
               <div className="mt-0.5 flex items-center gap-2 text-xs text-muted">
                 <span className="font-mono tabular-nums">
-                  {itemWeight(item).toFixed(1)} kg
+                  {formatWeight(itemWeight(item))} kg
                 </span>
                 {item.value ? (
                   <>
@@ -281,7 +282,7 @@ export function ItemTable({
                   {item.qty}
                 </td>
                 <td className="px-3 text-right font-mono text-base tabular-nums text-text">
-                  {item.weight.toFixed(1)}
+                  {formatWeight(item.weight)}
                 </td>
                 <td className="hidden whitespace-nowrap px-3 text-right font-mono text-base tabular-nums text-text md:table-cell">
                   <Value value={item.value} />

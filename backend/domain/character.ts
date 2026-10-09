@@ -123,11 +123,10 @@ export function conditionFor(attribute: AttributeKey) {
  * ------------------------------------------------------------------ */
 
 /**
- * Kin is an enum rather than free text for one reason: movement is derived
- * from it. A free-text kin would mean guessing a base movement from a string,
- * and a guessed number on a character sheet is worse than no number. `other`
- * exists so a homebrew kin is still expressible — it takes the human base and
- * says so.
+ * Kin is free text, so a homebrew kin is just typed in. The known ones are
+ * offered as suggestions and carry their base movement; anything else takes
+ * the human base of 10. Matching is by key or label, ignoring case, so rows
+ * stored back when kin was a dropdown ("elf") still resolve.
  */
 export const KINS = [
   { key: "human", label: "Human", movement: 10 },
@@ -139,10 +138,18 @@ export const KINS = [
   { key: "other", label: "Other", movement: 10 },
 ] as const;
 
-export type KinKey = (typeof KINS)[number]["key"];
-export const KinKeySchema = z.enum(
-  KINS.map((k) => k.key) as [KinKey, ...KinKey[]],
-);
+export const KinSchema = z.string().trim().max(40);
+
+/** The known kin a typed value names, if any. */
+export function knownKin(kin: string) {
+  const wanted = kin.trim().toLowerCase();
+  return KINS.find((k) => k.key === wanted || k.label.toLowerCase() === wanted);
+}
+
+/** How a stored kin reads on the sheet: a known key shows its label. */
+export function kinLabel(kin: string): string {
+  return knownKin(kin)?.label ?? kin;
+}
 
 export const AGES = [
   { key: "young", label: "Young" },
@@ -174,7 +181,7 @@ export const PROFESSIONS = [
 ] as const;
 
 export const Profile = z.object({
-  kin: KinKeySchema,
+  kin: KinSchema,
   profession: z.string().trim().max(60),
   age: AgeKeySchema,
   appearance: z.string().max(500),
@@ -410,8 +417,8 @@ export function maxWp(attributes: Attributes): number {
 }
 
 /** Kin sets the base; AGL moves it in steps of two. */
-export function movement(kin: KinKey, agility: number): number {
-  const base = KINS.find((k) => k.key === kin)?.movement ?? 10;
+export function movement(kin: string, agility: number): number {
+  const base = knownKin(kin)?.movement ?? 10;
   const step =
     agility <= 6 ? -4 : agility <= 9 ? -2 : agility <= 12 ? 0 : agility <= 15 ? 2 : 4;
   return Math.max(0, base + step);

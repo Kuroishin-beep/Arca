@@ -5,10 +5,21 @@ import { Chip, TagChip } from "@frontend/components/atoms/Chip";
 import { Avatar } from "@frontend/components/atoms/Status";
 import { WeightMeter } from "@frontend/components/molecules/WeightMeter";
 import { CharacterSheet } from "@frontend/components/organisms/CharacterSheet";
-import { TopBar } from "@frontend/components/organisms/TopBar";
+import { WorkspaceShell } from "@frontend/components/organisms/WorkspaceShell";
 import { repository } from "@backend/db";
-import { type ItemView, itemWeight } from "@backend/domain/view";
-import { PermissionError, canWrite } from "@backend/lib/permissions";
+import { CAMPAIGN_NAME } from "@backend/db/seed-data";
+import { listDatabases } from "@backend/domain/database";
+import {
+  type ItemView,
+  itemWeight,
+  formatWeight,
+} from "@backend/domain/view";
+import {
+  PermissionError,
+  canCreateItem,
+  canWrite,
+  creatableContainerTypes,
+} from "@backend/lib/permissions";
 import { currentPrincipal } from "@backend/lib/session";
 
 /**
@@ -20,9 +31,9 @@ import { currentPrincipal } from "@backend/lib/session";
  * new table, and the attributes below are stored by exactly the machinery that
  * stores an item's weight.
  *
- * The page is a document rather than an app shell on purpose. Every other
- * screen is a list you navigate with the sidebar; this one is a thing you read
- * top to bottom and poke at, so it gets the width and the quiet.
+ * It opens inside the same shell as a container, sidebar and all, so the sheet
+ * is one more place in the campaign rather than a full-screen detour you have
+ * to back out of.
  *
  * Reads and writes are the SAME gate — `canWrite` on the container, which
  * already says "your own pack, or anything if you are the GM". A player cannot
@@ -31,13 +42,16 @@ import { currentPrincipal } from "@backend/lib/session";
  */
 export default async function CharacterSheetPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ containerId: string }>;
+  searchParams: Promise<{ nav?: string; rail?: string }>;
 }) {
   const principal = await currentPrincipal();
   if (!principal) redirect("/signin");
 
   const { containerId } = await params;
+  const sp = await searchParams;
   const repo = repository();
 
   let container;
@@ -57,6 +71,32 @@ export default async function CharacterSheetPage({
   const editable = canWrite(principal, container);
 
   const items = await repo.listItems(principal, containerId);
+  const [containers, databases] = await Promise.all([
+    repo.listContainers(principal),
+    listDatabases(repo, principal),
+  ]);
+  const here = `/character/${containerId}`;
+  const railCollapsed = sp.rail === "0";
+  const writable = containers.find((c) => canWrite(principal, c));
+  const shell = {
+    principal,
+    containers,
+    databases,
+    campaignName: principal.campaignName ?? CAMPAIGN_NAME,
+    selectedId: containerId,
+    newContainerHref:
+      writable && creatableContainerTypes(principal).length > 0
+        ? `/c/${writable.id}?dialog=new-container`
+        : undefined,
+    newDatabaseHref:
+      writable && canCreateItem(principal) ? `/c/${writable.id}?dialog=add` : undefined,
+    navOpen: sp.nav === "1",
+    drawerHref: `${here}?nav=1`,
+    railCollapsed,
+    railHref: railCollapsed ? here : `${here}?rail=0`,
+    closeHref: here,
+  };
+
   const equipment = [...items].sort((a, b) => a.name.localeCompare(b.name));
 
   // A real split, not a fabricated "equipped" slot Arca does not model: the
@@ -66,10 +106,8 @@ export default async function CharacterSheetPage({
   const carried = equipment.filter((item) => !item.types.includes("Weapon"));
 
   return (
-    <div className="flex h-screen flex-col bg-bg">
-      <TopBar principal={principal} />
-
-      <main className="min-h-0 flex-1 overflow-y-auto">
+    <WorkspaceShell {...shell}>
+      <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex max-w-5xl flex-col gap-4 p-3 md:p-6">
           {/* The page's heading, for screen readers. The visible name is an
               editable field rather than a heading — so it can be renamed in
@@ -138,8 +176,8 @@ export default async function CharacterSheetPage({
             </p>
           </section>
         </div>
-      </main>
-    </div>
+      </div>
+    </WorkspaceShell>
   );
 }
 
@@ -228,7 +266,7 @@ function EquipmentTable({
                   {item.qty}
                 </td>
                 <td className="px-3 text-right font-mono tabular-nums text-text">
-                  {itemWeight(item).toFixed(1)}
+                  {formatWeight(itemWeight(item))}
                 </td>
               </tr>
             ))}

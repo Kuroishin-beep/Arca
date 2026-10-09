@@ -33,6 +33,8 @@ export function Modal({
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  /** Whether the current press STARTED on the backdrop. */
+  const pressedBackdrop = useRef(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -68,9 +70,16 @@ export function Modal({
         event.preventDefault();
         close();
       }}
+      onMouseDown={(event) => {
+        pressedBackdrop.current = event.target === ref.current;
+      }}
       onClick={(event) => {
-        // Backdrop clicks land on the dialog element itself.
-        if (event.target === ref.current) close();
+        // Backdrop clicks land on the dialog element itself. Only a press that
+        // also STARTED there counts: selecting a field's text and letting go
+        // past the card's edge fires a click on the dialog too, and that used
+        // to throw the whole form away.
+        if (event.target === ref.current && pressedBackdrop.current) close();
+        pressedBackdrop.current = false;
       }}
       // `overflow-hidden`: the dialog is no longer a scroll container, and
       // must not be one. Scrolling used to live here only because nothing

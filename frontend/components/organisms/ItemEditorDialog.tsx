@@ -9,7 +9,7 @@ import { TextAreaField, TextField } from "@frontend/components/atoms/Field";
 import { Icon } from "@frontend/components/atoms/Icon";
 import { Modal } from "@frontend/components/molecules/Modal";
 import { StatFields } from "@frontend/components/molecules/StatFields";
-import type { ContainerView, ItemView } from "@backend/domain/view";
+import { type ContainerView, type ItemView, WEIGHT_STEP } from "@backend/domain/view";
 
 /**
  * Add and edit are the same form. The only differences are the title, whether
@@ -201,7 +201,7 @@ export function ItemEditorDialog({
               readOnly={isCopy}
               type="number"
               min={0}
-              step={0.5}
+              step={WEIGHT_STEP}
               numeric
               defaultValue={item?.weight ?? 0}
               error={fieldErrors.weight}

@@ -14,7 +14,10 @@ import {
   type DatabaseRow,
 } from "@backend/domain/database";
 import { fieldsForTypes, type ItemField } from "@backend/domain/item-fields";
-import { matchesQuery } from "@backend/domain/view";
+import {
+  matchesQuery,
+  formatWeight,
+} from "@backend/domain/view";
 import { canCreateItem, canWrite, creatableContainerTypes } from "@backend/lib/permissions";
 import { currentPrincipal } from "@backend/lib/session";
 
@@ -293,7 +296,7 @@ export function DatabaseTable({
                 {row.value || "—"}
               </td>
               <td className="hidden px-3 py-2 text-right font-mono tabular-nums text-muted md:table-cell">
-                {row.weight.toFixed(1)}
+                {formatWeight(row.weight)}
               </td>
               <td className="px-3 py-2">
                 {row.holdings.length === 0 ? (

@@ -11,7 +11,12 @@ import { NumberStepper } from "@frontend/components/atoms/NumberStepper";
 import { Modal } from "@frontend/components/molecules/Modal";
 import { useOptimisticItems } from "@frontend/components/organisms/OptimisticItems";
 import type { ContainerView, ItemView } from "@backend/domain/view";
-import { encumbrance, weightPercent } from "@backend/domain/view";
+import {
+  encumbrance,
+  weightPercent,
+  formatWeight,
+  roundWeight,
+} from "@backend/domain/view";
 
 export interface MoveTarget {
   container: ContainerView;
@@ -63,8 +68,8 @@ export function MoveItemDialog({
   const preview = useMemo(() => {
     const moved = Math.min(Math.max(1, qty), item.qty) * item.weight;
     return {
-      fromAfter: round1(from.carriedWeight - moved),
-      toAfter: to ? round1(to.carriedWeight + moved) : 0,
+      fromAfter: roundWeight(from.carriedWeight - moved),
+      toAfter: to ? roundWeight(to.carriedWeight + moved) : 0,
     };
   }, [qty, item.qty, item.weight, from.carriedWeight, to]);
 
@@ -255,7 +260,7 @@ export function MoveItemDialog({
                         : container.type === "party"
                           ? "Shared"
                           : container.type === "character"
-                            ? "Pack"
+                            ? "Character"
                             : "World"}
                     </span>
                   </label>
@@ -331,8 +336,8 @@ function PreviewBar({
       <div className="mb-1 flex items-baseline justify-between gap-2">
         <span className="min-w-0 truncate text-sm text-muted">{label}</span>
         <span className="shrink-0 font-mono text-sm tabular-nums text-muted">
-          {before.toFixed(1)} → <span className={tone}>{after.toFixed(1)}</span>
-          {capacity !== null ? ` / ${capacity.toFixed(1)} kg` : " kg"}
+          {formatWeight(before)} → <span className={tone}>{formatWeight(after)}</span>
+          {capacity !== null ? ` / ${formatWeight(capacity)} kg` : " kg"}
         </span>
       </div>
       {capacity !== null ? (
@@ -347,4 +352,3 @@ function PreviewBar({
   );
 }
 
-const round1 = (n: number) => Math.round(n * 10) / 10;

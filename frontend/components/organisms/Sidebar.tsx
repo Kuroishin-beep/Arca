@@ -21,7 +21,7 @@ import {
  * a database is a kind; the same longsword is in exactly one place and in as
  * many kinds as it is, and at a table people reach for the place first.
  *
- * Containers keep their My Packs / Party / World sub-headings. The wireframe
+ * Containers keep their My Characters / Party / World sub-headings. The wireframe
  * draws two placeholder rows and rules nothing out, and the grouping is not
  * cosmetic — it is the same distinction the permission rules key off, so
  * flattening it would hide the one thing about the list that is load-bearing.
@@ -34,7 +34,7 @@ import {
  * that, so it is a drawer, rendered by the workspace.
  */
 const GROUPS: { type: ContainerType; heading: string }[] = [
-  { type: "character", heading: "My Packs" },
+  { type: "character", heading: "My Characters" },
   { type: "party", heading: "Party" },
   { type: "world", heading: "World" },
 ];
@@ -239,9 +239,9 @@ export function Sidebar({
           const lockedInGroup = lockedContainers.filter((c) => c.type === type);
           if (inGroup.length === 0 && lockedInGroup.length === 0) return null;
 
-          // "My Packs" is only "mine" for a player. A GM sees everyone's.
+          // "My Characters" is only "mine" for a player. A GM sees everyone's.
           const label =
-            type === "character" && principal.role === "gm" ? "Packs" : heading;
+            type === "character" && principal.role === "gm" ? "Characters" : heading;
 
           return (
             <div key={type} className="pt-3 first:pt-1">

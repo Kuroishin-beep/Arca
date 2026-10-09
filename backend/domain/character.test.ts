@@ -82,6 +82,12 @@ describe("movement", () => {
     expect(movement("wolfkin", 10)).toBe(12);
   });
 
+  it("reads a typed kin by label as well as by key, and a homebrew one as human", () => {
+    expect(movement("Wolfkin", 10)).toBe(12);
+    expect(movement("  ELF ", 16)).toBe(14);
+    expect(movement("Goblin", 10)).toBe(10);
+  });
+
   it("steps down as well as up", () => {
     expect(movement("human", 6)).toBe(6); // 10 - 4
     expect(movement("human", 9)).toBe(8); // 10 - 2

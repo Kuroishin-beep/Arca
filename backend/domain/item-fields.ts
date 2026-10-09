@@ -32,14 +32,22 @@ export interface ItemField {
   placeholder: string;
   /** Right-aligned and monospaced, like weight. */
   numeric?: boolean;
+  /** A sentence rather than a code: drawn as a text area, and allowed
+   *  `LONG_STAT_MAX` characters instead of `SHORT_STAT_MAX`. */
+  long?: boolean;
 }
+
+export const SHORT_STAT_MAX = 80;
+/** Room for a rule's full wording — "Can be thrown and secured with an
+ *  ACROBATICS roll" did not fit in 80. */
+export const LONG_STAT_MAX = 500;
 
 const GRIP: ItemField = { key: "grip", label: "Grip", short: "Grip", placeholder: "1H" };
 const STR: ItemField = { key: "str", label: "STR", short: "STR", placeholder: "—", numeric: true };
 const DAMAGE: ItemField = { key: "damage", label: "Damage", short: "Dmg", placeholder: "1D6", numeric: true };
 const DURABILITY: ItemField = { key: "durability", label: "Durability", short: "Dura", placeholder: "9", numeric: true };
-const FEATURES: ItemField = { key: "features", label: "Features", short: "Features", placeholder: "Subtle" };
-const EFFECT: ItemField = { key: "effect", label: "Effect", short: "Effect", placeholder: "What it does at the table" };
+const FEATURES: ItemField = { key: "features", label: "Features", short: "Features", placeholder: "Subtle", long: true };
+const EFFECT: ItemField = { key: "effect", label: "Effect", short: "Effect", placeholder: "What it does at the table", long: true };
 
 /**
  * Every field, in the one order columns are ever drawn in. A container holding
@@ -57,7 +65,7 @@ const TYPE_FIELDS: ReadonlyMap<string, readonly ItemField[]> = new Map([
   ["consumable", [EFFECT]],
 ]);
 
-export const StatValue = z.string().trim().max(80);
+export const StatValue = z.string().trim().max(LONG_STAT_MAX);
 /** An item's type-specific values, keyed by `ItemField.key`. */
 export const Stats = z.record(z.string(), StatValue);
 export type Stats = z.infer<typeof Stats>;
@@ -106,7 +114,7 @@ export function normaliseStats(types: readonly string[], raw: unknown): Stats {
   for (const field of fieldsForTypes(types)) {
     const value = source[field.key];
     if (typeof value === "string" && value.trim() !== "") {
-      out[field.key] = value.trim().slice(0, 80);
+      out[field.key] = value.trim().slice(0, field.long ? LONG_STAT_MAX : SHORT_STAT_MAX);
     }
   }
   return out;

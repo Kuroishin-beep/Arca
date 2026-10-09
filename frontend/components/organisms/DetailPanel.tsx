@@ -10,7 +10,10 @@ import {
   ReplyToggle,
 } from "@frontend/components/organisms/CommentComposer";
 import type { CommentView, ContainerView, ItemView } from "@backend/domain/view";
-import { itemWeight } from "@backend/domain/view";
+import {
+  itemWeight,
+  formatWeight,
+} from "@backend/domain/view";
 import { slugifyType } from "@backend/domain/database";
 import { fieldsForTypes } from "@backend/domain/item-fields";
 
@@ -99,7 +102,7 @@ export function DetailPanel({
         </h3>
         <dl className="flex flex-col gap-2">
           <Row label="Quantity" value={String(item.qty)} />
-          <Row label="Weight (each)" value={`${item.weight.toFixed(1)} kg`} />
+          <Row label="Weight (each)" value={`${formatWeight(item.weight)} kg`} />
           <Row label="Value (each)" value={item.value || "—"} />
           {/* Every field its types add, filled or not — this panel is the
               item's complete details, where a container only shows the
@@ -127,7 +130,7 @@ export function DetailPanel({
               Total weight <span className="text-faint">(derived)</span>
             </dt>
             <dd className="font-mono text-base tabular-nums text-accent">
-              {itemWeight(item).toFixed(1)} kg
+              {formatWeight(itemWeight(item))} kg
             </dd>
           </div>
         </dl>

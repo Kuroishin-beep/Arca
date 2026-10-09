@@ -26,6 +26,7 @@ import {
   clampSheet,
   conditionFor,
   derive,
+  kinLabel,
   skillState,
   skillValue,
 } from "@backend/domain/character";
@@ -35,6 +36,8 @@ import { Chip } from "@frontend/components/atoms/Chip";
 import { Icon } from "@frontend/components/atoms/Icon";
 import { IconButton } from "@frontend/components/atoms/IconButton";
 import { NumberStepper } from "@frontend/components/atoms/NumberStepper";
+
+const KIN_LABELS = KINS.map((k) => k.label);
 
 /**
  * The character sheet — SCOPE.md S1, and the one screen in Arca where every
@@ -215,15 +218,16 @@ function Identity({
           />
 
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <Select
+            {/* Free text, so homebrew kin are typed in; the book's kin are
+                suggestions and the only ones with their own base movement. */}
+            <TextChip
               id="kin"
               label="Kin"
-              value={sheet.profile.kin}
+              value={kinLabel(sheet.profile.kin)}
+              placeholder="Kin"
               disabled={!canEdit}
-              onChange={(v) =>
-                setProfile({ kin: v as CharacterSheetData["profile"]["kin"] })
-              }
-              options={KINS.map((k) => ({ value: k.key, label: k.label }))}
+              suggestions={KIN_LABELS}
+              onCommit={(v) => setProfile({ kin: v })}
             />
 
             <TextChip
@@ -756,14 +760,17 @@ function SkillGroup({
       <h3 className="mb-1 font-serif text-sm font-bold uppercase tracking-wider text-muted">
         {label}
       </h3>
-      <ul className="grid gap-x-6 lg:grid-cols-2">
+      {/* Columns, not a grid: a grid fills row by row, so an alphabetical
+          list read A, Aw, B, Be... across. Columns fill the left one top to
+          bottom first, the way a printed sheet reads. */}
+      <ul className="gap-x-6 lg:columns-2">
         {rows.map((skill) => {
           const state = skillState(sheet.skills, skill.name);
           const score = sheet.attributes[skill.attribute];
           return (
             <li
               key={skill.name}
-              className="flex items-center gap-2 border-b border-border py-1.5 last:border-0"
+              className="flex break-inside-avoid items-center gap-2 border-b border-border py-1.5 last:border-0"
             >
               <label className="flex min-w-0 flex-1 items-center gap-2">
                 <input

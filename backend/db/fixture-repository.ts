@@ -35,6 +35,7 @@ import {
   changedInheritedFields,
   inheritedFieldsMessage,
   ownershipProblem,
+  sameStack,
 } from "@backend/domain/view";
 import {
   assertCanEditContainer,
@@ -747,8 +748,26 @@ export const fixtureRepository: ArcaRepository = {
     }
 
     const split = input.qty < item.qty;
+    const moving = stripInternal(item);
+    // A matching stack already there absorbs the units instead of a second
+    // row appearing beside it.
+    const target = store().items.find(
+      (i) =>
+        i.containerId === to.id &&
+        i.archivedAt === null &&
+        sameStack(stripInternal(i), moving),
+    );
 
-    if (split) {
+    if (target) {
+      target.qty += input.qty;
+      target.updatedAt = new Date();
+      if (split) {
+        item.qty -= input.qty;
+      } else {
+        item.archivedAt = new Date();
+      }
+      item.updatedAt = new Date();
+    } else if (split) {
       // A partial move splits the stack: the source keeps the remainder and a
       // NEW object arrives at the destination. Identity is preserved for the
       // part that stayed.
@@ -775,6 +794,7 @@ export const fixtureRepository: ArcaRepository = {
     return {
       movedQty: input.qty,
       split,
+      merged: target !== undefined,
       fromContainerId: from.id,
       toContainerId: to.id,
       // Resolved, not raw: a catalogue copy's stored name is empty, and this

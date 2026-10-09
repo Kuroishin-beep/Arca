@@ -52,7 +52,7 @@ function kindChangeWarning(from: ContainerType, to: ContainerType): string {
 }
 
 const TYPES: { value: ContainerType; label: string; hint: string }[] = [
-  { value: "character", label: "Pack", hint: "One player's own. Only they and the GM may change it." },
+  { value: "character", label: "Character", hint: "One player's character and what they carry. Only they and the GM may change it." },
   { value: "party", label: "Shared", hint: "Everyone at the table can read and edit it." },
   { value: "world", label: "World", hint: "Yours until you reveal it. Players never edit it." },
 ];

@@ -4,7 +4,11 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { addFromCatalogAction } from "@backend/actions/catalog";
-import type { CatalogItemView, ContainerView } from "@backend/domain/view";
+import {
+  type CatalogItemView,
+  type ContainerView,
+  formatWeight,
+} from "@backend/domain/view";
 import { Button } from "@frontend/components/atoms/Button";
 import { TagChip } from "@frontend/components/atoms/Chip";
 import { Icon } from "@frontend/components/atoms/Icon";
@@ -144,7 +148,7 @@ export function CatalogPickerDialog({
                   <p className="text-base text-text">{entry.name}</p>
                   <p className="flex flex-wrap items-center gap-1 text-xs text-faint">
                     <span className="font-mono tabular-nums">
-                      {entry.weight.toFixed(1)} kg
+                      {formatWeight(entry.weight)} kg
                     </span>
                     {entry.value ? (
                       <>

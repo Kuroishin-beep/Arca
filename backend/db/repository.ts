@@ -40,6 +40,9 @@ export interface MoveOutcome {
   movedQty: number;
   /** True when only part of a stack moved and the source kept the remainder. */
   split: boolean;
+  /** True when the moved units joined a matching stack already at the
+   *  destination (`sameStack`) instead of arriving as a row of their own. */
+  merged: boolean;
   fromContainerId: string;
   toContainerId: string;
   itemName: string;

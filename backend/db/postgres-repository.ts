@@ -32,6 +32,7 @@ import {
   changedInheritedFields,
   inheritedFieldsMessage,
   ownershipProblem,
+  sameStack,
 } from "@backend/domain/view";
 import { normaliseStats } from "@backend/domain/item-fields";
 import { campaignId, defaultCampaignId, inCampaign } from "@backend/lib/campaign";
@@ -114,6 +115,54 @@ async function propertyIdsByName(
     .from(propertyDefinitions)
     .where(eq(propertyDefinitions.campaignId, campaignId()));
   return new Map(rows.map((r) => [r.name, r.id]));
+}
+
+/** Sets an object's quantity, creating the property row if it has none. */
+async function writeQty(
+  tx: Transaction,
+  ids: Map<string, string>,
+  objectId: string,
+  qty: number,
+): Promise<void> {
+  const propertyDefinitionId = ids.get("qty");
+  if (!propertyDefinitionId) return;
+  await tx
+    .insert(objectProperties)
+    .values({ objectId, propertyDefinitionId, value: qty })
+    .onConflictDoUpdate({
+      target: [objectProperties.objectId, objectProperties.propertyDefinitionId],
+      set: { value: sql`excluded.value` },
+    });
+}
+
+/**
+ * A stack's quantity as it is under the caller's lock — or `null` when it is
+ * no longer a live item in `containerId`, so a merge into it must not happen.
+ */
+async function liveQtyAt(
+  tx: Transaction,
+  objectId: string,
+  containerId: string,
+): Promise<number | null> {
+  const where = await tx
+    .select({ archivedAt: objects.archivedAt, containerId: containerObjects.containerId })
+    .from(objects)
+    .innerJoin(containerObjects, eq(containerObjects.objectId, objects.id))
+    .where(eq(objects.id, objectId))
+    .limit(1);
+  const row = where[0];
+  if (!row || row.archivedAt || row.containerId !== containerId) return null;
+
+  const qty = await tx
+    .select({ value: objectProperties.value })
+    .from(objectProperties)
+    .innerJoin(
+      propertyDefinitions,
+      eq(propertyDefinitions.id, objectProperties.propertyDefinitionId),
+    )
+    .where(and(eq(objectProperties.objectId, objectId), eq(propertyDefinitions.name, "qty")))
+    .limit(1);
+  return Math.max(1, Math.trunc(asNumber(qty[0]?.value, 1)));
 }
 
 async function propertiesFor(objectIds: string[]): Promise<PropertyMap> {
@@ -1304,18 +1353,36 @@ export const postgresRepository: ArcaRepository = {
     const resolved = await postgresRepository.getItem(principal, input.itemId);
     const itemName = resolved?.name ?? "Item";
 
+    // A matching stack already at the destination, which the moved units join
+    // instead of arriving as a second row (`sameStack`). Found here, then
+    // re-checked under the lock below.
+    const target = resolved
+      ? (await itemsIn(to.id)).find(
+          (i) => i.id !== input.itemId && sameStack(i, resolved),
+        )
+      : undefined;
+
     // Decided INSIDE the transaction, below, from the quantity as it is under
     // the lock. Read out here it is a guess about the past.
     let split = false;
+    let merged = false;
 
     // One transaction. A move that half-applied would put an item in two
     // places or none, and at a table both look like the app losing loot.
     await db().transaction(async (tx) => {
       // Lock the edge so two simultaneous moves of the same stack serialise
       // rather than silently overwriting each other (SCOPE.md §8.1).
+      // The target stack's edge too, when there is one. Both in ONE statement,
+      // in id order, so two opposite merges cannot each hold one lock and
+      // wait forever for the other.
+      const lockIds = [input.itemId, ...(target ? [target.id] : [])].sort();
       await tx.execute(
         sql`select 1 from ${containerObjects}
-            where ${containerObjects.objectId} = ${input.itemId}
+            where ${containerObjects.objectId} in (${sql.join(
+              lockIds.map((id) => sql`${id}`),
+              sql`, `,
+            )})
+            order by ${containerObjects.objectId}
             for update`,
       );
 
@@ -1363,6 +1430,36 @@ export const postgresRepository: ArcaRepository = {
         );
       }
       split = input.qty < currentQty;
+
+      // The target, re-read under its lock: still at the destination, still
+      // live, and its quantity as it is now.
+      if (target) {
+        const into = await liveQtyAt(tx, target.id, to.id);
+        if (into !== null) {
+          const ids = await propertyIdsByName(tx);
+          await writeQty(tx, ids, target.id, into + input.qty);
+          await tx
+            .update(objects)
+            .set({ updatedAt: new Date() })
+            .where(eq(objects.id, target.id));
+          if (split) {
+            await writeQty(tx, ids, input.itemId, currentQty - input.qty);
+            await tx
+              .update(objects)
+              .set({ updatedAt: new Date() })
+              .where(eq(objects.id, input.itemId));
+          } else {
+            // Every unit now lives in the target; the emptied stack is
+            // archived like any removed item, so its history stays.
+            await tx
+              .update(objects)
+              .set({ archivedAt: new Date(), updatedAt: new Date() })
+              .where(eq(objects.id, input.itemId));
+          }
+          merged = true;
+          return;
+        }
+      }
 
       if (!split) {
         // The whole stack: ONE column changes. Identity, properties, notes and
@@ -1443,24 +1540,7 @@ export const postgresRepository: ArcaRepository = {
         .insert(containerObjects)
         .values({ containerId: to.id, objectId: newId });
 
-      const remaining = currentQty - input.qty;
-      const qtyPropertyId = ids.get("qty");
-      if (qtyPropertyId) {
-        await tx
-          .insert(objectProperties)
-          .values({
-            objectId: input.itemId,
-            propertyDefinitionId: qtyPropertyId,
-            value: remaining,
-          })
-          .onConflictDoUpdate({
-            target: [
-              objectProperties.objectId,
-              objectProperties.propertyDefinitionId,
-            ],
-            set: { value: sql`excluded.value` },
-          });
-      }
+      await writeQty(tx, ids, input.itemId, currentQty - input.qty);
       await tx
         .update(objects)
         .set({ updatedAt: new Date() })
@@ -1470,6 +1550,7 @@ export const postgresRepository: ArcaRepository = {
     return {
       movedQty: input.qty,
       split,
+      merged,
       fromContainerId: from.id,
       toContainerId: to.id,
       itemName,

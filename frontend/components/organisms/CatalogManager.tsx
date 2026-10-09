@@ -7,7 +7,7 @@ import {
   createCatalogItemAction,
   updateCatalogItemAction,
 } from "@backend/actions/catalog";
-import type { CatalogItemView } from "@backend/domain/view";
+import { type CatalogItemView, WEIGHT_STEP, formatWeight } from "@backend/domain/view";
 import { Button } from "@frontend/components/atoms/Button";
 import { Chip, TagChip } from "@frontend/components/atoms/Chip";
 import { TextAreaField, TextField } from "@frontend/components/atoms/Field";
@@ -49,6 +49,23 @@ export function CatalogManager({
         ) : null}
       </div>
 
+      {/* At the top, not under the list: with a few dozen entries the button
+          sat a long scroll away from where the GM starts. */}
+      {canEdit ? (
+        adding ? (
+          <EntryForm onDone={() => setAdding(false)} onError={setError} />
+        ) : (
+          <Button
+            icon="plus"
+            variant="primary"
+            className="self-start"
+            onClick={() => setAdding(true)}
+          >
+            Define something
+          </Button>
+        )
+      ) : null}
+
       {entries.length === 0 ? (
         <p className="rounded-md border border-border bg-surface p-4 text-base text-muted">
           Nothing defined yet.{" "}
@@ -76,7 +93,7 @@ export function CatalogManager({
                   <p className="truncate text-base text-text">{entry.name}</p>
                   <p className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-faint">
                     <span className="font-mono tabular-nums">
-                      {entry.weight.toFixed(1)} kg
+                      {formatWeight(entry.weight)} kg
                     </span>
                     {entry.value ? (
                       <>
@@ -118,20 +135,6 @@ export function CatalogManager({
         </ul>
       )}
 
-      {canEdit ? (
-        adding ? (
-          <EntryForm onDone={() => setAdding(false)} onError={setError} />
-        ) : (
-          <Button
-            icon="plus"
-            variant="primary"
-            className="self-start"
-            onClick={() => setAdding(true)}
-          >
-            Define something
-          </Button>
-        )
-      ) : null}
     </div>
   );
 }
@@ -219,7 +222,7 @@ function EntryForm({
           label="Weight"
           type="number"
           min={0}
-          step={0.5}
+          step={WEIGHT_STEP}
           numeric
           defaultValue={entry?.weight ?? 0}
           error={fieldErrors.weight}

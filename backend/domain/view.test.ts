@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  formatWeight,
+  sameStack,
   CreateCommentInput,
   CreateContainerInput,
   type ItemView,
@@ -148,5 +150,47 @@ describe("CreateCommentInput (M12)", () => {
     expect(parsed.success).toBe(false);
     if (parsed.success) return;
     expect(parsed.error.issues[0]?.message).toMatch(/nothing to reply to/i);
+  });
+});
+
+describe("formatWeight", () => {
+  it("shows eighths exactly and keeps one decimal", () => {
+    expect(formatWeight(0.125)).toBe("0.125");
+    expect(formatWeight(0.5)).toBe("0.5");
+    expect(formatWeight(2)).toBe("2.0");
+    expect(formatWeight(8 * 0.125)).toBe("1.0");
+  });
+});
+
+describe("sameStack", () => {
+  type EntryId = ItemView["catalogItemId"];
+  const rations = {
+    catalogItemId: null as EntryId,
+    name: "Field Rations",
+    weight: 0.5,
+    value: "1 sp",
+    tags: ["food", "consumable"],
+    types: ["Consumable"],
+    stats: {},
+    notes: "",
+  };
+
+  it("matches the same hand-typed item, whatever order its tags are in", () => {
+    expect(sameStack(rations, { ...rations, tags: ["consumable", "food"] })).toBe(true);
+  });
+
+  it("keeps stacks with different notes apart", () => {
+    expect(sameStack(rations, { ...rations, notes: "Soggy" })).toBe(false);
+  });
+
+  it("keeps different items apart", () => {
+    expect(sameStack(rations, { ...rations, weight: 0.25 })).toBe(false);
+  });
+
+  it("matches copies on their catalogue entry, and never a copy with a hand-typed item", () => {
+    const copy = { ...rations, catalogItemId: "e1" as EntryId };
+    expect(sameStack(copy, { ...copy })).toBe(true);
+    expect(sameStack(copy, { ...copy, catalogItemId: "e2" as EntryId })).toBe(false);
+    expect(sameStack(copy, rations)).toBe(false);
   });
 });

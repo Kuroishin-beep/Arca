@@ -95,7 +95,7 @@ const CONTAINER: Record<
     dot: "bg-c-character",
     text: "text-c-character",
     icon: "pack",
-    label: "Pack",
+    label: "Character",
   },
   party: {
     dot: "bg-c-party",
