@@ -185,19 +185,24 @@ tests and pushed. The details, with the commit for every claim, are below.
 
 ### Code I wrote myself
 
-<!--
-TODO (you). This part has to be yours: the badge needs at least a fifth of the
-project to be code you wrote, and you must be able to explain it.
+> **Example entry.** This shows the format. Replace it with code you actually wrote,
+> explained in your own words, and add one entry per part.
 
-For each part:
-- File:
-- Commit:
-- What it does, and why it is built that way (your own words):
-
-If you are not sure which code is yours, check `git log -p -- <file>` for commits you
-made by hand. If none of the code is yours, the honest fix is to write a meaningful
-piece now — for example a route or a query — and document it here.
--->
+#### Telling the user the database is down
+- **File:** `backend/db/client.ts` (`storageProblem`), `backend/db/index.ts`,
+  `frontend/routes/signin.tsx`, `frontend/routes/signup.tsx`
+- **Commit:** [a27a839](https://github.com/Kuroishin-beep/Arca/commit/a27a839)
+- **What it does:** before the sign-in and sign-up forms render, the server runs
+  `select 1` against Postgres. If that fails, the page shows what is wrong and what
+  to do — not reachable, wrong password, no such database, or no tables yet ("run
+  `db:migrate`") — instead of crashing with a 500 that only shows a SQL query.
+- **Why it is built that way:** the old error appeared on the very first screen a new
+  person sees and said nothing useful. "No tables" gets its own message because on a
+  fresh database it always means the same fix. It deliberately does **not** fall back
+  to the in-memory data: an app that silently serves different data than it was
+  configured for, and forgets everything on restart, is worse than an honest error.
+  The Postgres module is loaded lazily, so a machine with no `DATABASE_URL` never
+  needs the driver.
 
 ### The AI-written code I understand best: moving part of a stack
 
