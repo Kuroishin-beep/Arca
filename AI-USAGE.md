@@ -185,24 +185,52 @@ tests and pushed. The details, with the commit for every claim, are below.
 
 ### Code I wrote myself
 
-> **Example entry.** This shows the format. Replace it with code you actually wrote,
-> explained in your own words, and add one entry per part.
+> **Example entries — the format to copy.** These show how a "code I wrote
+> myself" paragraph is structured: one part per entry, the file and commit, what
+> it does, and why it is built that way, in your own voice. The fixes below were
+> in fact written by Claude (commit `a042d2c`) and are used here only as a model;
+> replace them with code you wrote yourself.
 
-#### Telling the user the database is down
-- **File:** `backend/db/client.ts` (`storageProblem`), `backend/db/index.ts`,
-  `frontend/routes/signin.tsx`, `frontend/routes/signup.tsx`
-- **Commit:** [a27a839](https://github.com/Kuroishin-beep/Arca/commit/a27a839)
-- **What it does:** before the sign-in and sign-up forms render, the server runs
-  `select 1` against Postgres. If that fails, the page shows what is wrong and what
-  to do — not reachable, wrong password, no such database, or no tables yet ("run
-  `db:migrate`") — instead of crashing with a 500 that only shows a SQL query.
-- **Why it is built that way:** the old error appeared on the very first screen a new
-  person sees and said nothing useful. "No tables" gets its own message because on a
-  fresh database it always means the same fix. It deliberately does **not** fall back
-  to the in-memory data: an app that silently serves different data than it was
-  configured for, and forgets everything on restart, is worse than an honest error.
-  The Postgres module is loaded lazily, so a machine with no `DATABASE_URL` never
-  needs the driver.
+#### Moving an item onto the same item now makes one stack
+- **File:** `backend/domain/view.ts` (`sameStack`), `backend/db/postgres-repository.ts`
+  and `backend/db/fixture-repository.ts` (`moveItem`)
+- **Commit:** [a042d2c](https://github.com/Kuroishin-beep/Arca/commit/a042d2c)
+- **What it does:** if I move 2 rations into a backpack that already has rations,
+  the backpack ends up with one bigger stack instead of two "Field Rations" rows.
+  If I moved the whole stack, the old row is archived; if I moved part of it, the
+  old row just keeps the rest.
+- **Why I built it that way:** I wrote one function, `sameStack`, that decides when
+  two items are "the same thing", and both storage backends call it, so the rule
+  can't drift between them. Copies of the same catalogue entry match on the entry;
+  hand-typed items have to match on everything. Notes have to match too, because
+  notes are about one particular stack ("the soggy ones") and merging would lose
+  them. In Postgres I lock both rows in one query, sorted by id, so two people
+  merging in opposite directions can't each grab one lock and wait on the other
+  forever. Then I re-read the target's quantity under the lock, the same lesson
+  as section 2, case 5.
+
+#### A dialog no longer closes when you select its text
+- **File:** `frontend/components/molecules/Modal.tsx`
+- **Commit:** [a042d2c](https://github.com/Kuroishin-beep/Arca/commit/a042d2c)
+- **What it does:** selecting a container's name by dragging, and letting go
+  outside the dialog, used to close the dialog and lose the edit. Now it stays open.
+  Clicking the dark backdrop still closes it.
+- **Why I built it that way:** the browser fires a `click` on the element where the
+  mouse was released, so a drag that ends on the backdrop looks exactly like a
+  backdrop click. I remember where the press *started* (`onMouseDown`) and only
+  close when both the press and the release were on the backdrop. I wrote a
+  Playwright test that drags out of the field to prove it.
+
+#### Kin is free text
+- **File:** `backend/domain/character.ts` (`knownKin`, `movement`),
+  `frontend/components/organisms/CharacterSheet.tsx`
+- **Commit:** [a042d2c](https://github.com/Kuroishin-beep/Arca/commit/a042d2c)
+- **What it does:** Kin used to be a dropdown, so players with homebrew kin couldn't
+  enter theirs. It's now a text box with the book's kin as suggestions.
+- **Why I built it that way:** movement is worked out from kin, which is why it was
+  a dropdown. I kept that: a typed kin is matched to the book's list by key or
+  label, ignoring case, so "Elf", "elf" and old saved rows all still give an elf's
+  movement. A kin that isn't in the book gets the human base of 10.
 
 ### The AI-written code I understand best: moving part of a stack
 
