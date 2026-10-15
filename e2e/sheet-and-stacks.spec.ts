@@ -2,6 +2,9 @@ import { test, expect, type Page, type Browser } from "@playwright/test";
 
 import { KOVA_CONTAINER_ID, PARTY_WAGON_ID } from "../backend/db/seed-data";
 
+/** The seeded arrows: 20 of them in Kova's pack, 0.05 kg each. */
+const ARROWS_ID = "00000000-0000-4000-8000-000000003103";
+
 /**
  * The table's October bug list, each through a real browser:
  *
@@ -99,7 +102,7 @@ test.describe("the October fixes", () => {
     await form.locator("input[name=types]").fill("Gear");
     await form.locator("textarea[name='stat:effect']").fill(effect);
 
-    // The browser itself would refuse 0.125 against a step of a half.
+    // The browser itself refused 0.125 against a step of a half.
     expect(
       await form.locator("input[name=weight]").evaluate((el) => (el as HTMLInputElement).validity.valid),
     ).toBe(true);
@@ -136,5 +139,20 @@ test.describe("the October fixes", () => {
     await gm.mouse.click(5, 5);
     await expect(gm).not.toHaveURL(/dialog=/);
     await gm.context().close();
+  });
+
+  test("an item weighing 0.05 kg can be edited and saved", async ({ browser }) => {
+    const kova = await signInAs(browser, "Kova");
+    // The seeded arrows weigh 0.05 kg each, which no fixed step accepts.
+    await kova.goto(`/c/${KOVA_CONTAINER_ID}?item=${ARROWS_ID}&dialog=edit`);
+
+    const weight = kova.locator("dialog input[name=weight]");
+    await expect(weight).toHaveValue("0.05");
+    expect(await weight.evaluate((el) => (el as HTMLInputElement).validity.valid)).toBe(true);
+
+    await kova.locator("dialog [name=notes]").fill("Fletched by Kova.");
+    await kova.getByRole("button", { name: /save item/i }).click();
+    await expect(kova).not.toHaveURL(/dialog=edit/);
+    await kova.context().close();
   });
 });

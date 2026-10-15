@@ -168,7 +168,7 @@ export function MoveItemDialog({
           </div>
           {qty < item.qty ? (
             <p className="mt-2 text-sm text-muted">
-              Moving part of a stack splits it. One stays, one arrives.
+              Moving part of a stack splits it: the rest stays here. If the same item is already there, they join into one stack.
             </p>
           ) : null}
         </div>

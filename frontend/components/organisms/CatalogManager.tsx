@@ -7,7 +7,7 @@ import {
   createCatalogItemAction,
   updateCatalogItemAction,
 } from "@backend/actions/catalog";
-import { type CatalogItemView, WEIGHT_STEP, formatWeight } from "@backend/domain/view";
+import { type CatalogItemView, formatWeight } from "@backend/domain/view";
 import { Button } from "@frontend/components/atoms/Button";
 import { Chip, TagChip } from "@frontend/components/atoms/Chip";
 import { TextAreaField, TextField } from "@frontend/components/atoms/Field";
@@ -222,7 +222,7 @@ function EntryForm({
           label="Weight"
           type="number"
           min={0}
-          step={WEIGHT_STEP}
+          step="any"
           numeric
           defaultValue={entry?.weight ?? 0}
           error={fieldErrors.weight}
