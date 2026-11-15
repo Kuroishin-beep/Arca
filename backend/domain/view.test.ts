@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   formatWeight,
+  changedInheritedFields,
   sameStack,
   CreateCommentInput,
   CreateContainerInput,
@@ -187,10 +188,45 @@ describe("sameStack", () => {
     expect(sameStack(rations, { ...rations, weight: 0.25 })).toBe(false);
   });
 
-  it("matches copies on their catalogue entry, and never a copy with a hand-typed item", () => {
+  it("matches copies of one catalogue entry", () => {
     const copy = { ...rations, catalogItemId: "e1" as EntryId };
     expect(sameStack(copy, { ...copy })).toBe(true);
-    expect(sameStack(copy, { ...copy, catalogItemId: "e2" as EntryId })).toBe(false);
-    expect(sameStack(copy, rations)).toBe(false);
+  });
+
+  it("matches a copy with an identical hand-typed item, or a duplicate entry's copy", () => {
+    const copy = { ...rations, catalogItemId: "e1" as EntryId };
+    expect(sameStack(copy, rations)).toBe(true);
+    expect(sameStack(copy, { ...copy, catalogItemId: "e2" as EntryId })).toBe(true);
+  });
+
+  it("keeps a copy apart from a hand-typed item that differs", () => {
+    const copy = { ...rations, catalogItemId: "e1" as EntryId };
+    expect(sameStack(copy, { ...rations, value: "2 sp" })).toBe(false);
+    expect(sameStack(copy, { ...copy, notes: "Soggy" })).toBe(false);
+  });
+});
+
+describe("changedInheritedFields", () => {
+  const torch = {
+    name: "Torch",
+    weight: 0.5,
+    value: "1 cp",
+    tags: ["light", "common"],
+    types: ["Physical Object", "Gear", "Consumable"],
+    stats: {},
+  };
+
+  it("treats tags and types as sets — a reordered list is not a change", () => {
+    expect(
+      changedInheritedFields(torch, {
+        ...torch,
+        tags: ["common", "light"],
+        types: ["Consumable", "Physical Object", "Gear"],
+      }),
+    ).toEqual([]);
+  });
+
+  it("still reports a real change", () => {
+    expect(changedInheritedFields(torch, { ...torch, types: ["Gear"] })).toEqual(["types"]);
   });
 });

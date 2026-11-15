@@ -145,18 +145,22 @@ export type ItemView = z.infer<typeof ItemView>;
  * Whether two items are the same thing, so that moving one onto the other
  * should make one bigger stack rather than two rows of "Field Rations".
  *
- * Copies of one catalogue entry match on the entry. Hand-typed items match on
- * everything they define. Notes always have to agree: they are per-stack ("the
- * one with the dent"), and merging would silently drop one side's.
+ * Copies of one catalogue entry always match. Anything else matches on what a
+ * player can SEE: name, weight, value, tags, types and stats. That includes a
+ * catalogue copy meeting a hand-typed twin, or copies of two duplicate entries
+ * — two rows of "Currency, Gold Piece" that look identical are one stack to
+ * the table, whatever link one of them happens to carry. The merged stack is
+ * the destination's, so it keeps the destination's link (or lack of one).
+ *
+ * Notes always have to agree: they are per-stack ("the one with the dent"),
+ * and merging would silently drop one side's.
  */
 export function sameStack(
   a: Pick<ItemView, "catalogItemId" | "name" | "weight" | "value" | "tags" | "types" | "stats" | "notes">,
   b: Pick<ItemView, "catalogItemId" | "name" | "weight" | "value" | "tags" | "types" | "stats" | "notes">,
 ): boolean {
   if (a.notes.trim() !== b.notes.trim()) return false;
-  if (a.catalogItemId !== null || b.catalogItemId !== null) {
-    return a.catalogItemId === b.catalogItemId;
-  }
+  if (a.catalogItemId !== null && a.catalogItemId === b.catalogItemId) return true;
   const sorted = (list: readonly string[]) =>
     JSON.stringify([...list].map((v) => v.toLowerCase()).sort());
   const statKeys = new Set([...Object.keys(a.stats), ...Object.keys(b.stats)]);
@@ -514,8 +518,13 @@ export function changedInheritedFields(
   patch: Partial<Pick<ItemView, InheritedField>>,
 ): InheritedField[] {
   const same = (a: unknown, b: unknown): boolean => {
+    // Tags and types are sets. Postgres hands memberships back in no fixed
+    // order, so the list the form displayed and the one re-read on save can
+    // differ in order alone — which refused a copy's notes edit at random.
     if (Array.isArray(a) && Array.isArray(b)) {
-      return a.length === b.length && a.every((v, i) => v === b[i]);
+      const sorted = (list: unknown[]) => list.map(String).sort();
+      const [x, y] = [sorted(a), sorted(b)];
+      return x.length === y.length && x.every((v, i) => v === y[i]);
     }
     if (a !== null && b !== null && typeof a === "object" && typeof b === "object") {
       return sameStats(a as Stats, b as Stats);

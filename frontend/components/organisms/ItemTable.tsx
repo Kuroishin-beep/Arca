@@ -172,7 +172,7 @@ export function ItemTable({
               sort={sort}
               containerId={containerId}
               query={query}
-              className="px-3 md:px-4"
+              className="min-w-44 px-3 md:px-4"
             />
             <SortableHeader
               column="qty"
@@ -255,9 +255,13 @@ export function ItemTable({
                   selected ? "bg-surface2" : "hover:bg-surface"
                 }`}
               >
-                <td className="max-w-0 px-3 md:px-4">
+                {/* `max-w-0` lets a long name truncate instead of widening the
+                    table; `min-w-44` stops a wide text column (a weapon's
+                    Effect) squeezing every name down to its first letters. */}
+                <td className="min-w-44 max-w-0 px-3 md:px-4">
                   <Link
                     href={rowHref(containerId, item.id, query)}
+                    title={item.name}
                     className="flex items-center gap-2"
                   >
                     {selected ? (
