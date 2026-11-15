@@ -14,6 +14,8 @@ import { currentPrincipal } from "@backend/lib/session";
  * in a loading skeleton and only a redirect made BEFORE that streams is a real
  * 307 — see `proxy.ts`, which supplies the query string kept across it.
  *
+ * A signed-out visitor is sent to sign-in from here for the same reason.
+ *
  * Only a container the viewer may read is redirected, so the address never
  * reveals a sealed container's name; everything else falls through to the
  * page, which answers it exactly as before.
@@ -25,8 +27,11 @@ export default async function ContainerLayout({
   children: ReactNode;
   params: Promise<{ containerId: string }>;
 }) {
+  // Signed out: to sign-in here, as a real 307. Left to the page, the redirect
+  // came after the loading skeleton had streamed, so it arrived as a 200 and a
+  // second, client-side navigation.
   const principal = await currentPrincipal();
-  if (!principal) return children;
+  if (!principal) redirect("/signin");
 
   const { containerId: ref } = await params;
   const repo = repository();

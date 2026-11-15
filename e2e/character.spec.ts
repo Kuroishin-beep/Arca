@@ -479,6 +479,17 @@ test.describe("readable URLs", () => {
     await kova.context().close();
   });
 
+  test("a signed-out visitor is redirected to sign-in by the server", async ({
+    browser,
+  }) => {
+    const page = await (await browser.newContext()).newPage();
+    const response = await page.goto(`/c/${KOVA_CONTAINER_ID}`);
+    // Landed on /signin through a real redirect, not after a 200 skeleton.
+    expect(response?.request().redirectedFrom()).not.toBeNull();
+    expect(new URL(page.url()).pathname).toBe("/signin");
+    await page.context().close();
+  });
+
   test("a database has one canonical address", async ({ browser }) => {
     const kova = await signInAs(browser, "Kova");
     await kova.goto("/db/WEAPON");
