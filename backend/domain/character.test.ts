@@ -235,6 +235,41 @@ describe("reading a stored sheet", () => {
 
     expect(sheetFromProperties(sheetToProperties(original))).toEqual(original);
   });
+
+  it("reads a sheet stored before abilities, protection, money and rest existed", () => {
+    const legacy = sheetToProperties(emptySheet());
+    delete legacy.abilities;
+    delete legacy.protection;
+    delete legacy.money;
+    delete legacy.rest;
+    legacy.attributes = { STR: 14, CON: 12, AGL: 10, INT: 10, WIL: 10, CHA: 10 };
+
+    const sheet = sheetFromProperties(legacy);
+    expect(sheet.attributes.STR).toBe(14);
+    expect(sheet.abilities).toEqual([]);
+    expect(sheet.protection.armour).toEqual({ name: "", rating: 0, banes: "" });
+    expect(sheet.money).toEqual({ gold: 0, silver: 0, copper: 0 });
+    expect(sheet.rest).toEqual({ round: false, stretch: false });
+  });
+
+  it("drops only a malformed new section, keeping the rest", () => {
+    const sheet = sheetFromProperties({
+      ...sheetToProperties(emptySheet()),
+      money: { gold: -5, silver: "lots", copper: 1 },
+      protection: { armour: { name: "Chainmail", rating: 4, banes: "Sneaking" }, helmet: { name: "", rating: 0, banes: "" } },
+    });
+    expect(sheet.money).toEqual({ gold: 0, silver: 0, copper: 0 });
+    expect(sheet.protection.armour.rating).toBe(4);
+  });
+
+  it("round-trips abilities, protection, money and rest", () => {
+    const original = emptySheet();
+    original.abilities = [{ id: "a1", name: "Berserker", wp: 3, notes: "" }];
+    original.protection.helmet = { name: "Open helmet", rating: 1, banes: "" };
+    original.money = { gold: 2, silver: 15, copper: 40 };
+    original.rest = { round: true, stretch: false };
+    expect(sheetFromProperties(sheetToProperties(original))).toEqual(original);
+  });
 });
 
 describe("derive", () => {

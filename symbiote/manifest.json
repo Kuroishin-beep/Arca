@@ -1,0 +1,34 @@
+{
+  "manifestVersion": 1,
+  "name": "Arca",
+  "summary": "Shared Dragonbane inventory and character sheets for your table, with rolls straight to the dice tray.",
+  "descriptionFilePath": "/description.md",
+  "entryPoint": "https://arca-ivis.vercel.app",
+  "version": "1.0.0",
+  "about": {
+    "website": "https://arca-ivis.vercel.app",
+    "authors": ["Arca"]
+  },
+  "api": {
+    "version": "0.1",
+    "initTimeout": 10,
+    "subscriptions": {
+      "symbiote": {
+        "onStateChangeEvent": "arcaOnSymbioteState"
+      }
+    }
+  },
+  "controls": {
+    "reload": true,
+    "navigation": true
+  },
+  "icons": {
+    "64x64": "/icon.png",
+    "notification": "/notification.png"
+  },
+  "environment": {
+    "webViewBackgroundColor": "#1b1b1b",
+    "capabilities": ["runInBackground"],
+    "extras": ["colorStyles", "fonts", "/arca-bridge.js"]
+  }
+}

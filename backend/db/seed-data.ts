@@ -8,7 +8,10 @@
  * Names and contents match the mockups in `mockups/` so a screenshot and a
  * running screen can be compared directly.
  */
-import type { CharacterSheet } from "@backend/domain/character";
+import {
+  type CharacterSheet,
+  emptyGearSections,
+} from "@backend/domain/character";
 
 export interface SeedUser {
   id: string;
@@ -348,6 +351,13 @@ export const SEED_CHARACTERS: Record<string, CharacterSheet> = {
       Acrobatics: { trained: false, marked: true },
     },
     spells: [],
+    abilities: [],
+    protection: {
+      armour: { name: "Leather armour", rating: 1, banes: "" },
+      helmet: { name: "", rating: 0, banes: "" },
+    },
+    money: { gold: 1, silver: 8, copper: 14 },
+    rest: { round: false, stretch: false },
   },
   [c(2)]: {
     // Deliberately wounded and one condition down: the sheet's warning states
@@ -380,6 +390,8 @@ export const SEED_CHARACTERS: Record<string, CharacterSheet> = {
       Brawling: { trained: true, marked: false },
     },
     spells: [],
+    ...emptyGearSections(),
+    money: { gold: 0, silver: 23, copper: 6 },
   },
 };
 

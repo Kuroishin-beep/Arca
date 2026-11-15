@@ -39,7 +39,8 @@ export type IconName =
   | "eye"
   | "eye-off"
   | "sun"
-  | "moon";
+  | "moon"
+  | "d20";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   chest: (
@@ -90,6 +91,15 @@ const PATHS: Record<IconName, React.ReactNode> = {
       d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7Z"
       strokeLinejoin="round"
     />
+  ),
+  // A twenty-sided die seen face-on: the outer hexagon and its central
+  // triangle — the roll-under die every Dragonbane check is made with.
+  d20: (
+    <>
+      <path d="M8 1.5 14 5v6l-6 3.5L2 11V5Z" strokeLinejoin="round" />
+      <path d="M8 4.5 11.5 10.5h-7Z" strokeLinejoin="round" />
+      <path d="M8 1.5v3M2 5l2.5 5.5M14 5l-2.5 5.5M2 11h2.5M14 11h-2.5M8 14.5l-3.5-4M8 14.5l3.5-4" strokeLinecap="round" />
+    </>
   ),
   search: (
     <>

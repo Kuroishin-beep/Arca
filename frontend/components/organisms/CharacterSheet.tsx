@@ -32,10 +32,24 @@ import {
 } from "@backend/domain/character";
 import type { CharacterView } from "@backend/domain/view";
 import { Button } from "@frontend/components/atoms/Button";
-import { Chip } from "@frontend/components/atoms/Chip";
 import { Icon } from "@frontend/components/atoms/Icon";
 import { IconButton } from "@frontend/components/atoms/IconButton";
 import { NumberStepper } from "@frontend/components/atoms/NumberStepper";
+import { RollButton } from "@frontend/components/atoms/RollButton";
+import {
+  DerivedStrip,
+  HeroicAbilities,
+  Protection,
+  Purse,
+  RestBox,
+} from "@frontend/components/organisms/CharacterSheetGear";
+import { SHEET_BOX, SHEET_HEADING } from "@frontend/components/molecules/SheetBox";
+import {
+  LongText,
+  Select,
+  TextChip,
+  TextInput,
+} from "@frontend/components/molecules/SheetFields";
 
 const KIN_LABELS = KINS.map((k) => k.label);
 
@@ -120,23 +134,32 @@ export function CharacterSheet({
       <Identity
         character={character}
         sheet={sheet}
-        movement={derived.movement}
         canEdit={canEdit}
         onSave={save}
         onError={setError}
       />
 
-      <Vitals sheet={sheet} canEdit={canEdit} onSave={save} />
-
       <Attributes sheet={sheet} canEdit={canEdit} onSave={save} />
 
-      <Skills sheet={sheet} canEdit={canEdit} onSave={save} />
+      {/* The printed sheet's two halves: skills down the left, everything
+          spent or tracked during play down the right. One column until the
+          pane is wide enough for both to stay readable. */}
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+        <Skills sheet={sheet} canEdit={canEdit} onSave={save} />
 
-      {derived.castsSpells ? (
-        <Spells sheet={sheet} canEdit={canEdit} onSave={save} />
-      ) : (
-        <NoSpells />
-      )}
+        <div className="flex flex-col gap-4">
+          <Vitals sheet={sheet} canEdit={canEdit} onSave={save} />
+          <RestBox sheet={sheet} canEdit={canEdit} onSave={save} />
+          <HeroicAbilities sheet={sheet} canEdit={canEdit} onSave={save} />
+          {derived.castsSpells ? (
+            <Spells sheet={sheet} canEdit={canEdit} onSave={save} />
+          ) : (
+            <NoSpells />
+          )}
+          <Protection sheet={sheet} canEdit={canEdit} onSave={save} />
+          <Purse sheet={sheet} canEdit={canEdit} onSave={save} />
+        </div>
+      </div>
     </div>
   );
 }
@@ -148,14 +171,12 @@ export function CharacterSheet({
 function Identity({
   character,
   sheet,
-  movement,
   canEdit,
   onSave,
   onError,
 }: {
   character: CharacterView;
   sheet: CharacterSheetData;
-  movement: number;
   canEdit: boolean;
   onSave: (patch: Partial<CharacterSheetData>) => void;
   onError: (message: string | null) => void;
@@ -197,7 +218,7 @@ function Identity({
     onSave({ profile: { ...sheet.profile, ...patch } });
 
   return (
-    <section className="rounded-lg border border-border bg-surface p-4">
+    <section className={SHEET_BOX}>
       <div className="flex flex-col gap-3 panel:flex-row panel:items-start">
         <div className="min-w-0 flex-1">
           <label htmlFor="character-name" className="sr-only">
@@ -250,13 +271,6 @@ function Identity({
               }
               options={AGES.map((a) => ({ value: a.key, label: a.label }))}
             />
-
-            {/* Derived, and labelled as such: kin's base plus the AGL step.
-                There is nothing to edit here because there is nothing stored. */}
-            <Chip tone="accent">
-              <span className="text-faint">Movement</span>
-              <span className="font-mono tabular-nums">{movement} m</span>
-            </Chip>
           </div>
         </div>
       </div>
@@ -311,7 +325,7 @@ function Vitals({
     // leaves about 170px a card, and the row of minus / plus / Rest does not
     // fit it — the docked panel is the PRIMARY target (Design.md Step F), so it
     // gets the comfortable layout rather than the squeezed one.
-    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
       <PointsCard
         label="Hit points"
         hint="Maximum is CON"
@@ -332,6 +346,7 @@ function Vitals({
       />
       <DeathRollsCard
         rolls={sheet.deathRolls}
+        con={sheet.attributes.CON}
         canEdit={canEdit}
         onChange={(deathRolls) => onSave({ deathRolls })}
       />
@@ -361,9 +376,9 @@ function PointsCard({
   const accent = tone === "danger" ? "text-danger" : "text-info";
 
   return (
-    <section className="flex flex-col rounded-lg border border-border bg-surface p-4">
-      <div className="flex items-baseline justify-between gap-2">
-        <h2 className="font-serif text-lg font-bold text-text">{label}</h2>
+    <section className={`flex flex-col ${SHEET_BOX}`}>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-2">
+        <h2 className={SHEET_HEADING}>{label}</h2>
         <span className="text-xs text-faint">{hint}</span>
       </div>
 
@@ -419,10 +434,13 @@ function PointsCard({
 
 function DeathRollsCard({
   rolls,
+  con,
   canEdit,
   onChange,
 }: {
   rolls: CharacterSheetData["deathRolls"];
+  /** Death rolls are CON rolls — shown on the dice label. */
+  con: number;
   canEdit: boolean;
   onChange: (rolls: CharacterSheetData["deathRolls"]) => void;
 }) {
@@ -430,10 +448,13 @@ function DeathRollsCard({
   const stable = rolls.successes >= DEATH_ROLL_SLOTS;
 
   return (
-    <section className="flex flex-col rounded-lg border border-border bg-surface p-4 md:col-span-2 lg:col-span-1">
+    <section className={`flex flex-col sm:col-span-2 xl:col-span-1 2xl:col-span-2 ${SHEET_BOX}`}>
       <div className="flex items-baseline justify-between gap-2">
-        <h2 className="font-serif text-lg font-bold text-text">Death rolls</h2>
-        <span className="text-xs text-faint">Three ends it either way</span>
+        <h2 className={SHEET_HEADING}>Death rolls</h2>
+        <span className="flex items-center gap-1 text-xs text-faint">
+          Three ends it either way
+          <RollButton notation="D20" label={`Death roll (CON ${con})`} />
+        </span>
       </div>
 
       <div className="mt-2 flex flex-col gap-2">
@@ -544,9 +565,9 @@ function Attributes({
     onSave({ conditions: { ...sheet.conditions, [key]: on } });
 
   return (
-    <section className="rounded-lg border border-border bg-surface p-4">
+    <section className={SHEET_BOX}>
       <div className="mb-3 flex items-baseline justify-between gap-2">
-        <h2 className="font-serif text-lg font-bold text-text">Attributes</h2>
+        <h2 className={SHEET_HEADING}>Attributes</h2>
         <span className="text-xs text-faint">
           Base chance and conditions are derived
         </span>
@@ -570,6 +591,8 @@ function Attributes({
           />
         ))}
       </div>
+
+      <DerivedStrip sheet={sheet} />
     </section>
   );
 }
@@ -605,8 +628,13 @@ function AttributeBox({
         >
           {attribute}
         </label>
-        <span className="text-xs text-faint">
+        <span className="flex items-center justify-between gap-1 text-xs text-faint">
           {ATTRIBUTE_LABELS[attribute]}
+          <RollButton
+            notation="D20"
+            label={`${ATTRIBUTE_LABELS[attribute]} (${score})`}
+            className="-my-1"
+          />
         </span>
       </div>
 
@@ -687,9 +715,9 @@ function Skills({
   ).length;
 
   return (
-    <section className="rounded-lg border border-border bg-surface p-4">
+    <section className={SHEET_BOX}>
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="font-serif text-lg font-bold text-text">Skills</h2>
+        <h2 className={SHEET_HEADING}>Skills</h2>
         <div className="flex items-center gap-3">
           <span className="text-xs text-faint">
             {trainedCount} trained · trained skills double the base chance ·
@@ -764,7 +792,7 @@ function SkillGroup({
       {/* Columns, not a grid: a grid fills row by row, so an alphabetical
           list read A, Aw, B, Be... across. Columns fill the left one top to
           bottom first, the way a printed sheet reads. */}
-      <ul className="gap-x-6 lg:columns-2">
+      <ul className="gap-x-6 md:columns-2 xl:columns-1 2xl:columns-2">
         {rows.map((skill) => {
           const state = skillState(sheet.skills, skill.name);
           const score = sheet.attributes[skill.attribute];
@@ -804,6 +832,11 @@ function SkillGroup({
                 {skillValue(score, state.trained)}
               </span>
 
+              <RollButton
+                notation="D20"
+                label={`${skill.name} (${skillValue(score, state.trained)})`}
+              />
+
               {/* The advancement tick. Earned on a dragon or a demon, spent
                   between sessions — so it is a state a player sets during play,
                   not a derived one. */}
@@ -841,8 +874,8 @@ function SkillGroup({
 
 function NoSpells() {
   return (
-    <section className="rounded-lg border border-border bg-surface p-4">
-      <h2 className="mb-1 font-serif text-lg font-bold text-text">Spells</h2>
+    <section className={SHEET_BOX}>
+      <h2 className={`mb-1 ${SHEET_HEADING}`}>Spells</h2>
       <p className="text-base text-muted">
         Train a magic skill — Animism, Elementalism or Mentalism — and the spell
         list opens here.
@@ -883,9 +916,9 @@ function Spells({
     );
 
   return (
-    <section className="rounded-lg border border-border bg-surface p-4">
+    <section className={SHEET_BOX}>
       <div className="mb-3 flex items-baseline justify-between gap-2">
-        <h2 className="font-serif text-lg font-bold text-text">Spells</h2>
+        <h2 className={SHEET_HEADING}>Spells</h2>
         <span className="text-xs text-faint">
           {sheet.spells.length} known
         </span>
@@ -959,193 +992,5 @@ function Spells({
         </Button>
       ) : null}
     </section>
-  );
-}
-
-/* ================================================================== *
- * Small shared inputs
- *
- * Text holds its own state and commits on blur. Every other control on this
- * sheet writes on click, but a field that reverted mid-word — which optimistic
- * state would do on every keystroke's round trip — is a field nobody can type
- * a sentence into.
- * ================================================================== */
-
-function TextInput({
-  id,
-  label,
-  value,
-  placeholder,
-  disabled,
-  onCommit,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  placeholder?: string;
-  disabled?: boolean;
-  onCommit: (value: string) => void;
-}) {
-  const [draft, setDraft] = useState(value);
-
-  return (
-    <div className="min-w-0">
-      <label htmlFor={id} className="mb-1 block text-sm font-medium text-muted">
-        {label}
-      </label>
-      <input
-        id={id}
-        value={draft}
-        disabled={disabled}
-        placeholder={placeholder}
-        onChange={(e) => setDraft(e.target.value)}
-        // From the event, not from `draft` — see the note on `commitName`.
-        onBlur={(e) => {
-          if (e.currentTarget.value !== value) onCommit(e.currentTarget.value);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") e.currentTarget.blur();
-          if (e.key === "Escape") setDraft(value);
-        }}
-        className="h-9 w-full rounded-md border border-border bg-surface px-2 text-base text-text placeholder:text-faint"
-      />
-    </div>
-  );
-}
-
-function LongText({
-  id,
-  label,
-  value,
-  placeholder,
-  disabled,
-  onCommit,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  placeholder?: string;
-  disabled?: boolean;
-  onCommit: (value: string) => void;
-}) {
-  const [draft, setDraft] = useState(value);
-
-  return (
-    <div>
-      <label htmlFor={id} className="mb-1 block text-sm font-medium text-muted">
-        {label}
-      </label>
-      <textarea
-        id={id}
-        value={draft}
-        rows={2}
-        disabled={disabled}
-        placeholder={placeholder}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={(e) => {
-          if (e.currentTarget.value !== value) onCommit(e.currentTarget.value);
-        }}
-        className="w-full rounded-md border border-border bg-surface2 p-2 text-base text-text placeholder:text-faint"
-      />
-    </div>
-  );
-}
-
-/** A compact labelled select that reads as a chip in the identity row. */
-function Select({
-  id,
-  label,
-  value,
-  options,
-  disabled,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  options: { value: string; label: string }[];
-  disabled?: boolean;
-  onChange: (value: string) => void;
-}) {
-  return (
-    // The focus ring is drawn on the whole chip, not on the bare control
-    // inside it: the control has no border of its own, so the app's standard
-    // outline (globals.css, "never removed") goes where the edge actually is.
-    <span className="inline-flex items-center gap-1 rounded-sm border border-border bg-surface2 px-1.5 py-0.5 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-primary">
-      <label htmlFor={id} className="text-xs text-faint">
-        {label}
-      </label>
-      <select
-        id={id}
-        value={value}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.value)}
-        className="bg-transparent text-xs text-text focus:outline-none"
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </span>
-  );
-}
-
-/** Free text that still reads as a chip — profession, where an enum would cost
- *  every homebrew class and buy nothing, since nothing is derived from it. */
-function TextChip({
-  id,
-  label,
-  value,
-  placeholder,
-  suggestions,
-  disabled,
-  onCommit,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  placeholder?: string;
-  suggestions?: readonly string[];
-  disabled?: boolean;
-  onCommit: (value: string) => void;
-}) {
-  const [draft, setDraft] = useState(value);
-  const listId = `${id}-suggestions`;
-
-  return (
-    // The focus ring is drawn on the whole chip, not on the bare control
-    // inside it: the control has no border of its own, so the app's standard
-    // outline (globals.css, "never removed") goes where the edge actually is.
-    <span className="inline-flex items-center gap-1 rounded-sm border border-border bg-surface2 px-1.5 py-0.5 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-primary">
-      <label htmlFor={id} className="text-xs text-faint">
-        {label}
-      </label>
-      <input
-        id={id}
-        value={draft}
-        disabled={disabled}
-        placeholder={placeholder}
-        list={suggestions ? listId : undefined}
-        size={Math.max(8, draft.length || 8)}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={(e) => {
-          if (e.currentTarget.value !== value) onCommit(e.currentTarget.value);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") e.currentTarget.blur();
-          if (e.key === "Escape") setDraft(value);
-        }}
-        className="bg-transparent text-xs text-text placeholder:text-faint focus:outline-none"
-      />
-      {suggestions ? (
-        <datalist id={listId}>
-          {suggestions.map((s) => (
-            <option key={s} value={s} />
-          ))}
-        </datalist>
-      ) : null}
-    </span>
   );
 }

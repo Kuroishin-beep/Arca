@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { ButtonLink } from "@frontend/components/atoms/Button";
+import { RollButton } from "@frontend/components/atoms/RollButton";
 import { Chip, TagChip } from "@frontend/components/atoms/Chip";
 import { WeightMeter } from "@frontend/components/molecules/WeightMeter";
 import { CharacterSheet } from "@frontend/components/organisms/CharacterSheet";
@@ -134,7 +135,7 @@ export default async function CharacterSheetPage({
           boxes hung off the document and the page scrolled into blank space
           below the shell — ~1400px of it on a phone. */}
       <div className="relative min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex max-w-5xl flex-col gap-4 p-3 md:p-6">
+        <div className="mx-auto flex max-w-6xl flex-col gap-4 p-3 md:p-6">
           {/* The page's heading, for screen readers. The visible name is an
               editable field rather than a heading — so it can be renamed in
               place — which left the page with no <h1> at all, and the
@@ -178,13 +179,7 @@ export default async function CharacterSheetPage({
               </div>
             </div>
 
-            <EquipmentTable
-              title="Weapons"
-              subtitle="tagged Weapon"
-              items={weapons}
-              containerId={containerId}
-              emptyLabel="Nothing tagged as a weapon."
-            />
+            <WeaponsAtHand items={weapons} containerId={containerId} />
             <EquipmentTable
               title="Carried"
               subtitle="everything else"
@@ -308,6 +303,107 @@ function EquipmentTable({
             ))}
           </tbody>
         </table>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The printed sheet's "Weapons at hand" box: what each weapon does, read off
+ * the item's own Weapon fields (grip, STR requirement, damage, durability,
+ * features) — the same values the Weapon database shows, never a copy.
+ */
+function WeaponsAtHand({
+  items,
+  containerId,
+}: {
+  items: ItemView[];
+  containerId: string;
+}) {
+  const stat = (item: ItemView, key: string) =>
+    item.stats[key]?.trim() ? (
+      item.stats[key]
+    ) : (
+      <span className="text-faint">—</span>
+    );
+
+  return (
+    <div className="border-b border-border">
+      <div className="flex items-center gap-2 px-4 pt-3">
+        <h3 className="font-serif text-sm font-bold uppercase tracking-wider text-muted">
+          Weapons at hand
+        </h3>
+        <span className="text-sm text-faint">tagged Weapon</span>
+        <Chip tone="neutral" className="ml-auto">
+          {items.length}
+        </Chip>
+      </div>
+
+      {items.length === 0 ? (
+        <p className="px-4 py-3 text-base text-muted">Nothing tagged as a weapon.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="mt-2 w-full text-base">
+            <thead>
+              <tr className="border-b border-border text-left">
+                <th scope="col" className="px-4 py-2 text-sm font-medium text-muted">
+                  Weapon
+                </th>
+                <th scope="col" className="px-3 py-2 text-sm font-medium text-muted">
+                  Grip
+                </th>
+                <th scope="col" className="hidden px-3 py-2 text-sm font-medium text-muted panel:table-cell">
+                  STR
+                </th>
+                <th scope="col" className="px-3 py-2 text-sm font-medium text-muted">
+                  Damage
+                </th>
+                <th scope="col" className="hidden px-3 py-2 text-sm font-medium text-muted panel:table-cell">
+                  Durability
+                </th>
+                <th scope="col" className="hidden px-3 py-2 text-sm font-medium text-muted md:table-cell">
+                  Features
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item) => (
+                <tr key={item.id} className="h-10 border-b border-border last:border-0 hover:bg-surface2">
+                  <td className="min-w-32 max-w-0 px-4">
+                    <Link
+                      href={`/c/${containerId}?item=${item.id}`}
+                      title={item.name}
+                      className="block truncate text-text hover:text-primary hover:underline"
+                    >
+                      {item.name}
+                    </Link>
+                  </td>
+                  <td className="px-3 font-mono text-text">{stat(item, "grip")}</td>
+                  <td className="hidden px-3 font-mono text-text panel:table-cell">
+                    {stat(item, "str")}
+                  </td>
+                  <td className="px-3 font-mono text-text">
+                    <span className="inline-flex items-center gap-1">
+                      {stat(item, "damage")}
+                      {item.stats.damage?.trim() ? (
+                        <RollButton
+                          notation={item.stats.damage}
+                          label={`${item.name} damage`}
+                        />
+                      ) : null}
+                    </span>
+                  </td>
+                  <td className="hidden px-3 font-mono text-text panel:table-cell">
+                    {stat(item, "durability")}
+                  </td>
+                  <td className="hidden max-w-0 px-3 text-muted md:table-cell">
+                    <span className="block truncate">{stat(item, "features")}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

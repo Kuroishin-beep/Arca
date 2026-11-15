@@ -329,3 +329,65 @@ test.describe("character sheet polish", () => {
     ).toBeVisible();
   });
 });
+
+test.describe("the Dragonbane sheet", () => {
+  test("money and armour edits survive a reload", async ({ browser }) => {
+    const kova = await signInAs(browser, "Kova");
+    await kova.goto(`/character/${KOVA_CONTAINER_ID}`);
+
+    const gold = kova.locator("#money-gold");
+    const before = Number(await gold.inputValue());
+    await saved(kova, () => gold.fill(String(before + 3)));
+
+    await kova.locator("#helmet-name").fill("Open helmet");
+    await saved(kova, () => kova.locator("#helmet-name").press("Enter"));
+
+    await kova.reload();
+    await expect(kova.locator("#money-gold")).toHaveValue(String(before + 3));
+    await expect(kova.locator("#helmet-name")).toHaveValue("Open helmet");
+    await kova.context().close();
+  });
+
+  test("dice buttons appear only inside TaleSpire", async ({ browser }) => {
+    const kova = await signInAs(browser, "Kova");
+    await kova.goto(`/character/${KOVA_CONTAINER_ID}`);
+    await expect(kova.getByRole("heading", { name: "Skills", exact: true })).toBeVisible();
+    await expect(kova.getByRole("button", { name: /^roll /i })).toHaveCount(0);
+    await kova.context().close();
+  });
+
+  test("inside TaleSpire a skill's die goes to the dice tray, labelled", async ({
+    browser,
+  }) => {
+    const kova = await signInAs(browser, "Kova");
+    // A stand-in for the API TaleSpire injects: records what reaches the tray.
+    await kova.addInitScript(() => {
+      const w = window as unknown as {
+        TS: unknown;
+        trayCalls: { name: string; roll: string }[][];
+      };
+      w.trayCalls = [];
+      w.TS = {
+        dice: {
+          putDiceInTray: (descriptors: { name: string; roll: string }[]) => {
+            w.trayCalls.push(descriptors);
+            return Promise.resolve("roll-1");
+          },
+        },
+      };
+    });
+    await kova.goto(`/character/${KOVA_CONTAINER_ID}`);
+
+    const bushcraft = kova.locator("li").filter({ hasText: "Bushcraft" }).first();
+    await bushcraft.getByRole("button", { name: /^roll d20 for bushcraft/i }).click();
+
+    await expect
+      .poll(() =>
+        kova.evaluate(
+          () => (window as unknown as { trayCalls: unknown[] }).trayCalls,
+        ),
+      )
+      .toEqual([[{ name: expect.stringMatching(/^Bushcraft \(\d+\)$/), roll: "1d20" }]]);
+    await kova.context().close();
+  });
+});

@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useState } from "react";
 
 import { Button } from "@frontend/components/atoms/Button";
 import { Icon } from "@frontend/components/atoms/Icon";
+import { useSymbiote } from "@frontend/components/atoms/RollButton";
 import { parseDiceNotation } from "@backend/lib/dice";
-import { isSymbiote, rollDice } from "@backend/lib/talespire";
+import { rollDice } from "@backend/lib/talespire";
 
 interface HistoryEntry {
   id: number;
@@ -15,20 +16,6 @@ interface HistoryEntry {
 }
 
 const QUICK = ["d20", "2d6", "1d8+2", "4d6kh3", "d100"];
-
-/**
- * Whether TaleSpire is on the other side of the glass.
- *
- * `isSymbiote()` reads `window`, so the server cannot answer it and the two
- * renders would disagree. `useSyncExternalStore` is the primitive built for
- * exactly that: `getServerSnapshot` answers "no" during SSR and hydration,
- * then the client snapshot takes over. Reading it in an effect and calling
- * setState would work too, but it is a cascading render to learn something
- * that never changes afterwards.
- */
-const neverChanges = () => () => {};
-const symbioteOnClient = () => isSymbiote();
-const symbioteOnServer = () => false;
 
 /**
  * The parse preview is the important part of this screen.
@@ -42,11 +29,8 @@ export function DiceFinder() {
   const [notation, setNotation] = useState("2d6+3");
   const [history, setHistory] = useState<HistoryEntry[]>([]);
 
-  const connected = useSyncExternalStore(
-    neverChanges,
-    symbioteOnClient,
-    symbioteOnServer,
-  );
+  // Re-read when TaleSpire finishes initialising, which can be after mount.
+  const connected = useSymbiote();
 
   const parsed = useMemo(() => parseDiceNotation(notation), [notation]);
 

@@ -17,7 +17,11 @@ import {
   CharacterSheet,
   Conditions,
   DeathRolls,
+  HeroicAbilities,
+  Money,
   Profile,
+  Protection,
+  Rest,
   SkillMap,
   Spells,
 } from "./character";
@@ -655,6 +659,10 @@ export const UpdateCharacterInput = z.object({
   profile: Profile.optional(),
   skills: SkillMap.optional(),
   spells: Spells.optional(),
+  abilities: HeroicAbilities.optional(),
+  protection: Protection.optional(),
+  money: Money.optional(),
+  rest: Rest.optional(),
 });
 export type UpdateCharacterInput = z.infer<typeof UpdateCharacterInput>;
 

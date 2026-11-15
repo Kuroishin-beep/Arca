@@ -302,6 +302,54 @@ export const Spells = z.array(Spell).max(100);
 export type Spells = z.infer<typeof Spells>;
 
 /* ------------------------------------------------------------------ *
+ * Heroic abilities, gear, money, rest — the rest of the printed sheet
+ * ------------------------------------------------------------------ */
+
+/** A heroic ability: what it is called, what it costs in WP, what it does.
+ *  The sheet prints these beside the spells; both are WP spends. */
+export const HeroicAbility = z.object({
+  id: z.string().min(1),
+  name: z.string().trim().min(1, "An ability needs a name.").max(80),
+  wp: z.coerce.number().int().min(0).max(20),
+  notes: z.string().max(500),
+});
+export type HeroicAbility = z.infer<typeof HeroicAbility>;
+
+export const HeroicAbilities = z.array(HeroicAbility).max(50);
+export type HeroicAbilities = z.infer<typeof HeroicAbilities>;
+
+/** Armour or a helmet: the printed sheet's two protection boxes. Rating 0 and
+ *  an empty name is "wearing none". Banes are free text ("Sneaking, Evade"). */
+export const ArmourPiece = z.object({
+  name: z.string().trim().max(60),
+  rating: z.coerce.number().int().min(0).max(10),
+  banes: z.string().trim().max(200),
+});
+export type ArmourPiece = z.infer<typeof ArmourPiece>;
+
+export const Protection = z.object({
+  armour: ArmourPiece,
+  helmet: ArmourPiece,
+});
+export type Protection = z.infer<typeof Protection>;
+
+/** Gold, silver, copper — the sheet's purse. 1 gold = 10 silver = 100 copper,
+ *  but the coins are kept as coins: nobody at the table carries change. */
+export const Money = z.object({
+  gold: z.coerce.number().int().min(0).max(999_999),
+  silver: z.coerce.number().int().min(0).max(999_999),
+  copper: z.coerce.number().int().min(0).max(999_999),
+});
+export type Money = z.infer<typeof Money>;
+
+/** Whether this shift's round rest and stretch rest have been taken. */
+export const Rest = z.object({
+  round: z.boolean(),
+  stretch: z.boolean(),
+});
+export type Rest = z.infer<typeof Rest>;
+
+/* ------------------------------------------------------------------ *
  * Death rolls
  * ------------------------------------------------------------------ */
 
@@ -333,8 +381,27 @@ export const CharacterSheet = z.object({
   profile: Profile,
   skills: SkillMap,
   spells: Spells,
+  abilities: HeroicAbilities,
+  protection: Protection,
+  money: Money,
+  rest: Rest,
 });
 export type CharacterSheet = z.infer<typeof CharacterSheet>;
+
+/** The sections added after the first sheet shipped, at their defaults — so a
+ *  seed or a stored sheet that predates them still reads as a whole sheet. */
+export function emptyGearSections(): Pick<
+  CharacterSheet,
+  "abilities" | "protection" | "money" | "rest"
+> {
+  const none: ArmourPiece = { name: "", rating: 0, banes: "" };
+  return {
+    abilities: [],
+    protection: { armour: { ...none }, helmet: { ...none } },
+    money: { gold: 0, silver: 0, copper: 0 },
+    rest: { round: false, stretch: false },
+  };
+}
 
 /**
  * What a character container looks like before anybody has filled anything in.
@@ -376,6 +443,7 @@ export function emptySheet(): CharacterSheet {
     },
     skills: {},
     spells: [],
+    ...emptyGearSections(),
   };
 }
 
@@ -517,6 +585,10 @@ export function sheetFromProperties(
     profile: section(Profile, props.profile, empty.profile),
     skills: section(SkillMap, props.skills, empty.skills),
     spells: section(Spells, props.spells, empty.spells),
+    abilities: section(HeroicAbilities, props.abilities, empty.abilities),
+    protection: section(Protection, props.protection, empty.protection),
+    money: section(Money, props.money, empty.money),
+    rest: section(Rest, props.rest, empty.rest),
   });
 }
 
@@ -533,6 +605,10 @@ export function sheetToProperties(
     profile: sheet.profile,
     skills: sheet.skills,
     spells: sheet.spells,
+    abilities: sheet.abilities,
+    protection: sheet.protection,
+    money: sheet.money,
+    rest: sheet.rest,
   };
 }
 
@@ -547,4 +623,8 @@ export const CHARACTER_PROPERTY_NAMES = [
   "profile",
   "skills",
   "spells",
+  "abilities",
+  "protection",
+  "money",
+  "rest",
 ] as const;

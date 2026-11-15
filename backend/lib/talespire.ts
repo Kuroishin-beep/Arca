@@ -6,27 +6,48 @@
  *   1. The app runs in an ordinary browser tab, where every call below is a
  *      no-op. That is the only sane way to develop a Symbiote — you are not
  *      launching a virtual tabletop to check a padding change.
- *   2. When the real Symbiote API surprises us (SCOPE.md §10 R2), the blast
- *      radius is this file.
+ *   2. When the real Symbiote API surprises us, the blast radius is this file.
+ *
+ * ## How Arca gets the API
+ *
+ * The Symbiote package in `symbiote/` points TaleSpire's web view straight at
+ * the deployed app (`entryPoint` is our https URL — no iframe). TaleSpire then
+ * injects `TS` into the page, plus `symbiote/arca-bridge.js`, which defines the
+ * named global handlers the manifest subscribes to and re-emits them as the
+ * DOM events below. That indirection exists because TaleSpire calls handlers
+ * by global NAME and can fire before React has hydrated.
+ *
+ * API reference: https://symbiote-docs.talespire.com/api_doc_v0_1.md.html
  */
 
-/** The subset of the Symbiote API Arca actually uses. */
-interface TaleSpireBridge {
+/** One die group handed to TaleSpire's tray: a label and a roll string. */
+export interface RollDescriptor {
+  name: string;
+  roll: string;
+}
+
+/** The subset of the Symbiote API v0.1 Arca uses. Every member optional,
+ *  because a missing one has to degrade, not throw. */
+interface TaleSpireApi {
   dice?: {
-    /** `unknown` because the real API may return a promise or nothing at all,
-     *  and `unknown` already covers both — spelling it `Promise<unknown> |
-     *  unknown` says the same thing less clearly. Callers `await` it either
-     *  way, which is valid on a non-promise. */
-    roll?: (notation: string, label?: string) => unknown;
+    putDiceInTray?: (
+      descriptors: RollDescriptor[],
+      quietResults: boolean,
+    ) => Promise<string>;
   };
-  getName?: () => string | undefined;
+  players?: {
+    whoAmI?: () => Promise<{ id: string; name: string }>;
+  };
 }
 
 declare global {
   interface Window {
-    TS?: TaleSpireBridge;
+    TS?: TaleSpireApi;
   }
 }
+
+/** Fired by `symbiote/arca-bridge.js` once TaleSpire's API has initialised. */
+export const TS_READY_EVENT = "arca:ts-ready";
 
 /** True only inside TaleSpire's embedded browser. */
 export function isSymbiote(): boolean {
@@ -34,28 +55,52 @@ export function isSymbiote(): boolean {
 }
 
 /**
- * Fire a roll into TaleSpire's own dice roller.
+ * Dice notation as TaleSpire's tray wants it: lower-case `d`, and an explicit
+ * count, so "D6" → "1d6" and "2D6+1" → "2d6+1". Dragonbane prints dice upper
+ * case; the tray rejects a bare "d6" group as `noDiceSpecified`.
+ */
+export function toTrayNotation(notation: string): string {
+  const compact = notation.replace(/\s+/g, "").toLowerCase();
+  return compact.replace(/(^|[+-])d(\d)/g, "$11d$2");
+}
+
+/**
+ * Put dice in TaleSpire's own tray, labelled.
  *
  * Arca never rolls dice itself. TaleSpire does, on the table, where everyone
- * can see them — the result being public and physical is the entire point
- * (SCOPE.md S2).
+ * can see them — the result being public and physical is the point.
  *
- * Returns `false` when there is no bridge, so callers can disable the control
- * and say why rather than pretending the roll happened.
+ * Returns `false` when there is no bridge, or TaleSpire refused the roll (not
+ * on a board, an unsupported die), so callers can say so rather than
+ * pretending the roll happened.
  */
 export async function rollDice(
   notation: string,
   label?: string,
 ): Promise<boolean> {
   if (!isSymbiote()) return false;
-  const roll = window.TS?.dice?.roll;
-  if (typeof roll !== "function") return false;
-  await roll(notation, label);
-  return true;
+  const put = window.TS?.dice?.putDiceInTray;
+  if (typeof put !== "function") return false;
+  const roll = toTrayNotation(notation);
+  try {
+    await put([{ name: label ?? roll, roll }], false);
+    return true;
+  } catch {
+    // TaleSpire rejects with a cause (notInBoard, unsupportedSidesCount…);
+    // the caller's `false` is what the player sees, so nothing is lost here.
+    return false;
+  }
 }
 
-/** The display name TaleSpire knows this client by, when it offers one. */
-export function symbioteName(): string | undefined {
+/** The player name TaleSpire knows this client by, when it offers one. */
+export async function symbioteName(): Promise<string | undefined> {
   if (!isSymbiote()) return undefined;
-  return window.TS?.getName?.();
+  const whoAmI = window.TS?.players?.whoAmI;
+  if (typeof whoAmI !== "function") return undefined;
+  try {
+    return (await whoAmI()).name;
+  } catch {
+    // Not in a campaign yet, or the API is still initialising: no name to show.
+    return undefined;
+  }
 }
