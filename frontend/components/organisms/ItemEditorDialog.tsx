@@ -11,6 +11,7 @@ import { Modal } from "@frontend/components/molecules/Modal";
 import { StatFields } from "@frontend/components/molecules/StatFields";
 import type { ContainerView, ItemView } from "@backend/domain/view";
 import { containerPath } from "@backend/lib/paths";
+import { submitKeepingInput } from "@frontend/components/molecules/submitKeepingInput";
 
 /**
  * Add and edit are the same form. The only differences are the title, whether
@@ -100,7 +101,7 @@ export function ItemEditorDialog({
       closeHref={closeHref}
       subtitle={editing ? item.name : undefined}
     >
-      <form action={onSubmit} id="item-form">
+      <form onSubmit={submitKeepingInput(onSubmit)} id="item-form">
         {editing ? <input type="hidden" name="id" value={item.id} /> : null}
 
         <div className="flex flex-col gap-4 p-4">

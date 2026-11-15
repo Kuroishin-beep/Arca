@@ -497,3 +497,76 @@ test.describe("readable URLs", () => {
     await kova.context().close();
   });
 });
+
+test.describe("skills, advancement and abilities", () => {
+  test("advancement raises a marked skill by one and spends the mark", async ({
+    browser,
+  }) => {
+    const kova = await signInAs(browser, "Kova");
+    await kova.goto(`/character/${KOVA_CONTAINER_ID}`);
+    const row = () => kova.locator("li").filter({ hasText: "Bushcraft" }).first();
+    // Bushcraft is marked in the seed. Mark it if another test spent it.
+    const mark = row().getByRole("checkbox", { name: /advancement mark for bushcraft/i });
+    if (!(await mark.isChecked())) await saved(kova, () => mark.check());
+    const before = Number(await row().locator("span.font-mono.tabular-nums").innerText());
+
+    await kova.getByRole("button", { name: /^advancement/i }).click();
+    const panel = kova.locator("#advancement");
+    const entry = panel.locator("li").filter({ hasText: "Bushcraft" });
+    await saved(kova, () => entry.getByRole("button", { name: /raised \+1/i }).click());
+
+    await kova.reload();
+    await expect(row().locator("span.font-mono.tabular-nums")).toHaveText(String(before + 1));
+    await expect(
+      row().getByRole("checkbox", { name: /advancement mark for bushcraft/i }),
+    ).not.toBeChecked();
+    await kova.context().close();
+  });
+
+  test("levels are read-only until Edit levels", async ({ browser }) => {
+    const kova = await signInAs(browser, "Kova");
+    await kova.goto(`/character/${KOVA_CONTAINER_ID}`);
+    await expect(kova.locator("#skill-level-Swimming")).toHaveCount(0);
+
+    await kova.getByRole("button", { name: /edit levels/i }).click();
+    const swimming = kova.locator("#skill-level-Swimming");
+    const start = Number(await swimming.inputValue());
+    await saved(kova, () => swimming.fill(String(start + 2)));
+    await kova.getByRole("button", { name: /^done$/i }).click();
+
+    await kova.reload();
+    await expect(
+      kova.locator("li").filter({ hasText: "Swimming" }).first().locator("span.font-mono.tabular-nums"),
+    ).toHaveText(String(start + 2));
+    await kova.context().close();
+  });
+
+  test("a heroic ability reads plainly and opens for editing with its pencil", async ({
+    browser,
+  }) => {
+    const kova = await signInAs(browser, "Kova");
+    await kova.goto(`/character/${KOVA_CONTAINER_ID}`);
+    const name = `Probe ${Date.now().toString().slice(-5)}`;
+
+    await saved(kova, () => kova.getByRole("button", { name: /add ability/i }).click());
+    const field = kova.locator('input[id^="ability-name-"]');
+    await field.fill(name);
+    await saved(kova, () => field.press("Enter"));
+    await kova.getByRole("button", { name: /^done$/i }).click();
+
+    await expect(kova.locator('input[id^="ability-name-"]')).toHaveCount(0);
+    await expect(kova.getByRole("heading", { name, level: 3 })).toBeVisible();
+
+    await kova.getByRole("button", { name: `Edit ${name}` }).click();
+    await saved(kova, () => kova.getByRole("button", { name: /^remove$/i }).click());
+    await expect(kova.getByRole("heading", { name, level: 3 })).toHaveCount(0);
+    await kova.context().close();
+  });
+
+  test("the dice roller is on the sheet", async ({ browser }) => {
+    const kova = await signInAs(browser, "Kova");
+    await kova.goto(`/character/${KOVA_CONTAINER_ID}`);
+    await expect(kova.locator("#dice #notation")).toBeVisible();
+    await kova.context().close();
+  });
+});

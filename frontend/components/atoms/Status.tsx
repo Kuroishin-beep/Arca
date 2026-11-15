@@ -103,10 +103,12 @@ export function UserBadge({ principal }: { principal: Principal }) {
     <div className="flex min-w-0 shrink items-center gap-2">
       <Avatar name={principal.displayName} />
       <span
-        className="hidden min-w-0 truncate text-xs font-medium text-muted md:inline"
+        className="hidden min-w-0 max-w-48 truncate text-xs font-medium text-muted md:inline"
         title={`${principal.displayName} · ${principal.email}`}
       >
-        {principal.email} · {principal.role === "gm" ? "GM" : "Player"}
+        {/* The name, not the address: a long email ran off the right edge.
+            The address is one hover away. */}
+        {principal.displayName} · {principal.role === "gm" ? "GM" : "Player"}
       </span>
     </div>
   );

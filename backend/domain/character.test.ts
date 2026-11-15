@@ -18,7 +18,9 @@ import {
   sheetFromProperties,
   sheetToProperties,
   skillState,
+  skillLevel,
   skillValue,
+  advancementTarget,
 } from "./character";
 
 /**
@@ -164,6 +166,7 @@ describe("skills", () => {
     expect(skillState({}, "Swimming")).toEqual({
       trained: false,
       marked: false,
+      advances: 0,
     });
   });
 
@@ -289,4 +292,22 @@ describe("derive", () => {
       trainedSkills: 1,
     });
   });
+});
+
+describe("skill levels and advancement", () => {
+  const trained = { trained: true, marked: true, advances: 0 };
+
+  it("adds advances to the starting value, within 1–18", () => {
+    expect(skillLevel(16, trained)).toBe(14);
+    expect(skillLevel(16, { ...trained, advances: 3 })).toBe(17);
+    expect(skillLevel(16, { ...trained, advances: 9 })).toBe(18);
+    expect(skillLevel(3, { trained: false, marked: false, advances: -9 })).toBe(1);
+    // A sheet saved before advances existed.
+    expect(skillLevel(16, { trained: true, marked: false })).toBe(14);
+  });
+
+  it("needs a roll higher than the level, and none once at 18", () => {
+    expect(advancementTarget(14)).toBe(14);
+    expect(advancementTarget(18)).toBeNull();
+});
 });

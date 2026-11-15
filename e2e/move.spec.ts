@@ -313,8 +313,10 @@ test.describe("creating an account", () => {
 
     // Signed in and landed, without a second trip through the sign-in form.
     await page.waitForURL(/\/c\//);
-    await expect(page.getByText(email)).toBeVisible();
-    await expect(page.getByText(/· Player/)).toBeVisible();
+    // The badge shows the name and role, with the address on hover.
+    const badge = page.locator(`[title="Sera · ${email}"]`);
+    await expect(badge).toBeVisible();
+    await expect(badge).toHaveText("Sera · Player");
 
     // A player, so the GM's roster screen is not theirs.
     await expect(page.locator('a[href="/members"]')).toHaveCount(0);

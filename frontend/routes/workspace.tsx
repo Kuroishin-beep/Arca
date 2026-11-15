@@ -442,12 +442,11 @@ export default async function WorkspacePage({
             )}
           </div>
 
-          {/* `xl` and up (Design.md Step F): the table gains a max-width and
-              centres rather than stretching its columns across whatever is
-              left over once the three panes are all pinned — an item name
-              does not get more readable by getting wider. */}
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto xl:items-center">
-            <div className="w-full xl:max-w-5xl">
+          {/* Full width. It used to centre at a max width on wide screens,
+              which left a wide empty strip beside the table; the columns that
+              had nothing to show (Notes) now drop out instead. */}
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+            <div className="w-full">
               <ItemTable
                 items={items}
                 basePath={here}

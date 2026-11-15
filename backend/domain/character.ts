@@ -255,17 +255,24 @@ export const SKILL_KINDS: { kind: SkillKind; label: string }[] = [
 ];
 
 /**
- * What is stored per skill, and it is deliberately only two booleans.
+ * What is stored per skill.
  *
- * `trained` doubles the value; `marked` is the advancement tick a player earns
- * on a dragon or a demon and spends between sessions. The VALUE is not here on
- * purpose — it is `baseChance(attribute) × (trained ? 2 : 1)`, so a stored
- * value would be a number that silently disagrees with the attribute the
- * moment the attribute changes.
+ * `trained` doubles the starting value; `marked` is the advancement tick a
+ * player earns on a dragon or a demon and spends between sessions; `advances`
+ * is how many points advancement has added since.
+ *
+ * The level itself is still not stored: it is the starting value
+ * (`baseChance(attribute) × (trained ? 2 : 1)`) plus `advances`, so it follows
+ * the attribute if that changes, and every advancement made is kept. Stored as
+ * the offset, not the level, for exactly that reason. Optional with a default
+ * of 0 (absent) so sheets saved before advancement existed read unchanged.
  */
+export const SKILL_LEVEL_MAX = 18;
+
 export const SkillState = z.object({
   trained: z.boolean(),
   marked: z.boolean(),
+  advances: z.coerce.number().int().min(-SKILL_LEVEL_MAX).max(SKILL_LEVEL_MAX).optional(),
 });
 export type SkillState = z.infer<typeof SkillState>;
 
@@ -278,10 +285,15 @@ export type SkillState = z.infer<typeof SkillState>;
 export const SkillMap = z.record(z.string(), SkillState);
 export type SkillMap = z.infer<typeof SkillMap>;
 
-export const DEFAULT_SKILL_STATE: SkillState = { trained: false, marked: false };
+export const DEFAULT_SKILL_STATE: SkillState = {
+  trained: false,
+  marked: false,
+  advances: 0,
+};
 
 export function skillState(skills: SkillMap, name: string): SkillState {
-  return skills[name] ?? DEFAULT_SKILL_STATE;
+  const stored = skills[name];
+  return stored ? { ...DEFAULT_SKILL_STATE, ...stored } : DEFAULT_SKILL_STATE;
 }
 
 /* ------------------------------------------------------------------ *
@@ -467,6 +479,23 @@ export function baseChance(score: number): number {
 /** Training doubles the base chance. That is the whole rule. */
 export function skillValue(score: number, trained: boolean): number {
   return trained ? baseChance(score) * 2 : baseChance(score);
+}
+
+/** A skill's level as the sheet shows it and a roll is made under: the
+ *  starting value plus every advancement, kept within 1–18. */
+export function skillLevel(score: number, state: SkillState): number {
+  const level = skillValue(score, state.trained) + (state.advances ?? 0);
+  return Math.min(SKILL_LEVEL_MAX, Math.max(1, level));
+}
+
+/**
+ * Dragonbane advancement: roll a d20 for each marked skill; a roll HIGHER
+ * than the current level raises it by one. A level of 18 cannot improve.
+ * The sheet cannot see TaleSpire's dice, so the player reports the outcome;
+ * this is the number the roll has to beat.
+ */
+export function advancementTarget(level: number): number | null {
+  return level >= SKILL_LEVEL_MAX ? null : level;
 }
 
 /** `null` rather than `"—"`: the absence of a bonus is data, not a glyph. */

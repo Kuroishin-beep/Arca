@@ -289,7 +289,13 @@ export function Sidebar({
         ) : null}
       </Section>
 
-      <Section title="Databases">
+      {/* "What are these?" was the first question about this section: each is
+          every item of one type (Weapon, Gear…) across every container you can
+          see, listed once with where it is kept. */}
+      <Section
+        title="Databases"
+        hint="Every item of one type, across all your containers"
+      >
         {databases.length === 0 ? (
           <p className="px-2 py-1 text-sm text-faint">
             Nothing typed yet. Give an item a type and its database appears
@@ -351,16 +357,22 @@ export function Sidebar({
 
 function Section({
   title,
+  hint,
   children,
 }: {
   title: string;
+  /** One line under the heading, for a section whose purpose is not obvious. */
+  hint?: string;
   children: React.ReactNode;
 }) {
   return (
     <div className="px-3 pt-5">
-      <h3 className="mb-2 px-2 font-serif text-sm font-bold uppercase tracking-wider text-muted">
+      <h3
+        className={`${hint ? "" : "mb-2 "}px-2 font-serif text-sm font-bold uppercase tracking-wider text-muted`}
+      >
         {title}
       </h3>
+      {hint ? <p className="mb-2 px-2 text-xs text-faint">{hint}</p> : null}
       {children}
     </div>
   );

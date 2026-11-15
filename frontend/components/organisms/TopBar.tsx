@@ -88,7 +88,7 @@ export function TopBar({
           The search is width-capped from `md` up, so without this the account
           controls trailed straight after it and stopped mid-screen, leaving the
           right of the bar empty. */}
-      <div className="ml-auto flex shrink-0 items-center gap-3">
+      <div className="ml-auto flex min-w-0 items-center gap-3">
         {/* The only client component in the bar. It subscribes to the campaign
           channel and reports what it actually knows, rather than the hardcoded
           "Synced" that stood in before the channel existed. */}

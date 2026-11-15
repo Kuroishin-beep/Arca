@@ -50,21 +50,29 @@ async function saved(page: Page, edit: () => Promise<unknown>): Promise<void> {
 }
 
 test.describe("the October fixes", () => {
-  test("kin is free text, and a homebrew kin survives a reload", async ({ browser }) => {
+  test("kin offers every kin, and a custom kin survives a reload", async ({ browser }) => {
     const kova = await signInAs(browser, "Kova");
     await kova.goto(`/character/${KOVA_CONTAINER_ID}`);
 
     const kin = kova.locator("#kin");
-    await expect(kin).toHaveValue("Elf");
+    await expect(kin).toHaveValue("elf");
+    // Every kin from the book, plus Custom — not just the one already chosen.
+    for (const label of ["Human", "Halfling", "Dwarf", "Elf", "Mallard", "Wolfkin", "Custom…"]) {
+      await expect(kin.locator("option", { hasText: label })).toHaveCount(1);
+    }
 
-    await kin.fill("Goblin");
-    await saved(kova, () => kin.press("Enter"));
+    await kin.selectOption("__custom");
+    const custom = kova.locator("#kin-custom");
+    await custom.fill("Goblin");
+    await saved(kova, () => custom.press("Enter"));
     await kova.reload();
-    await expect(kova.locator("#kin")).toHaveValue("Goblin");
+    await expect(kova.locator("#kin")).toHaveValue("__custom");
+    await expect(kova.locator("#kin-custom")).toHaveValue("Goblin");
 
     // Put the seeded elf back, so the other specs still see their example.
-    await kova.locator("#kin").fill("Elf");
-    await saved(kova, () => kova.locator("#kin").press("Enter"));
+    await saved(kova, () => kova.locator("#kin").selectOption("elf"));
+    await kova.reload();
+    await expect(kova.locator("#kin")).toHaveValue("elf");
     await kova.context().close();
   });
 

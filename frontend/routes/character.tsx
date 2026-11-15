@@ -159,7 +159,7 @@ export default async function CharacterSheetPage({
           boxes hung off the document and the page scrolled into blank space
           below the shell — ~1400px of it on a phone. */}
       <div className="relative min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex max-w-6xl flex-col gap-4 p-3 md:p-6">
+        <div className="mx-auto flex max-w-[120rem] flex-col gap-4 p-3 md:p-6">
           {/* The page's heading, for screen readers. The visible name is an
               editable field rather than a heading — so it can be renamed in
               place — which left the page with no <h1> at all, and the
@@ -170,8 +170,9 @@ export default async function CharacterSheetPage({
             <ButtonLink href={inventoryPath} size="sm" icon="pack">
               Back to inventory
             </ButtonLink>
-            <ButtonLink href="/dice" size="sm">
-              DiceFinder
+            {/* DiceFinder is on this page now; this jumps to it. */}
+            <ButtonLink href="#dice" size="sm" icon="d20">
+              Dice
             </ButtonLink>
             {!editable ? (
               <Chip tone="neutral">Read only</Chip>

@@ -65,7 +65,11 @@ export function ItemTable({
   // detail panel is open beside the table — and it already shows that item's
   // notes in full — so keeping the column there only squeezed the names down to
   // "Iron spikes (bund…". Extra stat columns push it out a breakpoint too.
-  const notesCell = selectedId
+  // And a column of nothing but dashes is not shown at all.
+  const anyNotes = items.some((item) => item.notes.trim() !== "");
+  const notesCell = !anyNotes
+    ? ""
+    : selectedId
     ? "2xl:table-cell"
     : extra.length > 0
       ? "xl:table-cell"

@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import {
   type ArmourPiece,
   type CharacterSheet as CharacterSheetData,
@@ -79,11 +81,21 @@ export function HeroicAbilities({
   canEdit: boolean;
   onSave: Save;
 }) {
+  // Read-only until a pencil is pressed: an ability is read far more often
+  // than it is changed, and a form per ability buried the text in inputs.
+  const [editingId, setEditingId] = useState<string | null>(null);
+
   const setAbilities = (abilities: HeroicAbility[]) => onSave({ abilities });
   const patch = (id: string, fields: Partial<HeroicAbility>) =>
     setAbilities(
       sheet.abilities.map((a) => (a.id === id ? { ...a, ...fields } : a)),
     );
+
+  const add = () => {
+    const id = newId("ability");
+    setAbilities([...sheet.abilities, { id, name: "New ability", wp: 3, notes: "" }]);
+    setEditingId(id);
+  };
 
   return (
     <section className={SHEET_BOX}>
@@ -98,26 +110,27 @@ export function HeroicAbilities({
         </p>
       ) : (
         <ul className="mb-3 flex flex-col gap-2">
-          {sheet.abilities.map((ability) => (
-            <li
-              key={ability.id}
-              className="grid items-end gap-2 rounded-sm border border-border bg-surface2 p-3 panel:grid-cols-[1fr_auto_auto]"
-            >
-              <TextInput
-                id={`ability-name-${ability.id}`}
-                label="Ability"
-                value={ability.name}
-                disabled={!canEdit}
-                onCommit={(name) => name.trim() && patch(ability.id, { name })}
-              />
-              <div>
-                <label
-                  htmlFor={`ability-wp-${ability.id}`}
-                  className="mb-1 block text-sm font-medium text-muted"
-                >
-                  WP cost
-                </label>
-                {canEdit ? (
+          {sheet.abilities.map((ability) =>
+            editingId === ability.id && canEdit ? (
+              <li
+                key={ability.id}
+                className="grid items-end gap-2 rounded-sm border border-primary bg-surface2 p-3 panel:grid-cols-[1fr_auto]"
+              >
+                <TextInput
+                  id={`ability-name-${ability.id}`}
+                  label="Ability"
+                  value={ability.name}
+                  onCommit={(name) => {
+                    if (name.trim()) patch(ability.id, { name: name.trim() });
+                  }}
+                />
+                <div>
+                  <label
+                    htmlFor={`ability-wp-${ability.id}`}
+                    className="mb-1 block text-sm font-medium text-muted"
+                  >
+                    WP cost
+                  </label>
                   <NumberStepper
                     id={`ability-wp-${ability.id}`}
                     label="WP cost"
@@ -127,49 +140,62 @@ export function HeroicAbilities({
                     size="sm"
                     onChange={(wp) => patch(ability.id, { wp })}
                   />
-                ) : (
-                  <p className="font-mono text-base tabular-nums text-text">
-                    {ability.wp}
-                  </p>
-                )}
-              </div>
-              {canEdit ? (
-                <IconButton
-                  icon="trash"
-                  label={`Remove ${ability.name}`}
-                  size={16}
-                  onClick={() =>
-                    setAbilities(sheet.abilities.filter((a) => a.id !== ability.id))
-                  }
-                  className="h-9 w-9 border border-border hover:text-danger"
-                />
-              ) : null}
-              <div className="panel:col-span-3">
-                <LongText
-                  id={`ability-notes-${ability.id}`}
-                  label="Effect"
-                  value={ability.notes}
-                  disabled={!canEdit}
-                  placeholder="What it lets you do."
-                  onCommit={(notes) => patch(ability.id, { notes })}
-                />
-              </div>
-            </li>
-          ))}
+                </div>
+                <div className="panel:col-span-2">
+                  <LongText
+                    id={`ability-notes-${ability.id}`}
+                    label="Effect"
+                    value={ability.notes}
+                    placeholder="What it lets you do."
+                    onCommit={(notes) => patch(ability.id, { notes })}
+                  />
+                </div>
+                <div className="flex items-center gap-2 panel:col-span-2">
+                  <Button size="sm" variant="primary" icon="check" onClick={() => setEditingId(null)}>
+                    Done
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    icon="trash"
+                    className="ml-auto"
+                    onClick={() => {
+                      setAbilities(sheet.abilities.filter((a) => a.id !== ability.id));
+                      setEditingId(null);
+                    }}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              </li>
+            ) : (
+              <li key={ability.id} className="rounded-sm border border-border bg-surface2 p-3">
+                <div className="flex items-start gap-2">
+                  <h3 className="min-w-0 flex-1 font-medium text-text">{ability.name}</h3>
+                  <span className="shrink-0 rounded-sm bg-info-weak px-1.5 py-0.5 font-mono text-xs text-info">
+                    {ability.wp} WP
+                  </span>
+                  {canEdit ? (
+                    <IconButton
+                      icon="edit"
+                      label={`Edit ${ability.name}`}
+                      size={14}
+                      onClick={() => setEditingId(ability.id)}
+                      className="-my-1 h-7 w-7"
+                    />
+                  ) : null}
+                </div>
+                {ability.notes.trim() ? (
+                  <p className="mt-1 whitespace-pre-line text-sm text-muted">{ability.notes}</p>
+                ) : null}
+              </li>
+            ),
+          )}
         </ul>
       )}
 
       {canEdit ? (
-        <Button
-          size="sm"
-          icon="plus"
-          onClick={() =>
-            setAbilities([
-              ...sheet.abilities,
-              { id: newId("ability"), name: "New ability", wp: 3, notes: "" },
-            ])
-          }
-        >
+        <Button size="sm" icon="plus" onClick={add}>
           Add ability
         </Button>
       ) : null}

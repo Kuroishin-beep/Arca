@@ -15,6 +15,7 @@ import { RetireContainerButton } from "@frontend/components/organisms/RetireCont
 import type { ContainerType } from "@backend/domain/types";
 import type { ContainerView, Principal } from "@backend/domain/view";
 import { containerPath } from "@backend/lib/paths";
+import { submitKeepingInput } from "@frontend/components/molecules/submitKeepingInput";
 
 /**
  * Create or edit a container — SCOPE.md §3.
@@ -199,7 +200,7 @@ export function ContainerEditorDialog({
         </>
       }
     >
-      <form action={onSubmit} id="container-form">
+      <form onSubmit={submitKeepingInput(onSubmit)} id="container-form">
         {editing ? <input type="hidden" name="id" value={container.id} /> : null}
 
         <div className="flex flex-col gap-4 p-4">

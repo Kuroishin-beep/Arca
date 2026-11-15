@@ -13,6 +13,7 @@ import { Chip, TagChip } from "@frontend/components/atoms/Chip";
 import { TextAreaField, TextField } from "@frontend/components/atoms/Field";
 import { StatChips, StatFields } from "@frontend/components/molecules/StatFields";
 import { Icon } from "@frontend/components/atoms/Icon";
+import { submitKeepingInput } from "@frontend/components/molecules/submitKeepingInput";
 
 /**
  * The GM's half of the catalogue — SCOPE.md S3.
@@ -185,7 +186,7 @@ function EntryForm({
 
   return (
     <form
-      action={submit}
+      onSubmit={submitKeepingInput(submit)}
       className="flex flex-col gap-3 rounded-md border border-primary bg-surface p-4"
     >
       {entry ? <input type="hidden" name="id" value={entry.id} /> : null}
