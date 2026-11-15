@@ -318,22 +318,43 @@ async function entriesFor(entryIds: string[]): Promise<
 }
 
 async function itemsIn(containerId: string): Promise<ItemView[]> {
+  return (await itemsInMany([containerId])).get(containerId) ?? [];
+}
+
+/**
+ * The live contents of several containers in a constant number of round trips:
+ * one containment query and one `resolveItems` batch, however many containers
+ * are asked for. Every container asked for has an entry, empty or not.
+ *
+ * This is what keeps a page cheap. Loading each container's items separately
+ * was ~5 statements per container, and the container list is loaded by nearly
+ * every read — a 12-container campaign cost ~860 statements per page.
+ */
+async function itemsInMany(
+  containerIds: string[],
+): Promise<Map<string, ItemView[]>> {
+  const out = new Map<string, ItemView[]>(containerIds.map((id) => [id, []]));
+  if (containerIds.length === 0) return out;
+
   const rows = await db()
     .select({
       objectId: objects.id,
       updatedAt: objects.updatedAt,
-      position: containerObjects.position,
+      containerId: containerObjects.containerId,
     })
     .from(containerObjects)
     .innerJoin(objects, eq(objects.id, containerObjects.objectId))
     .where(
       and(
-        eq(containerObjects.containerId, containerId),
+        inArray(containerObjects.containerId, containerIds),
         isNull(objects.archivedAt),
       ),
     );
 
-  return resolveItems(rows, containerId);
+  for (const item of await resolveItems(rows)) {
+    out.get(item.containerId)?.push(item);
+  }
+  return out;
 }
 
 /**
@@ -347,8 +368,7 @@ async function itemsIn(containerId: string): Promise<ItemView[]> {
  * an object into an ItemView comes through here.
  */
 async function resolveItems(
-  rows: { objectId: string; updatedAt: Date }[],
-  containerId: string,
+  rows: { objectId: string; updatedAt: Date; containerId: string }[],
 ): Promise<ItemView[]> {
   const ids = rows.map((r) => r.objectId);
   const [props, types, links] = await Promise.all([
@@ -365,7 +385,7 @@ async function resolveItems(
     const entryId = links.get(r.objectId);
     const item = project(
       r.objectId,
-      containerId,
+      r.containerId,
       r.updatedAt,
       props.get(r.objectId),
       types.get(r.objectId),
@@ -521,35 +541,37 @@ async function loadContainers(): Promise<ContainerView[]> {
       and(eq(objects.campaignId, campaignId()), isNull(objects.archivedAt)),
     );
 
-  const props = await propertiesFor(rows.map((r) => r.id));
+  const ids = rows.map((r) => r.id);
+  const [props, contents] = await Promise.all([
+    propertiesFor(ids),
+    itemsInMany(ids),
+  ]);
 
-  return Promise.all(
-    rows.map(async (r) => {
-      const items = await itemsIn(r.id);
-      const capacityValue = props.get(r.id)?.capacity;
-      const membersValue = props.get(r.id)?.members;
-      return {
-        id: r.id as ContainerView["id"],
-        name: r.name,
-        type: r.type,
-        ownerId: r.ownerId as ContainerView["ownerId"],
-        revealed: r.revealed,
-        itemCount: items.reduce((n, i) => n + i.qty, 0),
-        carriedWeight: carriedWeight(items),
-        capacity:
-          typeof capacityValue === "number" && capacityValue > 0
-            ? capacityValue
-            : null,
-        // Absent = everyone at the table: every shared container that existed
-        // before the GM could choose has no such property, and must keep
-        // meaning what it meant.
-        memberIds:
-          r.type === "party" && Array.isArray(membersValue)
-            ? (membersValue.filter((v) => typeof v === "string") as ContainerView["memberIds"])
-            : null,
-      } satisfies ContainerView;
-    }),
-  );
+  return rows.map((r) => {
+    const items = contents.get(r.id) ?? [];
+    const capacityValue = props.get(r.id)?.capacity;
+    const membersValue = props.get(r.id)?.members;
+    return {
+      id: r.id as ContainerView["id"],
+      name: r.name,
+      type: r.type,
+      ownerId: r.ownerId as ContainerView["ownerId"],
+      revealed: r.revealed,
+      itemCount: items.reduce((n, i) => n + i.qty, 0),
+      carriedWeight: carriedWeight(items),
+      capacity:
+        typeof capacityValue === "number" && capacityValue > 0
+          ? capacityValue
+          : null,
+      // Absent = everyone at the table: every shared container that existed
+      // before the GM could choose has no such property, and must keep
+      // meaning what it meant.
+      memberIds:
+        r.type === "party" && Array.isArray(membersValue)
+          ? (membersValue.filter((v) => typeof v === "string") as ContainerView["memberIds"])
+          : null,
+    } satisfies ContainerView;
+  });
 }
 
 async function requireContainer(containerId: string): Promise<ContainerView> {
@@ -1113,6 +1135,16 @@ export const postgresRepository: ArcaRepository = {
     return itemsIn(containerId);
   },
 
+  async listItemsIn(principal, containerIds) {
+    const all = await loadContainers();
+    for (const id of containerIds) {
+      const found = all.find((c) => c.id === id);
+      if (!found) throw new NotFoundError("No such container.");
+      assertCanRead(principal, found);
+    }
+    return itemsInMany(containerIds);
+  },
+
   async getItem(principal, itemId) {
     const row = await db()
       .select({ id: objects.id, updatedAt: objects.updatedAt })
@@ -1127,10 +1159,9 @@ export const postgresRepository: ArcaRepository = {
     // Through the resolver, not straight off the object's own properties: a
     // catalogue copy stores no name, so reading it directly returned "Unnamed"
     // with its link dropped.
-    const [item] = await resolveItems(
-      [{ objectId: itemId, updatedAt: row[0].updatedAt }],
-      container.id,
-    );
+    const [item] = await resolveItems([
+      { objectId: itemId, updatedAt: row[0].updatedAt, containerId: container.id },
+    ]);
     return item ?? null;
   },
 

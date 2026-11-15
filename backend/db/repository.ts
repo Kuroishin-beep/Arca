@@ -158,6 +158,18 @@ export interface ArcaRepository {
 
   listItems(principal: Principal, containerId: string): Promise<ItemView[]>;
 
+  /**
+   * `listItems` for several containers at once, keyed by container id. The
+   * same gate: every id must be readable, and one that is not throws rather
+   * than being skipped — a caller asking for a sealed vault is a bug, not a
+   * filter. Exists so a cross-container view costs one batch, not one round
+   * trip per container.
+   */
+  listItemsIn(
+    principal: Principal,
+    containerIds: string[],
+  ): Promise<Map<string, ItemView[]>>;
+
   getItem(principal: Principal, itemId: string): Promise<ItemView | null>;
 
   listComments(

@@ -122,6 +122,9 @@ test.describe("the move", () => {
       .getByRole("navigation", { name: "Containers" })
       .first()
       .getByRole("link");
+    // The workspace streams in behind a loading skeleton; read the sidebar
+    // once it has actually arrived rather than whatever is on screen first.
+    await expect(worldLink.first()).toBeVisible();
     const count = await worldLink.count();
     let sealedPath: string | null = null;
     for (let i = 0; i < count; i++) {

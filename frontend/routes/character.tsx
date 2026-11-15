@@ -92,8 +92,8 @@ export default async function CharacterSheetPage({
 
   const editable = canWrite(principal, container);
 
-  const items = await repo.listItems(principal, containerId);
-  const [containers, databases] = await Promise.all([
+  const [items, containers, databases] = await Promise.all([
+    repo.listItems(principal, containerId),
     repo.listContainers(principal),
     listDatabases(repo, principal),
   ]);

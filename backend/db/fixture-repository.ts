@@ -511,6 +511,12 @@ export const fixtureRepository: ArcaRepository = {
     return liveItemsIn(containerId);
   },
 
+  async listItemsIn(principal, containerIds) {
+    // Every gate first, then any reads — same order as `listItems`.
+    for (const id of containerIds) assertCanRead(principal, findContainer(id));
+    return new Map(containerIds.map((id) => [id, liveItemsIn(id)]));
+  },
+
   async getItem(principal, itemId) {
     const item = store().items.find(
       (i) => i.id === itemId && i.archivedAt === null,

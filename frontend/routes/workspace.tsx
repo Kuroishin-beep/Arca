@@ -83,29 +83,53 @@ export default async function WorkspacePage({
   const query = sp.q ?? "";
   const repo = repository();
 
-  const containers = await repo.listContainers(principal);
-
   // A container that exists but is not theirs, and one that does not exist at
   // all, are answered separately — but neither answer says what is inside.
-  let container;
-  try {
-    container = await repo.getContainer(principal, containerId);
-  } catch (error) {
-    if (error instanceof PermissionError) {
-      return <Forbidden message={error.message} containers={containers} />;
-    }
-    throw error;
+  // The two reads are independent, so they run together.
+  const [containers, lookup] = await Promise.all([
+    repo.listContainers(principal),
+    repo.getContainer(principal, containerId).then(
+      (found) => ({ found, denied: null }),
+      (error: unknown) => {
+        if (error instanceof PermissionError) return { found: null, denied: error };
+        throw error;
+      },
+    ),
+  ]);
+  if (lookup.denied) {
+    return <Forbidden message={lookup.denied.message} containers={containers} />;
   }
+  const container = lookup.found;
   if (!container) {
     return <Forbidden message="No such container." containers={containers} />;
   }
+
+  // Everything below depends only on the container being readable, so it is
+  // fetched in one round of parallel reads rather than one after another.
+  const containerDialogOpen =
+    sp.dialog === "new-container" || sp.dialog === "edit-container";
+  const shareOpen = sp.dialog === "share";
+  const isGm = principal.role === "gm";
+  const [allItems, comments, databases, members] = await Promise.all([
+    repo.listItems(principal, containerId),
+    repo.listComments(principal, containerId),
+    // The Databases section of the sidebar. Derived from the types on objects
+    // this principal can reach, so it is a per-viewer list by construction —
+    // see `backend/domain/database.ts`.
+    listDatabases(repo, principal),
+    // Only the GM gets an owner picker, so only the GM needs the roster for
+    // the container dialogs. Share needs it for everyone, because the whole
+    // point of that dialog is the per-member answer. Fetched only when one of
+    // them is actually open.
+    shareOpen || (containerDialogOpen && isGm)
+      ? repo.listMembers(principal)
+      : Promise.resolve([]),
+  ]);
 
   const sort: Sort = {
     column: SortColumn.safeParse(sp.sort).data ?? DEFAULT_SORT.column,
     direction: SortDirection.safeParse(sp.dir).data ?? DEFAULT_SORT.direction,
   };
-
-  const allItems = await repo.listItems(principal, containerId);
 
   const selectedTags = (sp.tags ?? "")
     .split(",")
@@ -145,7 +169,6 @@ export default async function WorkspacePage({
   const selected = sp.item
     ? (allItems.find((i) => i.id === sp.item) ?? null)
     : null;
-  const comments = await repo.listComments(principal, containerId);
   const editable = canWrite(principal, container);
 
   const closeHref = `/c/${containerId}${
@@ -182,14 +205,8 @@ export default async function WorkspacePage({
     }));
 
   const drawerOpen = sp.nav === "1";
-  const isGm = principal.role === "gm";
   // From scratch is GM-only; players take from the catalogue (`canCreateItem`).
   const canCreate = editable && canCreateItem(principal);
-
-  // The Databases section of the sidebar. Derived from the types on objects
-  // this principal can reach, so it is a per-viewer list by construction —
-  // see `backend/domain/database.ts`.
-  const databases = await listDatabases(repo, principal);
 
   // The Sidebar renders this only for someone who may create something — but
   // the action checks the principal again server-side, because a link is not a
@@ -201,19 +218,6 @@ export default async function WorkspacePage({
   // down: the dialog is a client component and the rules are not.
   const allowedTypes = creatableContainerTypes(principal);
   const canRetireThis = canRetireContainer(principal, container);
-  // Only fetched when the dialog is actually open: the owner picker is the one
-  // place the roster is needed, and a GM opening a container list should not
-  // cost a members query every time.
-  // Needed by BOTH container dialogs now that owner is editable, and still only
-  // fetched when one of them is actually open.
-  const containerDialogOpen =
-    sp.dialog === "new-container" || sp.dialog === "edit-container";
-  // Only the GM gets an owner picker, so only the GM needs the roster there.
-  // Share needs it for everyone, because the whole point of that dialog is the
-  // per-member answer — so it is fetched when either is open.
-  const shareOpen = sp.dialog === "share";
-  const members =
-    shareOpen || (containerDialogOpen && isGm) ? await repo.listMembers(principal) : [];
 
   // Somewhere to land after retiring, since the current container will be gone.
   const retireFallbackHref = (() => {

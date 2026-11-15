@@ -23,7 +23,7 @@
  *
  * ## Why this is not a repository method
  *
- * It composes `listContainers` and `listItems` and derives nothing they do not
+ * It composes `listContainers` and `listItemsIn` and derives nothing they do not
  * already expose. Adding it to `ArcaRepository` would mean two copies of a
  * permission-sensitive filter — one per implementation — that have to stay
  * identical forever. One copy, over the authorised methods, cannot drift.
@@ -110,16 +110,16 @@ async function readableContents(
     canRead(principal, c),
   );
 
-  // Sequential rather than `Promise.all`: the fixture store is synchronous
-  // anyway, and against Postgres a table of six people with a handful of
-  // containers is not worth opening a connection per container for.
-  const rows: Placed[] = [];
-  for (const container of containers) {
-    for (const item of await repo.listItems(principal, container.id)) {
-      rows.push({ item, container });
-    }
-  }
-  return rows;
+  // One batch for every container rather than a `listItems` per container:
+  // against Postgres each of those reloaded the whole container list, which
+  // made this sidebar section the most expensive thing on every page.
+  const contents = await repo.listItemsIn(
+    principal,
+    containers.map((c) => c.id),
+  );
+  return containers.flatMap((container) =>
+    (contents.get(container.id) ?? []).map((item) => ({ item, container })),
+  );
 }
 
 /**
