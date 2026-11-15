@@ -130,3 +130,35 @@ test.describe("the workspace shell", () => {
     await expect(page.locator("table tbody tr").filter({ hasText: name })).toContainText("3");
   });
 });
+
+test.describe("what's new", () => {
+  test("the banner names the latest change, links to the changelog, and stays dismissed", async ({
+    browser,
+  }) => {
+    const page = await (await browser.newContext()).newPage();
+    await page.goto("/signin");
+    await page.locator("#email").fill("milo@ravenholt.example");
+    await page.locator("#password").fill("clay-lantern-5518");
+    await page.getByText(/first time signing in/i).click().catch(() => undefined);
+    if (await page.locator("#confirmPassword").isVisible()) {
+      await page.locator("#confirmPassword").fill("clay-lantern-5518");
+    }
+    await page.getByRole("button", { name: /sign in/i }).click();
+    await page.waitForURL(/\/c\//);
+
+    const banner = page.getByRole("region", { name: "What's new" });
+    await expect(banner).toBeVisible();
+    await banner.getByRole("link", { name: /see what changed/i }).click();
+    await page.waitForURL(/\/changelog$/);
+    await expect(page.getByRole("heading", { level: 1, name: /what's new/i })).toBeVisible();
+    await expect(page.locator("ol > li").first()).toBeVisible();
+
+    await page.goBack();
+    await page.getByRole("button", { name: /dismiss what's new/i }).click();
+    await expect(banner).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
+    await expect(page.getByRole("region", { name: "What's new" })).toHaveCount(0);
+    await page.context().close();
+  });
+});

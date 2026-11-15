@@ -7,6 +7,7 @@ import { Sidebar } from "@frontend/components/organisms/Sidebar";
 import { TopBar } from "@frontend/components/organisms/TopBar";
 import type { DatabaseSummary } from "@backend/domain/database";
 import type { ContainerView, Principal } from "@backend/domain/view";
+import { ChangelogBanner } from "@frontend/components/molecules/ChangelogBanner";
 
 /**
  * The chrome every inside-the-app screen shares — Wireframe.png frame 1.
@@ -117,6 +118,7 @@ export function WorkspaceShell({
 
   return (
     <div className="flex h-screen flex-col bg-bg">
+      <ChangelogBanner />
       <TopBar
         principal={principal}
         drawerHref={navOpen ? undefined : drawerHref}
