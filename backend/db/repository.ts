@@ -57,6 +57,9 @@ export interface MoveOutcome {
  */
 export interface Member extends Principal {
   hasPassword: boolean;
+  /** They said "I forgot my password" on the sign-in screen and the GM has
+   *  not reset it yet — shown beside the reset control on the roster. */
+  resetRequested?: boolean;
 }
 
 export interface ArcaRepository {
@@ -295,6 +298,22 @@ export interface ArcaRepository {
   >;
 
   /**
+   * TaleSpire campaign linking. A GM links the Arca campaign they are in to
+   * the TaleSpire campaign the Symbiote is open in; after that, opening Arca
+   * inside that TaleSpire campaign switches straight to it.
+   *
+   * `campaignForTaleSpire`: the Arca campaign linked to `talespireId` that
+   * this user is a member of, or null — never a campaign they are not in.
+   * `taleSpireLinkOf`: what the principal's current campaign is linked to.
+   * `linkTaleSpireCampaign`: GM only. A TaleSpire campaign leads to one Arca
+   * campaign, so the link moves from wherever it was — refused if that other
+   * campaign is not one this GM runs.
+   */
+  campaignForTaleSpire(userId: string, talespireId: string): Promise<string | null>;
+  taleSpireLinkOf(principal: Principal): Promise<string | null>;
+  linkTaleSpireCampaign(principal: Principal, talespireId: string): Promise<void>;
+
+  /**
    * Start a campaign. Anyone signed in may; whoever starts it is its GM. It
    * comes with one shared container so it has somewhere to land.
    */
@@ -387,6 +406,22 @@ export interface ArcaRepository {
    * merely empty on a new row.
    */
   resetMemberPassword(principal: Principal, userId: string): Promise<void>;
+
+  /**
+   * "I forgot my password", from the sign-in screen. Marks the account so its
+   * GMs see the request on the roster; the reset itself is still the GM's
+   * (`resetMemberPassword`), because there is no mail to send a link with.
+   * Says nothing back — an unknown address is accepted silently, so the form
+   * cannot be used to learn who has an account.
+   */
+  requestPasswordReset(email: string): Promise<void>;
+
+  /**
+   * A signed-in member changes their own password. `false` when the current
+   * password is wrong — the one thing that stops someone at an unlocked
+   * screen from locking the owner out.
+   */
+  changePassword(principal: Principal, current: string, next: string): Promise<boolean>;
 
   /**
    * Change what someone is — the GM's, and the only way an existing member

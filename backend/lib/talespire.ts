@@ -38,6 +38,9 @@ interface TaleSpireApi {
   players?: {
     whoAmI?: () => Promise<{ id: string; name: string }>;
   };
+  campaigns?: {
+    whereAmI?: () => Promise<{ id: string; name: string }>;
+  };
 }
 
 declare global {
@@ -101,6 +104,24 @@ export async function symbioteName(): Promise<string | undefined> {
     return (await whoAmI()).name;
   } catch {
     // Not in a campaign yet, or the API is still initialising: no name to show.
+    return undefined;
+  }
+}
+
+/**
+ * The TaleSpire campaign this client is in — what an Arca campaign is linked
+ * to. `undefined` outside TaleSpire, before its API has initialised, or when
+ * TaleSpire has no campaign open.
+ */
+export async function taleSpireCampaign(): Promise<{ id: string; name: string } | undefined> {
+  if (!isSymbiote()) return undefined;
+  const whereAmI = window.TS?.campaigns?.whereAmI;
+  if (typeof whereAmI !== "function") return undefined;
+  try {
+    const here = await whereAmI();
+    return here && typeof here.id === "string" && here.id !== "" ? here : undefined;
+  } catch {
+    // Not in a campaign (TaleSpire's main menu): nothing to link to.
     return undefined;
   }
 }

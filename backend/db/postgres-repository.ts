@@ -35,9 +35,10 @@ import {
   sameStack,
 } from "@backend/domain/view";
 import { normaliseStats } from "@backend/domain/item-fields";
-import { campaignId, defaultCampaignId, inCampaign } from "@backend/lib/campaign";
+import { campaignId, campaignOf, defaultCampaignId, inCampaign } from "@backend/lib/campaign";
 import { containerRefs, rememberName } from "@backend/lib/paths";
 import {
+  PermissionError,
   assertCanEditContainer,
   assertCanCreateItem,
   assertCanManageAccess,
@@ -1626,6 +1627,7 @@ export const postgresRepository: ArcaRepository = {
         // mapping it away later would put it in scope in a module that renders
         // to a page.
         hasPassword: sql<boolean>`${users.passwordHash} is not null`,
+        resetRequested: sql<boolean>`${users.passwordResetRequestedAt} is not null`,
       })
       .from(campaignMembers)
       .innerJoin(users, eq(users.id, campaignMembers.userId))
@@ -1637,6 +1639,7 @@ export const postgresRepository: ArcaRepository = {
       email: r.email,
       role: r.role,
       hasPassword: r.hasPassword,
+      resetRequested: r.resetRequested,
     }));
   },
 
@@ -1810,6 +1813,71 @@ export const postgresRepository: ArcaRepository = {
     return rows;
   },
 
+  async campaignForTaleSpire(userId, talespireId) {
+    if (!UUID.test(userId)) return null;
+    const rows = await db()
+      .select({ id: campaigns.id })
+      .from(campaigns)
+      .innerJoin(campaignMembers, eq(campaignMembers.campaignId, campaigns.id))
+      .where(
+        and(
+          eq(campaigns.talespireCampaignId, talespireId),
+          eq(campaignMembers.userId, userId),
+        ),
+      )
+      .limit(1);
+    return rows[0]?.id ?? null;
+  },
+
+  async taleSpireLinkOf(principal) {
+    const rows = await db()
+      .select({ link: campaigns.talespireCampaignId })
+      .from(campaigns)
+      .where(eq(campaigns.id, campaignOf(principal)))
+      .limit(1);
+    return rows[0]?.link ?? null;
+  },
+
+  async linkTaleSpireCampaign(principal, talespireId) {
+    if (principal.role !== "gm") {
+      throw new PermissionError("Only the GM can link this campaign to TaleSpire.");
+    }
+    const here = campaignOf(principal);
+    await db().transaction(async (tx) => {
+      const [elsewhere] = await tx
+        .select({ id: campaigns.id })
+        .from(campaigns)
+        .where(eq(campaigns.talespireCampaignId, talespireId))
+        .limit(1);
+      if (elsewhere && elsewhere.id !== here) {
+        const [seat] = await tx
+          .select({ role: campaignMembers.role })
+          .from(campaignMembers)
+          .where(
+            and(
+              eq(campaignMembers.campaignId, elsewhere.id),
+              eq(campaignMembers.userId, principal.userId),
+            ),
+          )
+          .limit(1);
+        if (seat?.role !== "gm") {
+          throw new ConflictError(
+            "That TaleSpire campaign is already linked to another Arca campaign.",
+          );
+        }
+        // One TaleSpire campaign leads to one place: the link moves.
+        await tx
+          .update(campaigns)
+          .set({ talespireCampaignId: null })
+          .where(eq(campaigns.id, elsewhere.id));
+      }
+      await tx
+        .update(campaigns)
+        .set({ talespireCampaignId: talespireId })
+        .where(eq(campaigns.id, here));
+    });
+  },
+
   async createCampaign(principal, input) {
     const created = await db().transaction(async (tx) => {
       const [campaign] = await tx
@@ -1935,12 +2003,37 @@ export const postgresRepository: ArcaRepository = {
 
     await db()
       .update(users)
-      .set({ passwordHash: null })
+      .set({ passwordHash: null, passwordResetRequestedAt: null })
       .where(eq(users.id, userId));
 
     // The throttle is keyed by address, so a reset that did not clear it would
     // leave a locked-out member locked out with a brand new password.
     clearFailures(row.email);
+  },
+
+  async requestPasswordReset(email) {
+    const wanted = normaliseEmail(email);
+    if (wanted === "") return;
+    await db()
+      .update(users)
+      .set({ passwordResetRequestedAt: new Date() })
+      .where(eq(users.email, wanted));
+  },
+
+  async changePassword(principal, current, next) {
+    if (!UUID.test(principal.userId)) return false;
+    const [row] = await db()
+      .select({ hash: users.passwordHash })
+      .from(users)
+      .where(eq(users.id, principal.userId))
+      .limit(1);
+    if (!row?.hash) return false;
+    if (!(await verifyPassword(current, row.hash))) return false;
+    await db()
+      .update(users)
+      .set({ passwordHash: await hashPassword(next), passwordResetRequestedAt: null })
+      .where(eq(users.id, principal.userId));
+    return true;
   },
 
   async enrolMemberPassword(email, password) {

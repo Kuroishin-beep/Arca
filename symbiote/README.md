@@ -6,27 +6,36 @@ the dice buttons on character sheets put rolls straight in your dice tray.
 
 ## Install (each player, once)
 
-1. In TaleSpire, open **Settings** and turn on **Symbiotes**. A Symbiotes
-   panel appears on the right.
-2. In that panel, click **Open Symbiotes Directory**. On Windows this is
-   `%AppData%\..\LocalLow\BouncyRock Entertainment\TaleSpire\Symbiotes`.
-3. Copy this whole `symbiote` folder in there and rename it `Arca`. The
-   result must be `...\Symbiotes\Arca\manifest.json`, not one folder deeper.
-4. Back in TaleSpire, Arca is now listed in the Symbiotes panel. Open it and
-   sign in with the email your GM added to the campaign.
+**From the mod browser** (once Arca is published — see `MODIO.md`): in
+TaleSpire, open the Symbiotes panel, choose **Open Community Mod Browser**,
+find Arca and install it.
 
-## What it does in TaleSpire
+**From the download:** unzip `arca-symbiote-install.zip` (built with
+`npm run symbiote:pack`) and double-click `install-arca.bat`. Run it again any
+time to update.
 
-- **d20 next to every skill and attribute:** puts a d20 in your tray, labelled
-  with the skill and the number to roll under, e.g. "Bushcraft (12)".
-- **Damage dice next to each weapon at hand, and the damage bonuses:** puts
-  that weapon's damage in the tray.
-- **Death roll, round rest, stretch rest:** each has its die too.
-- **Runs in the background** (`runInBackground`), so live inventory sync keeps
-  going while the panel is closed.
+**By hand:** copy this folder into
+`%AppData%\..\LocalLow\BouncyRock Entertainment\TaleSpire\Symbiotes` and name
+it `Arca`, so the result is `...\Symbiotes\Arca\manifest.json`.
 
-Outside TaleSpire none of the dice buttons appear. The sheet still shows
-every number you roll against.
+Then in TaleSpire: **Settings → Symbiotes** on, open **Arca** from the
+Symbiotes panel, and sign in with the email your GM added you with.
+
+## What happens automatically
+
+- **Staying signed in.** Sign in once; every visit renews the session, so
+  you are only asked again after a month of not using Arca.
+- **The right campaign.** The first time the GM opens Arca inside a TaleSpire
+  campaign, Arca offers to link it to the Arca campaign they are in. After
+  that, anyone opening Arca inside that TaleSpire campaign lands in the linked
+  Arca campaign — no campaign menu.
+- **Dice.** The d20 beside every skill and attribute, the damage dice beside
+  each weapon, death rolls and rests put the roll in your tray, labelled with
+  what it is for. You must be on a board.
+- **Colours.** Arca takes on TaleSpire's colours and font.
+
+Forgot your password? Use **Forgot your password?** on the sign-in screen; your
+GM sees the request on the Members page and resets it.
 
 ## Pointing it at another deployment
 

@@ -13,7 +13,7 @@
 import { randomUUID } from "node:crypto";
 
 import { normaliseStats } from "@backend/domain/item-fields";
-import { campaignId, defaultCampaignId, inCampaign } from "@backend/lib/campaign";
+import { campaignId, campaignOf, defaultCampaignId, inCampaign } from "@backend/lib/campaign";
 import { containerRefs, rememberName } from "@backend/lib/paths";
 
 import {
@@ -39,6 +39,7 @@ import {
   sameStack,
 } from "@backend/domain/view";
 import {
+  PermissionError,
   assertCanEditContainer,
   assertCanCreateItem,
   assertCanManageAccess,
@@ -84,6 +85,7 @@ interface Account {
   displayName: string;
   email: string;
   passwordHash: string | null;
+  resetRequestedAt?: Date | null;
 }
 
 /** A seat at one campaign's table, and what the person is there. */
@@ -97,7 +99,7 @@ interface Membership {
  *  campaign, so one campaign's containers simply do not exist from another's,
  *  the in-memory shape of every Postgres query filtering on campaign_id. */
 interface World {
-  campaigns: { id: string; name: string }[];
+  campaigns: { id: string; name: string; talespireCampaignId?: string }[];
   accounts: Account[];
   memberships: Membership[];
   stores: Record<string, Store>;
@@ -833,12 +835,13 @@ export const fixtureRepository: ArcaRepository = {
     // not travel with them. Spreading the row and deleting the field would
     // leave the hash one forgotten `...member` away from a client component.
     return members().map(
-      ({ userId, displayName, email, role, passwordHash }) => ({
+      ({ userId, displayName, email, role, passwordHash, resetRequestedAt }) => ({
         userId,
         displayName,
         email,
         role,
         hasPassword: passwordHash !== null,
+        resetRequested: resetRequestedAt != null,
       }),
     );
   },
@@ -951,6 +954,41 @@ export const fixtureRepository: ArcaRepository = {
       }));
   },
 
+  async campaignForTaleSpire(userId, talespireId) {
+    const mine = new Set(
+      world().memberships.filter((m) => m.userId === userId).map((m) => m.campaignId),
+    );
+    const linked = world().campaigns.find(
+      (c) => c.talespireCampaignId === talespireId && mine.has(c.id),
+    );
+    return linked?.id ?? null;
+  },
+
+  async taleSpireLinkOf(principal) {
+    return world().campaigns.find((c) => c.id === campaignOf(principal))?.talespireCampaignId ?? null;
+  },
+
+  async linkTaleSpireCampaign(principal, talespireId) {
+    if (principal.role !== "gm") {
+      throw new PermissionError("Only the GM can link this campaign to TaleSpire.");
+    }
+    const here = campaignOf(principal);
+    const elsewhere = world().campaigns.find(
+      (c) => c.talespireCampaignId === talespireId && c.id !== here,
+    );
+    if (elsewhere) {
+      const runsIt = world().memberships.some(
+        (m) => m.campaignId === elsewhere.id && m.userId === principal.userId && m.role === "gm",
+      );
+      if (!runsIt) {
+        throw new ConflictError("That TaleSpire campaign is already linked to another Arca campaign.");
+      }
+      delete elsewhere.talespireCampaignId;
+    }
+    const campaign = world().campaigns.find((c) => c.id === here);
+    if (campaign) campaign.talespireCampaignId = talespireId;
+  },
+
   async createCampaign(principal, input) {
     const id = randomUUID();
     world().campaigns.push({ id, name: input.name });
@@ -981,9 +1019,24 @@ export const fixtureRepository: ArcaRepository = {
     const account = world().accounts.find((a) => a.userId === userId);
     if (!member || !account) throw new NotFoundError("No such member.");
     account.passwordHash = null;
+    account.resetRequestedAt = null;
     // The throttle is keyed by address, so a reset that did not clear it would
     // leave a locked-out member locked out with a brand new password.
     clearFailures(member.email);
+  },
+
+  async requestPasswordReset(email) {
+    const account = byEmail(email);
+    if (account) account.resetRequestedAt = new Date();
+  },
+
+  async changePassword(principal, current, next) {
+    const account = world().accounts.find((a) => a.userId === principal.userId);
+    if (!account?.passwordHash) return false;
+    if (!(await verifyPassword(current, account.passwordHash))) return false;
+    account.passwordHash = await hashPassword(next);
+    account.resetRequestedAt = null;
+    return true;
   },
 
   async enrolMemberPassword(email, password) {

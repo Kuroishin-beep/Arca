@@ -14,7 +14,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx --env-file-if-exists=.env.local backend/db/seed.ts",
-    "db:make-gm": "tsx --env-file-if-exists=.env.local backend/db/make-gm.ts"
+    "db:make-gm": "tsx --env-file-if-exists=.env.local backend/db/make-gm.ts",
+    "symbiote:pack": "node scripts/pack-symbiote.mjs"
   },
   "repository": {
     "type": "git",
