@@ -1,21 +1,19 @@
 /**
  * Readable URLs for containers and character sheets.
  *
- * A container's address is its name plus the last eight hex digits of its id:
+ * A container's address is its name:
  *
- *   /c/packmule-honky-6f3a91c2        /character/kova-00000201
+ *   /c/packmule-honky        /character/kova
  *
- * The name is for people; the id suffix is what the server actually looks the
- * container up by (`resolveContainerRef`). So renaming a container, or two
- * containers sharing a name, never breaks a link — a stale name in the URL is
- * simply redirected to the current one. The full-uuid URLs every earlier
- * version produced still resolve and redirect too.
+ * Only when two containers in a campaign slug alike does each get the last
+ * eight hex digits of its id as well (`/c/rope-6f3a91c2`), so no address is
+ * ever ambiguous. Older links — full ids, and `name-<8 hex>` from the previous
+ * release — still resolve (`backend/lib/container-ref.ts`) and redirect here.
  *
  * The LAST eight digits rather than the first: seeded ids differ only at the
  * end (00000000-…-000000000201), and a v4 uuid's tail is as random as its head.
  */
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SUFFIX_LENGTH = 8;
 
 /**
@@ -34,22 +32,57 @@ export function slugify(text: string): string {
     .replace(/-+$/g, "");
 }
 
-function idSuffix(id: string): string {
+/** How many earlier names a container remembers, so links made before a
+ *  rename keep working (`formerNames`). */
+export const FORMER_NAMES_KEPT = 10;
+
+/** The list after renaming away from `previous`: newest first, no repeats. */
+export function rememberName(formerNames: readonly string[], previous: string): string[] {
+  return [previous, ...formerNames.filter((n) => slugify(n) !== slugify(previous))].slice(
+    0,
+    FORMER_NAMES_KEPT,
+  );
+}
+
+/** The id's tail, used to tell apart containers whose names slug alike. */
+export function idSuffix(id: string): string {
   return id.replace(/-/g, "").slice(-SUFFIX_LENGTH).toLowerCase();
 }
 
-/** The URL segment for a container: `name-slug-<8 hex>`, or just the hex. */
-export function containerRef(container: { id: string; name: string }): string {
-  const words = slugify(container.name);
-  const suffix = idSuffix(container.id);
-  return words ? `${words}-${suffix}` : suffix;
+/**
+ * Every container's URL segment, over a whole campaign: the plain name slug
+ * ("seirakhan") when no other container shares it, and `slug-<8 hex>` for each
+ * of the ones that do — so a duplicate name never makes two links point at
+ * one place, and a unique one carries no noise.
+ */
+export function containerRefs(
+  containers: readonly { id: string; name: string }[],
+): Map<string, string> {
+  const counts = new Map<string, number>();
+  for (const c of containers) {
+    const slug = slugify(c.name);
+    counts.set(slug, (counts.get(slug) ?? 0) + 1);
+  }
+  const out = new Map<string, string>();
+  for (const c of containers) {
+    const slug = slugify(c.name);
+    const suffix = idSuffix(c.id);
+    out.set(c.id, slug === "" ? suffix : (counts.get(slug) ?? 0) > 1 ? `${slug}-${suffix}` : slug);
+  }
+  return out;
 }
 
-export function containerPath(container: { id: string; name: string }): string {
+/** The URL segment for a container: its `ref` when the repository supplied
+ *  one, else its name slug (a container just created, known only by name). */
+export function containerRef(container: { id: string; name: string; ref?: string }): string {
+  return container.ref ?? (slugify(container.name) || idSuffix(container.id));
+}
+
+export function containerPath(container: { id: string; name: string; ref?: string }): string {
   return `/c/${containerRef(container)}`;
 }
 
-export function sheetPath(container: { id: string; name: string }): string {
+export function sheetPath(container: { id: string; name: string; ref?: string }): string {
   return `/character/${containerRef(container)}`;
 }
 
@@ -63,18 +96,11 @@ export function decodeSegment(raw: string): string {
   }
 }
 
-/** What a `/c/[ref]` segment names: a full id, or an id suffix to look up. */
-export type ParsedRef = { id: string } | { suffix: string };
-
-export function parseContainerRef(raw: string): ParsedRef | null {
-  const ref = decodeSegment(raw).trim().toLowerCase();
-  if (UUID.test(ref)) return { id: ref };
-  const match = /(?:^|-)([0-9a-f]{8})$/.exec(ref);
-  return match?.[1] ? { suffix: match[1] } : null;
-}
-
 /** Whether the URL as typed is already the canonical one for this container. */
-export function isCanonicalRef(raw: string, container: { id: string; name: string }): boolean {
+export function isCanonicalRef(
+  raw: string,
+  container: { id: string; name: string; ref?: string },
+): boolean {
   return decodeSegment(raw) === containerRef(container);
 }
 

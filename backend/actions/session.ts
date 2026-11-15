@@ -14,6 +14,7 @@ import {
   recordFailure,
 } from "@backend/lib/password";
 import { SESSION_COOKIE } from "@backend/lib/session";
+import { SESSION_MAX_AGE } from "@backend/lib/session-cookie";
 import { sessionSecret, signSession } from "@backend/lib/session-token";
 
 /**
@@ -52,11 +53,11 @@ async function land(principal: Principal): Promise<never> {
   jar.set(SESSION_COOKIE, signSession(principal.userId, sessionSecret()), {
     httpOnly: true,
     sameSite: "lax",
-    // The Symbiote loads Arca in an iframe, so a secure cookie is required in
-    // production for it to be sent at all.
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    maxAge: 60 * 60 * 24 * 30,
+    // Renewed on every visit by proxy.ts, so this is "30 days of not using
+    // Arca", not "30 days from sign-in".
+    maxAge: SESSION_MAX_AGE,
   });
 
   // Home picks the landing page, because only the session knows which

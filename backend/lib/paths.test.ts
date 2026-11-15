@@ -4,7 +4,7 @@ import {
   containerPath,
   containerRef,
   isCanonicalRef,
-  parseContainerRef,
+  containerRefs,
   queryString,
   sheetPath,
   slugify,
@@ -23,26 +23,33 @@ describe("slugify", () => {
 });
 
 describe("container refs", () => {
-  it("is the name plus the id's last eight hex digits", () => {
-    expect(containerRef(packmule)).toBe("packmule-honky-6f3a91c2");
-    expect(containerPath(packmule)).toBe("/c/packmule-honky-6f3a91c2");
-    expect(sheetPath(packmule)).toBe("/character/packmule-honky-6f3a91c2");
+  it("is just the name, with no id noise", () => {
+    expect(containerRef(packmule)).toBe("packmule-honky");
+    expect(containerPath(packmule)).toBe("/c/packmule-honky");
+    expect(sheetPath(packmule)).toBe("/character/packmule-honky");
     expect(containerRef({ id: packmule.id, name: "!!!" })).toBe("6f3a91c2");
   });
 
-  it("parses a slug, a bare suffix and a legacy full id", () => {
-    expect(parseContainerRef("packmule-honky-6f3a91c2")).toEqual({ suffix: "6f3a91c2" });
-    expect(parseContainerRef("old-name-6F3A91C2")).toEqual({ suffix: "6f3a91c2" });
-    expect(parseContainerRef("6f3a91c2")).toEqual({ suffix: "6f3a91c2" });
-    expect(parseContainerRef(packmule.id)).toEqual({ id: packmule.id });
-    expect(parseContainerRef("%E6%AD%A6%E5%99%A8-6f3a91c2")).toEqual({ suffix: "6f3a91c2" });
-    expect(parseContainerRef("not-a-ref")).toBeNull();
-    expect(parseContainerRef("%E2")).toBeNull();
+  it("adds the id tail only to names that clash in the campaign", () => {
+    const refs = containerRefs([
+      packmule,
+      { id: "00000000-0000-4000-8000-0000000000aa", name: "Rope" },
+      { id: "00000000-0000-4000-8000-0000000000bb", name: "rope!" },
+    ]);
+    expect(refs.get(packmule.id)).toBe("packmule-honky");
+    expect(refs.get("00000000-0000-4000-8000-0000000000aa")).toBe("rope-000000aa");
+    expect(refs.get("00000000-0000-4000-8000-0000000000bb")).toBe("rope-000000bb");
+  });
+
+  it("prefers the repository's ref when there is one", () => {
+    expect(containerRef({ ...packmule, ref: "packmule-honky-6f3a91c2" })).toBe(
+      "packmule-honky-6f3a91c2",
+    );
   });
 
   it("knows when a URL is already canonical", () => {
-    expect(isCanonicalRef("packmule-honky-6f3a91c2", packmule)).toBe(true);
-    expect(isCanonicalRef("honky-6f3a91c2", packmule)).toBe(false);
+    expect(isCanonicalRef("packmule-honky", packmule)).toBe(true);
+    expect(isCanonicalRef("packmule-honky-6f3a91c2", packmule)).toBe(false);
     expect(isCanonicalRef(packmule.id, packmule)).toBe(false);
   });
 });

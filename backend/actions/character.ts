@@ -15,6 +15,7 @@ import { requirePrincipal } from "@backend/lib/session";
 import { realtime } from "@backend/realtime";
 
 import type { ActionResult } from "./items";
+import { currentRef, nameClash } from "@backend/lib/container-ref";
 
 /**
  * The character sheet's writes — SCOPE.md S1.
@@ -51,7 +52,7 @@ async function announce(
   }
 }
 
-function toResult(error: unknown, fallback: string): ActionResult {
+function toResult<T = undefined>(error: unknown, fallback: string): ActionResult<T> {
   if (
     error instanceof PermissionError ||
     error instanceof ConflictError ||
@@ -129,7 +130,7 @@ export async function updateCharacterAction(
 export async function renameCharacterAction(
   containerId: string,
   name: string,
-): Promise<ActionResult> {
+): Promise<ActionResult<{ ref: string }>> {
   try {
     const principal = await requirePrincipal();
 
@@ -148,6 +149,9 @@ export async function renameCharacterAction(
       };
     }
 
+    const clash = await nameClash(repository(), principal, name, containerId);
+    if (clash) return { ok: false, error: clash };
+
     await repository().updateContainer(principal, parsed.data);
 
     // Every screen that shows a container name, because they all show this one.
@@ -157,7 +161,8 @@ export async function renameCharacterAction(
     revalidatePath("/members", "page");
     await announce(principal, containerId);
 
-    return { ok: true };
+    // The sheet's address is the name, so the page moves to the new one.
+    return { ok: true, data: { ref: await currentRef(repository(), principal, containerId) } };
   } catch (error) {
     return toResult(error, "Could not rename that character.");
   }

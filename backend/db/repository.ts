@@ -159,15 +159,16 @@ export interface ArcaRepository {
   listItems(principal: Principal, containerId: string): Promise<ItemView[]>;
 
   /**
-   * The ids of live containers in the current campaign whose id ends in these
-   * eight hex digits — how a readable URL (`/c/packmule-honky-6f3a91c2`) finds
-   * its container. Deliberately NOT permission-filtered: it answers only "is
-   * there such an id", and the caller still goes through `getContainer`,
-   * which is where a sealed container is refused. Usually one id; more than
-   * one is a collision the caller must treat as not found. Takes the
-   * principal only to run in their campaign (`scopedRepository`).
+   * Every live container in the current campaign, by id and name only — what
+   * a readable URL (`/c/seirakhan`) is resolved against. Deliberately NOT
+   * permission-filtered: an address has to mean the same container for
+   * everyone, and the caller still goes through `getContainer`, which is where
+   * a sealed container is refused. Takes the principal only to run in their
+   * campaign (`scopedRepository`).
    */
-  findContainerIdsBySuffix(principal: Principal, suffix: string): Promise<string[]>;
+  listContainerNames(
+    principal: Principal,
+  ): Promise<{ id: string; name: string; formerNames?: string[] }[]>;
 
   /**
    * `listItems` for several containers at once, keyed by container id. The

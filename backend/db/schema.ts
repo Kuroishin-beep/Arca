@@ -60,13 +60,24 @@ export const viewTypeEnum = pgEnum("view_type", [
  * (SCOPE.md §3), and the principal is a membership row.
  * ------------------------------------------------------------------ */
 
-export const campaigns = pgTable("campaigns", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  name: text("name").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const campaigns = pgTable(
+  "campaigns",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    /**
+     * The TaleSpire campaign this one is played in, as TaleSpire's
+     * `campaigns.whereAmI()` reports it. Opening the Symbiote inside that
+     * TaleSpire campaign switches Arca to this one. Null until a GM links them;
+     * unique, because one TaleSpire campaign can only lead to one place.
+     */
+    talespireCampaignId: text("talespire_campaign_id"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [uniqueIndex("campaigns_talespire_campaign_id_key").on(t.talespireCampaignId)],
+);
 
 export const users = pgTable(
   "users",
@@ -91,6 +102,15 @@ export const users = pgTable(
      * is no reset mail and no mail to send it with.
      */
     passwordHash: text("password_hash"),
+    /**
+     * When this member last said "I forgot my password" on the sign-in screen.
+     * Shown to their GMs on the roster beside the reset control; cleared when
+     * the password is reset or they sign in. Never says whether the address
+     * exists to the person asking.
+     */
+    passwordResetRequestedAt: timestamp("password_reset_requested_at", {
+      withTimezone: true,
+    }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

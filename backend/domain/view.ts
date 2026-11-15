@@ -106,6 +106,13 @@ export const ContainerView = z.object({
    * packs and world containers, whose access comes from their kind.
    */
   memberIds: z.array(UserId).nullable(),
+  /**
+   * This container's URL segment: its name as a slug ("seirakhan"), with the
+   * id's last eight hex digits added only when another container in the
+   * campaign has the same slug. Worked out over the WHOLE campaign by the
+   * repository (`containerRefs`), so everyone gets the same address.
+   */
+  ref: z.string(),
 });
 export type ContainerView = z.infer<typeof ContainerView>;
 

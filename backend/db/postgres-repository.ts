@@ -15,7 +15,7 @@
  * the table owner, and Postgres exempts owners from RLS. See the header of that
  * migration for the two steps that activate it (phase 1).
  */
-import { and, eq, inArray, isNull, like, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import { sheetFromProperties } from "@backend/domain/character";
 import {
@@ -36,6 +36,7 @@ import {
 } from "@backend/domain/view";
 import { normaliseStats } from "@backend/domain/item-fields";
 import { campaignId, defaultCampaignId, inCampaign } from "@backend/lib/campaign";
+import { containerRefs, rememberName } from "@backend/lib/paths";
 import {
   assertCanEditContainer,
   assertCanCreateItem,
@@ -546,6 +547,8 @@ async function loadContainers(): Promise<ContainerView[]> {
     propertiesFor(ids),
     itemsInMany(ids),
   ]);
+  // URL segments over the whole campaign, so a shared name gets its suffix.
+  const refs = containerRefs(rows);
 
   return rows.map((r) => {
     const items = contents.get(r.id) ?? [];
@@ -557,6 +560,7 @@ async function loadContainers(): Promise<ContainerView[]> {
       type: r.type,
       ownerId: r.ownerId as ContainerView["ownerId"],
       revealed: r.revealed,
+      ref: refs.get(r.id) ?? r.id,
       itemCount: items.reduce((n, i) => n + i.qty, 0),
       carriedWeight: carriedWeight(items),
       capacity:
@@ -609,6 +613,9 @@ async function setProperties(
   }
   if (values.members !== undefined) {
     await ensurePropertyDefinitions(["members"], "Who is in a shared container");
+  }
+  if (values.formerNames !== undefined) {
+    await ensurePropertyDefinitions(["formerNames"], "Earlier names, so old links still work");
   }
   const ids = await propertyIdsByName();
   const rows = Object.entries(values)
@@ -710,22 +717,17 @@ export const postgresRepository: ArcaRepository = {
     return visibleContainers(principal, await loadContainers());
   },
 
-  async findContainerIdsBySuffix(_principal, suffix) {
-    // The uuid's text form ends in its last 12 hex digits, so a suffix of 8
-    // is a plain LIKE on the text. Parameterised; the suffix is validated as
-    // hex by `parseContainerRef` before it gets here anyway.
+  async listContainerNames() {
     const rows = await db()
-      .select({ id: containers.objectId })
+      .select({ id: containers.objectId, name: containers.name })
       .from(containers)
       .innerJoin(objects, eq(objects.id, containers.objectId))
-      .where(
-        and(
-          eq(objects.campaignId, campaignId()),
-          isNull(objects.archivedAt),
-          like(sql<string>`${containers.objectId}::text`, `%${suffix.toLowerCase()}`),
-        ),
-      );
-    return rows.map((r) => r.id);
+      .where(and(eq(objects.campaignId, campaignId()), isNull(objects.archivedAt)));
+    const props = await propertiesFor(rows.map((r) => r.id));
+    return rows.map((r) => ({
+      ...r,
+      formerNames: asStringArray(props.get(r.id)?.formerNames),
+    }));
   },
 
   async getContainer(principal, containerId) {
@@ -871,6 +873,13 @@ export const postgresRepository: ArcaRepository = {
         .update(containers)
         .set(fields)
         .where(eq(containers.objectId, input.id));
+    }
+
+    // A rename keeps the old name, so links made before it still resolve
+    // (backend/lib/container-ref.ts) instead of answering "No such container".
+    if (input.name !== undefined && input.name !== existing.name) {
+      const former = asStringArray((await propertiesFor([input.id])).get(input.id)?.formerNames);
+      await setProperties(input.id, { formerNames: rememberName(former, existing.name) });
     }
 
     if (input.capacity !== undefined) {

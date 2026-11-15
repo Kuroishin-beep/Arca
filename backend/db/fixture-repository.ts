@@ -14,6 +14,7 @@ import { randomUUID } from "node:crypto";
 
 import { normaliseStats } from "@backend/domain/item-fields";
 import { campaignId, defaultCampaignId, inCampaign } from "@backend/lib/campaign";
+import { containerRefs, rememberName } from "@backend/lib/paths";
 
 import {
   type CharacterSheet,
@@ -103,7 +104,10 @@ interface World {
 }
 
 interface Store {
-  containers: Omit<ContainerView, "itemCount" | "carriedWeight">[];
+  containers: (Omit<ContainerView, "itemCount" | "carriedWeight" | "ref"> & {
+    /** Earlier names, so links made before a rename still resolve. */
+    formerNames?: string[];
+  })[];
   items: (ItemView & { archivedAt: Date | null })[];
   comments: CommentView[];
   /**
@@ -293,13 +297,17 @@ function stripInternal(item: ItemView & { archivedAt: Date | null }): ItemView {
 
 /** Containers carry their derived counts; nothing is stored. */
 function hydrate(
-  container: Omit<ContainerView, "itemCount" | "carriedWeight">,
+  stored: Omit<ContainerView, "itemCount" | "carriedWeight" | "ref"> & { formerNames?: string[] },
 ): ContainerView {
+  // Former names stay server-side; they only matter to address resolution.
+  const { formerNames: _formerNames, ...container } = stored;
   const items = liveItemsIn(container.id);
   return {
     ...container,
     itemCount: items.reduce((n, i) => n + i.qty, 0),
     carriedWeight: carriedWeight(items),
+    // Over the whole campaign's containers, so a shared name gets its suffix.
+    ref: containerRefs(store().containers).get(container.id) ?? container.id,
   };
 }
 
@@ -349,11 +357,12 @@ export const fixtureRepository: ArcaRepository = {
     return visibleContainers(principal, store().containers.map(hydrate));
   },
 
-  async findContainerIdsBySuffix(_principal, suffix) {
-    const wanted = suffix.toLowerCase();
-    return store()
-      .containers.map((c) => c.id as string)
-      .filter((id) => id.toLowerCase().endsWith(wanted));
+  async listContainerNames() {
+    return store().containers.map((c) => ({
+      id: c.id,
+      name: c.name,
+      formerNames: c.formerNames ?? [],
+    }));
   },
 
   async getContainer(principal, containerId) {
@@ -427,7 +436,10 @@ export const fixtureRepository: ArcaRepository = {
     // `undefined` means leave it alone; `null` on capacity means no limit.
     // Assigning unconditionally is exactly the data-loss bug UpdateItemInput's
     // comment warns about, one level up.
-    if (input.name !== undefined) raw.name = input.name;
+    if (input.name !== undefined && input.name !== raw.name) {
+      raw.formerNames = rememberName(raw.formerNames ?? [], raw.name);
+      raw.name = input.name;
+    }
     if (input.capacity !== undefined) raw.capacity = input.capacity;
     raw.type = type;
     raw.ownerId = ownerId;

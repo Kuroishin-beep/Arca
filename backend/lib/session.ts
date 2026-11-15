@@ -4,6 +4,7 @@ import type { Principal } from "@backend/domain/view";
 import { repository } from "@backend/db";
 
 import { defaultCampaignId } from "./campaign";
+import { SESSION_COOKIE_NAME } from "./session-cookie";
 import { sessionSecret, verifySession } from "./session-token";
 
 /**
@@ -29,7 +30,7 @@ import { sessionSecret, verifySession } from "./session-token";
  * the campaign resolves to no principal, which is the same closed door as never
  * having signed in.
  */
-const COOKIE = "arca_user";
+const COOKIE = SESSION_COOKIE_NAME;
 
 /**
  * Which campaign this person is working in. Plain, not signed: it names a

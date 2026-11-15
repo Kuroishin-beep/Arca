@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useOptimistic, useState, useTransition } from "react";
 
 import {
@@ -188,6 +189,7 @@ function Identity({
   onError: (message: string | null) => void;
 }) {
   const [, startTransition] = useTransition();
+  const router = useRouter();
   const [name, setName] = useState(character.name);
 
   /**
@@ -216,7 +218,11 @@ function Identity({
       if (!result.ok) {
         setName(character.name);
         onError(result.error ?? "Could not rename that character.");
+        return;
       }
+      // The sheet's address is the name; move to the new one before anything
+      // re-renders the old address into "not found".
+      if (result.data?.ref) router.replace(`/character/${result.data.ref}`);
     });
   };
 

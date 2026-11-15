@@ -321,9 +321,8 @@ test.describe("character sheet polish", () => {
     await first.click();
     await page.waitForURL(
       (url) =>
-        // Readable URL: the name, then the id's last eight hex digits.
-        url.pathname.startsWith("/c/") &&
-        url.pathname.endsWith(KOVA_CONTAINER_ID.slice(-8)) &&
+        // Readable URL: just the name.
+        url.pathname === "/c/kova" &&
         url.searchParams.has("item"),
     );
     await expect(
@@ -464,18 +463,20 @@ test.describe("readable URLs", () => {
     expect(response?.status()).toBe(200);
     // A real redirect before anything rendered, not a second navigation later.
     expect(response?.request().redirectedFrom()).not.toBeNull();
+    // Just the name — no id digits.
     const container = new URL(kova.url());
-    expect(container.pathname).toMatch(new RegExp(`^/c/[a-z0-9-]+-${suffix}$`));
+    expect(container.pathname).toBe("/c/kova");
     expect(container.searchParams.get("q")).toBe("rope");
 
     await kova.goto(`/character/${KOVA_CONTAINER_ID}`);
-    expect(new URL(kova.url()).pathname).toMatch(
-      new RegExp(`^/character/[a-z0-9-]+-${suffix}$`),
-    );
+    expect(new URL(kova.url()).pathname).toBe("/character/kova");
 
-    // A stale name with the right suffix still finds it, and is corrected.
+    // Links from the previous release (name + id digits) and stale names with
+    // the right digits still find it, and are corrected.
+    await kova.goto(`/c/kova-${suffix}`);
+    expect(new URL(kova.url()).pathname).toBe("/c/kova");
     await kova.goto(`/c/some-old-name-${suffix}`);
-    expect(new URL(kova.url()).pathname).toBe(container.pathname);
+    expect(new URL(kova.url()).pathname).toBe("/c/kova");
     await kova.context().close();
   });
 

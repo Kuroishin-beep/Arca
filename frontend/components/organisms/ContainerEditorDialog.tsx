@@ -14,7 +14,6 @@ import { Modal } from "@frontend/components/molecules/Modal";
 import { RetireContainerButton } from "@frontend/components/organisms/RetireContainerButton";
 import type { ContainerType } from "@backend/domain/types";
 import type { ContainerView, Principal } from "@backend/domain/view";
-import { containerPath } from "@backend/lib/paths";
 import { submitKeepingInput } from "@frontend/components/molecules/submitKeepingInput";
 
 /**
@@ -145,24 +144,11 @@ export function ContainerEditorDialog({
         return;
       }
 
-      if (editing) {
-        router.push(closeHref);
-      } else {
-        // Straight into the thing just made — an empty container is exactly
-        // where you want to be, because the next step is putting something in
-        // it.
-        // Its readable address, built from the name just typed, so the
-        // browser lands there directly instead of via a redirect.
-        router.push(
-          containerPath({
-            id: result.data!.containerId,
-            name: (() => {
-              const typed = formData.get("name");
-              return typeof typed === "string" ? typed : "";
-            })(),
-          }),
-        );
-      }
+      // To the container's address as the server now has it: a rename changes
+      // it (the old one would answer "No such container"), and a new container
+      // lands straight in itself — the next step is putting something in it.
+      const ref = result.data?.ref;
+      router.push(ref ? `/c/${ref}` : closeHref);
       // Push only — see ItemEditorDialog. The action revalidates, so the
       // push fetches fresh; a refresh fired straight after raced it, and could
       // land on the old `?dialog=` URL and stall or reopen the dialog.

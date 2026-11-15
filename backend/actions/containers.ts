@@ -12,6 +12,7 @@ import { requirePrincipal } from "@backend/lib/session";
 import { realtime } from "@backend/realtime";
 
 import type { ActionResult } from "./items";
+import { currentRef, nameClash } from "@backend/lib/container-ref";
 
 /**
  * Creating and retiring containers — SCOPE.md §3, GM only.
@@ -59,7 +60,7 @@ function text(raw: FormDataEntryValue | null): string {
 
 export async function createContainerAction(
   formData: FormData,
-): Promise<ActionResult<{ containerId: string }>> {
+): Promise<ActionResult<{ containerId: string; ref: string }>> {
   try {
     const principal = await requirePrincipal();
 
@@ -84,6 +85,11 @@ export async function createContainerAction(
       };
     }
 
+    const clash = await nameClash(repository(), principal, parsed.data.name);
+    if (clash) {
+      return { ok: false, error: "Fix the highlighted fields.", fieldErrors: { name: clash } };
+    }
+
     const created = await repository().createContainer(principal, parsed.data);
 
     revalidatePath("/c/[containerId]", "page");
@@ -91,7 +97,10 @@ export async function createContainerAction(
     // container has to reach the other panels the same way an item does.
     await announce(principal, created.id);
 
-    return { ok: true, data: { containerId: created.id } };
+    return {
+      ok: true,
+      data: { containerId: created.id, ref: await currentRef(repository(), principal, created.id) },
+    };
   } catch (error) {
     return toResult(error, "Could not create that container.");
   }
@@ -99,7 +108,7 @@ export async function createContainerAction(
 
 export async function updateContainerAction(
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<ActionResult<{ ref: string }>> {
   try {
     const principal = await requirePrincipal();
 
@@ -126,6 +135,13 @@ export async function updateContainerAction(
       };
     }
 
+    if (parsed.data.name !== undefined) {
+      const clash = await nameClash(repository(), principal, parsed.data.name, parsed.data.id);
+      if (clash) {
+        return { ok: false, error: "Fix the highlighted fields.", fieldErrors: { name: clash } };
+      }
+    }
+
     // The ownership invariant is judged against the merged row inside the
     // repository, so it arrives as a ConflictError rather than a zod issue.
     // Render it against the owner field anyway — that is the control the GM
@@ -146,7 +162,8 @@ export async function updateContainerAction(
     revalidatePath("/c/[containerId]", "page");
     await announce(principal, parsed.data.id);
 
-    return { ok: true };
+    // A rename changes the address; the dialog moves the page to the new one.
+    return { ok: true, data: { ref: await currentRef(repository(), principal, parsed.data.id) } };
   } catch (error) {
     return toResult(error, "Could not save that container.");
   }

@@ -102,8 +102,11 @@ export default async function WorkspacePage({
       },
     ),
   ]);
+  // One answer for "sealed" and "no such container". Addresses are names now,
+  // so different wording would let a player confirm a hidden container's name
+  // by typing it into the address bar.
   if (lookup.denied) {
-    return <Forbidden message={lookup.denied.message} containers={containers} />;
+    return <Forbidden message="No such container." containers={containers} />;
   }
   const container = lookup.found;
   if (!container || !containerId) {
