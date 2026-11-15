@@ -1,1 +1,1 @@
-export { default } from "@frontend/routes/dice";
+export { default, metadata } from "@frontend/routes/dice";

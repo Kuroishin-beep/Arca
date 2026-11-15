@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { createCampaignAction } from "@backend/actions/campaigns";
@@ -6,6 +7,8 @@ import { Button, ButtonLink } from "@frontend/components/atoms/Button";
 import { TextField } from "@frontend/components/atoms/Field";
 import { Icon } from "@frontend/components/atoms/Icon";
 import { TopBar } from "@frontend/components/organisms/TopBar";
+
+export const metadata: Metadata = { title: "New campaign" };
 
 /**
  * Starting a campaign — from "New campaign" in the campaign menu.
@@ -26,7 +29,7 @@ export default async function NewCampaignPage({
   return (
     <div className="flex h-screen flex-col bg-bg">
       <TopBar principal={principal} />
-      <main className="min-h-0 flex-1 overflow-y-auto">
+      <main className="relative min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex max-w-md flex-col gap-5 p-4 md:p-6">
           <div>
             <ButtonLink href="/" size="sm" icon="pack">

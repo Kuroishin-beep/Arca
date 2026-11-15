@@ -1,1 +1,1 @@
-export { default } from "@frontend/routes/catalog";
+export { default, metadata } from "@frontend/routes/catalog";

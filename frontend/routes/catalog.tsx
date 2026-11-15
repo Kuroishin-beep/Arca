@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { Chip } from "@frontend/components/atoms/Chip";
@@ -14,6 +15,8 @@ import {
   creatableContainerTypes,
 } from "@backend/lib/permissions";
 import { currentPrincipal } from "@backend/lib/session";
+
+export const metadata: Metadata = { title: "Catalogue" };
 
 /**
  * The catalogue — SCOPE.md S3.
@@ -71,7 +74,7 @@ export default async function CatalogPage({
 
   return (
     <WorkspaceShell {...shell}>
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="relative min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-3xl p-3 md:p-6">
           <div className="flex flex-wrap items-center gap-2">
             <Icon name="table" size={18} className="shrink-0 text-primary" />

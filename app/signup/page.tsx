@@ -1,1 +1,1 @@
-export { default } from "@frontend/routes/signup";
+export { default, metadata } from "@frontend/routes/signup";

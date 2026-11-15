@@ -1,6 +1,8 @@
 node_modules/
-.env
-.env.local
+# Every local env file (.env, .env.local, .env.production.local, ...).
+# This repository is public; only the template is committed.
+.env*
+!.env.example
 
 coverage/
 *.log

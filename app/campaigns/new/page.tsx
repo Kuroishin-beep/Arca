@@ -1,1 +1,1 @@
-export { default } from "@frontend/routes/campaign-new";
+export { default, metadata } from "@frontend/routes/campaign-new";

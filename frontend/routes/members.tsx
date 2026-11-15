@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -21,6 +22,8 @@ import {
   creatableContainerTypes,
 } from "@backend/lib/permissions";
 import { currentPrincipal } from "@backend/lib/session";
+
+export const metadata: Metadata = { title: "Members" };
 
 /**
  * The roster — who is at this table, and the GM's two verbs for changing it.
@@ -157,7 +160,7 @@ export default async function MembersPage({
 
   return (
     <WorkspaceShell {...shell}>
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="relative min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-2xl p-4 md:p-6">
           <div className="flex items-center gap-2">
             <Icon name="users" size={18} className="shrink-0 text-primary" />

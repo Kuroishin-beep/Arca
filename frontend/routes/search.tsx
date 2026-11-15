@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { Chip } from "@frontend/components/atoms/Chip";
@@ -13,6 +14,8 @@ import {
   creatableContainerTypes,
 } from "@backend/lib/permissions";
 import { currentPrincipal } from "@backend/lib/session";
+
+export const metadata: Metadata = { title: "Search" };
 
 /**
  * Search everything — the sidebar's search box.

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { signInAsAction } from "@backend/actions/session";
@@ -10,6 +11,8 @@ import { AuthTabs } from "@frontend/components/molecules/AuthTabs";
 import { repositoryKind, storageProblem } from "@backend/db";
 import { currentSession } from "@backend/lib/session";
 import { realtimeKind } from "@backend/realtime";
+
+export const metadata: Metadata = { title: "Sign in" };
 
 /**
  * Sign in — SCOPE.md M1.
@@ -73,7 +76,7 @@ export default async function SignInPage({
           />
           <h1 className="font-serif text-2xl font-bold text-text">Arca</h1>
           <p className="mt-2 text-base text-muted">
-            Shared inventory for the Ravenholt Westmarch. Runs inside TaleSpire.
+            Shared inventory for your Dragonbane table. Runs inside TaleSpire.
           </p>
         </div>
 
@@ -109,9 +112,8 @@ export default async function SignInPage({
             Sit at the table
           </h2>
           <p className="mb-3 text-sm text-muted">
-            Your email is the one the GM added to this campaign. Each role sees a
-            different set of containers — that is the permission model, not a
-            demo mode.
+            Use the email your GM added to the campaign. What you can see
+            depends on your role.
           </p>
 
           <SignInForm
@@ -122,9 +124,13 @@ export default async function SignInPage({
           />
         </div>
 
-        <p className="mt-6 text-center font-mono text-xs text-faint">
-          storage: {repositoryKind()} · sync: {realtimeKind()} · auth: email
-        </p>
+        {/* Which backends are live is a developer's question. On a public
+            deployment it only tells a stranger how the app is built. */}
+        {process.env.NODE_ENV !== "production" ? (
+          <p className="mt-6 text-center font-mono text-xs text-faint">
+            storage: {repositoryKind()} · sync: {realtimeKind()} · auth: email
+          </p>
+        ) : null}
       </div>
     </main>
   );

@@ -3,7 +3,7 @@ import type { Metadata, Viewport } from "next";
 import "../styles/globals.css";
 
 export const metadata: Metadata = {
-  title: "Arca",
+  title: { default: "Arca", template: "%s · Arca" },
   description:
     "Shared inventory for a Dragonbane Westmarch campaign, running as a TaleSpire Symbiote.",
 };

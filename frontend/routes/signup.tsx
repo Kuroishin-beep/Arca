@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { signUpAction } from "@backend/actions/session";
@@ -9,6 +10,8 @@ import { ThemeToggle } from "@frontend/components/atoms/ThemeToggle";
 import { AuthTabs } from "@frontend/components/molecules/AuthTabs";
 import { storageProblem } from "@backend/db";
 import { currentSession } from "@backend/lib/session";
+
+export const metadata: Metadata = { title: "Create account" };
 
 /**
  * Create an account — SCOPE.md M1.
@@ -68,7 +71,7 @@ export default async function SignUpPage({
           />
           <h1 className="font-serif text-2xl font-bold text-text">Arca</h1>
           <p className="mt-2 text-base text-muted">
-            Shared inventory for the Ravenholt Westmarch. Runs inside TaleSpire.
+            Shared inventory for your Dragonbane table. Runs inside TaleSpire.
           </p>
         </div>
 

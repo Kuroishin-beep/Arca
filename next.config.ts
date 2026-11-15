@@ -19,6 +19,10 @@ const nextConfig: NextConfig = {
   // No `X-Powered-By: Next.js` on every response: it names the framework (and
   // so which advisories to try) to anyone scanning, and tells a player nothing.
   poweredByHeader: false,
+  // `next dev` blocks its own client chunks and HMR socket for any origin but
+  // localhost, so a page opened at 127.0.0.1 (Playwright's baseURL) half-loads
+  // in dev. Development only; ignored by `next start`.
+  allowedDevOrigins: ["127.0.0.1"],
   async headers() {
     return [
       {
