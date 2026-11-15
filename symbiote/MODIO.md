@@ -27,8 +27,7 @@ the form asks for.
 - **Summary** (250 characters max):
   Shared Dragonbane inventory and character sheets for your table, inside
   TaleSpire. Skill, attribute and damage dice go straight to your dice tray.
-- **Logo:** `symbiote/icon.png` (mod.io may ask for a larger image; render
-  `app/icon.svg` at the size it asks for)
+- **Listing image** (16:9, at least 512×288): `symbiote/listing.png` (1280×720)
 - **Tags:** Symbiote, and whatever system / utility tags the form offers
 - **Description:**
 
