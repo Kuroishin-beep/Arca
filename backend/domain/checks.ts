@@ -8,31 +8,43 @@ import {
 /**
  * Dragonbane checks: roll a d20 against a number, at or under succeeds.
  *
- * A bane adds a d20 and the WORST (highest) die counts. Every bane adds one
- * more die. A natural 1 is a Dragon (always a success, and the skill is marked
- * for advancement); a natural 20 is a Demon (always a failure, and marked too).
+ * A bane adds a d20 and the WORST (highest) die counts; every bane adds one
+ * more die. A boon adds a d20 and the BEST (lowest) die counts. The player
+ * says which before rolling — Arca only suggests, from conditions and armour.
+ * A natural 1 is a Dragon (always a success, and the skill is marked for
+ * advancement); a natural 20 is a Demon (always a failure, and marked too).
  * Pure functions over dice the caller rolled — TaleSpire's tray inside the
  * Symbiote, the browser outside it — so the rules are testable on their own.
  */
 
+/** How a check is rolled: with a boon, plainly, or with a bane. */
+export type Edge = "boon" | "normal" | "bane";
+
 export interface CheckResult {
   /** Every d20 thrown, in order. */
   dice: number[];
-  /** The die that counts: the highest when there are banes. */
+  /** The die that counts: the lowest with a boon, the highest with a bane. */
   kept: number;
+  edge: Edge;
   target: number;
   success: boolean;
   dragon: boolean;
   demon: boolean;
 }
 
-export function resolveCheck(target: number, dice: readonly number[]): CheckResult {
-  const kept = dice.length > 0 ? Math.max(...dice) : 20;
+export function resolveCheck(
+  target: number,
+  dice: readonly number[],
+  edge: Edge = dice.length > 1 ? "bane" : "normal",
+): CheckResult {
+  const kept =
+    dice.length === 0 ? 20 : edge === "boon" ? Math.min(...dice) : Math.max(...dice);
   const dragon = kept === 1;
   const demon = kept === 20;
   return {
     dice: [...dice],
     kept,
+    edge,
     target,
     success: dragon || (!demon && kept <= target),
     dragon,
@@ -99,4 +111,12 @@ export function armourDefaultsFor(
 ): Omit<ArmourPiece, "name"> | null {
   const known = ARMOUR_DEFAULTS.find((a) => a.slot === slot && a.match.test(itemName));
   return known ? { ...known.piece } : null;
+}
+
+/** How many d20s a check with this edge throws: one, or one per bane plus
+ *  one (at least two), or two for a boon. */
+export function diceFor(edge: Edge, baneCount: number): number {
+  if (edge === "normal") return 1;
+  if (edge === "boon") return 2;
+  return 1 + Math.max(1, baneCount);
 }

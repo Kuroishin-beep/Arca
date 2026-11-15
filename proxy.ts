@@ -17,7 +17,7 @@ const SEARCH_HEADER = "x-arca-search";
  *    navigation rather than a 307. Layouts are not given the query string.
  *
  * 2. Keeps an active player signed in. The session cookie lasts 30 days; each
- *    page load (GET) with a VALID one restarts that clock, so someone who opens Arca in
+ *    full page load with a VALID one restarts that clock, so someone who opens Arca in
  *    TaleSpire every week never sees the sign-in screen again, while a device
  *    left unused for a month is signed out. Only a cookie we signed is renewed
  *    — renewing a forged one would launder it.
@@ -27,11 +27,13 @@ export function proxy(request: NextRequest): NextResponse {
   headers.set(SEARCH_HEADER, request.nextUrl.search);
   const response = NextResponse.next({ request: { headers } });
 
-  // GET only. Server actions are POSTs, and one of them is signing out: the
-  // action deletes the cookie, and renewing it on the same response put it
-  // straight back — signing out did not sign you out.
+  // Full page loads only. Signing out deletes the cookie, and anything that
+  // renewed it afterwards undid the sign-out: first the sign-out POST itself,
+  // then any background fetch (a prefetch, a data refresh) that left before
+  // the sign-out and came back after it. A page load is something the person
+  // just did, so it cannot be in flight across their own sign-out click.
   const session = request.cookies.get(SESSION_COOKIE_NAME)?.value;
-  if (request.method === "GET" && session && verifySession(session, sessionSecret())) {
+  if (isPageLoad(request) && session && verifySession(session, sessionSecret())) {
     response.cookies.set(SESSION_COOKIE_NAME, session, {
       httpOnly: true,
       sameSite: "lax",
@@ -41,6 +43,15 @@ export function proxy(request: NextRequest): NextResponse {
     });
   }
   return response;
+}
+
+/** A document navigation — not a server action, an RSC fetch or a prefetch. */
+function isPageLoad(request: NextRequest): boolean {
+  if (request.method !== "GET") return false;
+  const h = request.headers;
+  if (h.get("rsc") !== null || h.get("next-router-prefetch") !== null) return false;
+  const dest = h.get("sec-fetch-dest");
+  return dest === null ? (h.get("accept") ?? "").includes("text/html") : dest === "document";
 }
 
 export const config = {

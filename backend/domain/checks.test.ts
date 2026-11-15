@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { emptySheet } from "./character";
-import { armourDefaultsFor, banesFor, resolveCheck, rollD20s } from "./checks";
+import { armourDefaultsFor, banesFor, diceFor, resolveCheck, rollD20s } from "./checks";
 
 describe("resolveCheck", () => {
   it("succeeds at or under the target", () => {
@@ -13,6 +13,18 @@ describe("resolveCheck", () => {
     const result = resolveCheck(12, [3, 15]);
     expect(result.kept).toBe(15);
     expect(result.success).toBe(false);
+  });
+
+  it("keeps the best die with a boon", () => {
+    const result = resolveCheck(12, [3, 15], "boon");
+    expect(result).toMatchObject({ kept: 3, success: true, edge: "boon" });
+  });
+
+  it("throws one die plainly, two for a boon, one per bane plus one", () => {
+    expect(diceFor("normal", 2)).toBe(1);
+    expect(diceFor("boon", 0)).toBe(2);
+    expect(diceFor("bane", 0)).toBe(2);
+    expect(diceFor("bane", 2)).toBe(3);
   });
 
   it("calls a 1 a Dragon and a 20 a Demon, whatever the target", () => {

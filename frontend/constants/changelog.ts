@@ -23,7 +23,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
     title: "Rolls that judge themselves",
     changes: [
       "The d20 beside a skill or attribute rolls the check and tells you: Success, Failure, Dragon or Demon.",
-      "Banes are added for you — from the attribute's condition and from armour that lists the skill.",
+      "Each roll asks Boon, Normal or Bane — and suggests a bane from the attribute's condition or armour that lists the skill.",
       "A Dragon or a Demon marks the skill for advancement on its own.",
       "Inside TaleSpire the dice still land in your tray; Arca reads the result back. Reinstall the Symbiote once to get this.",
       "Heroic abilities have a Use button that spends their WP (with Undo).",

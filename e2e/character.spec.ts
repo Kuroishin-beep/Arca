@@ -378,10 +378,19 @@ test.describe("the Dragonbane sheet", () => {
     await kova.goto(`/character/${KOVA_CONTAINER_ID}`);
     const row = kova.locator("li").filter({ hasText: "Awareness" }).first();
     await row.getByRole("button", { name: /^roll awareness \(\d+\)/i }).click();
+    // It asks first: Boon, Normal or Bane — Normal suggested, with no bane.
+    const choice = row.getByRole("group", { name: /how to roll awareness/i });
+    await expect(choice.getByRole("button", { name: /^normal/i })).toContainText("suggested");
+    await choice.getByRole("button", { name: /^normal/i }).click();
 
     const toast = kova.getByRole("status").filter({ hasText: "Awareness" });
     await expect(toast).toContainText(/rolled \d+ vs \d+/);
     await expect(toast).toContainText(/success|failure|dragon|demon/i);
+
+    // A boon throws two and keeps the best.
+    await row.getByRole("button", { name: /^roll awareness \(\d+\)/i }).click();
+    await choice.getByRole("button", { name: /^boon/i }).click();
+    await expect(toast).toContainText(/boon: dice \d+, \d+, best kept/i);
     await kova.context().close();
   });
 
@@ -423,7 +432,13 @@ test.describe("the Dragonbane sheet", () => {
     const mark = row.getByRole("checkbox", { name: /advancement mark for awareness/i });
     if (await mark.isChecked()) await saved(kova, () => mark.uncheck());
 
-    await saved(kova, () => row.getByRole("button", { name: /^roll awareness \(\d+\)/i }).click());
+    await row.getByRole("button", { name: /^roll awareness \(\d+\)/i }).click();
+    await saved(kova, () =>
+      row
+        .getByRole("group", { name: /how to roll awareness/i })
+        .getByRole("button", { name: /^normal/i })
+        .click(),
+    );
 
     await expect
       .poll(() =>

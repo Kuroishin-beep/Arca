@@ -216,6 +216,18 @@ test.describe("the session", () => {
    * while leaving the cookie in place looks identical from the button and is
    * wrong in the way that matters on a shared machine.
    */
+  test("a page load renews the session cookie, so active players stay signed in", async ({
+    browser,
+  }) => {
+    const player = await signInAs(browser, "Kova");
+    const response = await player.goto(new URL(player.url()).pathname);
+    const renewed = (await response?.headersArray())?.some(
+      (h) => h.name.toLowerCase() === "set-cookie" && h.value.startsWith("arca_user="),
+    );
+    expect(renewed).toBe(true);
+    await player.context().close();
+  });
+
   test("signing out ends the session", async ({ browser }) => {
     const player = await signInAs(browser, "Kova");
     const containerPath = new URL(player.url()).pathname;
