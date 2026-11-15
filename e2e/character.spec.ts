@@ -371,19 +371,26 @@ test.describe("the Dragonbane sheet", () => {
     await kova.context().close();
   });
 
-  test("dice buttons appear only inside TaleSpire", async ({ browser }) => {
-    const kova = await signInAs(browser, "Kova");
-    await kova.goto(`/character/${KOVA_CONTAINER_ID}`);
-    await expect(kova.getByRole("heading", { name: "Skills", exact: true })).toBeVisible();
-    await expect(kova.getByRole("button", { name: /^roll /i })).toHaveCount(0);
-    await kova.context().close();
-  });
-
-  test("inside TaleSpire a skill's die goes to the dice tray, labelled", async ({
+  test("in a browser tab a skill's d20 rolls the check and says how it went", async ({
     browser,
   }) => {
     const kova = await signInAs(browser, "Kova");
-    // A stand-in for the API TaleSpire injects: records what reaches the tray.
+    await kova.goto(`/character/${KOVA_CONTAINER_ID}`);
+    const row = kova.locator("li").filter({ hasText: "Awareness" }).first();
+    await row.getByRole("button", { name: /^roll awareness \(\d+\)/i }).click();
+
+    const toast = kova.getByRole("status").filter({ hasText: "Awareness" });
+    await expect(toast).toContainText(/rolled \d+ vs \d+/);
+    await expect(toast).toContainText(/success|failure|dragon|demon/i);
+    await kova.context().close();
+  });
+
+  test("inside TaleSpire the check is thrown in the tray, read back, and a Dragon marks the skill", async ({
+    browser,
+  }) => {
+    const kova = await signInAs(browser, "Kova");
+    // A stand-in for TaleSpire: records what reaches the tray, then reports
+    // the throw back the way the bridge does — here, a natural 1.
     await kova.addInitScript(() => {
       const w = window as unknown as {
         TS: unknown;
@@ -394,23 +401,85 @@ test.describe("the Dragonbane sheet", () => {
         dice: {
           putDiceInTray: (descriptors: { name: string; roll: string }[]) => {
             w.trayCalls.push(descriptors);
+            window.setTimeout(() => {
+              window.dispatchEvent(
+                new CustomEvent("arca:ts-roll", {
+                  detail: {
+                    kind: "rollResults",
+                    payload: { rollId: "roll-1", resultsGroups: descriptors.map(() => ({ v: 1 })) },
+                  },
+                }),
+              );
+            }, 50);
             return Promise.resolve("roll-1");
           },
+          evaluateDiceResultsGroup: (group: { v: number }) => Promise.resolve(group.v),
         },
       };
     });
     await kova.goto(`/character/${KOVA_CONTAINER_ID}`);
 
-    const bushcraft = kova.locator("li").filter({ hasText: "Bushcraft" }).first();
-    await bushcraft.getByRole("button", { name: /^roll d20 for bushcraft/i }).click();
+    const row = kova.locator("li").filter({ hasText: "Awareness" }).first();
+    const mark = row.getByRole("checkbox", { name: /advancement mark for awareness/i });
+    if (await mark.isChecked()) await saved(kova, () => mark.uncheck());
+
+    await saved(kova, () => row.getByRole("button", { name: /^roll awareness \(\d+\)/i }).click());
 
     await expect
       .poll(() =>
-        kova.evaluate(
-          () => (window as unknown as { trayCalls: unknown[] }).trayCalls,
-        ),
+        kova.evaluate(() => (window as unknown as { trayCalls: unknown[] }).trayCalls),
       )
-      .toEqual([[{ name: expect.stringMatching(/^Bushcraft \(\d+\)$/), roll: "1d20" }]]);
+      .toEqual([[{ name: expect.stringMatching(/^Awareness \(\d+\)$/), roll: "1d20" }]]);
+    const toast = kova.getByRole("status").filter({ hasText: "Awareness" });
+    await expect(toast).toContainText("Dragon!");
+    await expect(toast).toContainText(/marked for advancement/i);
+    await expect(mark).toBeChecked();
+
+    await kova.reload();
+    await expect(
+      kova
+        .locator("li")
+        .filter({ hasText: "Awareness" })
+        .first()
+        .getByRole("checkbox", { name: /advancement mark for awareness/i }),
+    ).toBeChecked();
+    await kova.context().close();
+  });
+
+  test("using a heroic ability spends its WP, and can be undone", async ({ browser }) => {
+    const kova = await signInAs(browser, "Kova");
+    await kova.goto(`/character/${KOVA_CONTAINER_ID}`);
+    const name = `Probe ${Date.now().toString().slice(-5)}`;
+    const willpower = kova.locator("section").filter({
+      has: kova.getByRole("heading", { level: 2, name: /willpower/i }),
+    });
+    const wp = async () => Number((await willpower.locator("p.font-serif").first().innerText()).split("/")[0]);
+
+    await saved(kova, () => kova.getByRole("button", { name: /add ability/i }).click());
+    const field = kova.locator('input[id^="ability-name-"]');
+    await field.fill(name);
+    await saved(kova, () => field.press("Enter"));
+    await kova.getByRole("button", { name: /^done$/i }).click();
+
+    const before = await wp();
+    const card = kova.locator("li").filter({ has: kova.getByRole("heading", { name, level: 3 }) });
+    await saved(kova, () => card.getByRole("button", { name: /^use \(3 wp\)$/i }).click());
+    await expect.poll(wp).toBe(before - 3);
+
+    await saved(kova, () => card.getByRole("button", { name: /^undo$/i }).click());
+    await expect.poll(wp).toBe(before);
+
+    await card.getByRole("button", { name: `Edit ${name}` }).click();
+    await saved(kova, () => kova.getByRole("button", { name: /^remove$/i }).click());
+    await kova.context().close();
+  });
+
+  test("picking armour from the pack fills in its rating", async ({ browser }) => {
+    const kova = await signInAs(browser, "Kova");
+    await kova.goto(`/character/${KOVA_CONTAINER_ID}`);
+    await saved(kova, () => kova.locator("#armour-pick").selectOption("Leather armour"));
+    await expect(kova.locator("#armour-name")).toHaveValue("Leather armour");
+    await expect(kova.locator("#armour-rating")).toHaveValue("1");
     await kova.context().close();
   });
 });

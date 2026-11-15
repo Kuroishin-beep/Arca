@@ -181,7 +181,11 @@ export default async function CharacterSheetPage({
 
           {/* Everything above the equipment is the sheet proper, and all of it
               is editable in place. */}
-          <CharacterSheet character={character} canEdit={editable} />
+          <CharacterSheet
+            character={character}
+            canEdit={editable}
+            packItems={[...new Set(equipment.map((item) => item.name))]}
+          />
 
           {/* Equipment is the one section that is NOT stored on the character:
               it is the containment view of the same container, which is the

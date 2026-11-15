@@ -15,6 +15,7 @@ import { NumberStepper } from "@frontend/components/atoms/NumberStepper";
 import { RollButton } from "@frontend/components/atoms/RollButton";
 import { SHEET_BOX, SHEET_HEADING } from "@frontend/components/molecules/SheetBox";
 import { LongText, TextInput } from "@frontend/components/molecules/SheetFields";
+import { armourDefaultsFor } from "@backend/domain/checks";
 
 /**
  * The parts of the printed Dragonbane sheet the first version of this screen
@@ -84,6 +85,8 @@ export function HeroicAbilities({
   // Read-only until a pencil is pressed: an ability is read far more often
   // than it is changed, and a form per ability buried the text in inputs.
   const [editingId, setEditingId] = useState<string | null>(null);
+  /** The last ability used, so its WP spend can be undone. */
+  const [used, setUsed] = useState<{ id: string; before: number } | null>(null);
 
   const setAbilities = (abilities: HeroicAbility[]) => onSave({ abilities });
   const patch = (id: string, fields: Partial<HeroicAbility>) =>
@@ -188,6 +191,42 @@ export function HeroicAbilities({
                 {ability.notes.trim() ? (
                   <p className="mt-1 whitespace-pre-line text-sm text-muted">{ability.notes}</p>
                 ) : null}
+                {canEdit && ability.wp > 0 ? (
+                  // Using it spends its WP on the spot — no separate trip to
+                  // the Willpower box. Refused when there is not enough left.
+                  <div className="mt-2 flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={sheet.wp < ability.wp}
+                      onClick={() => {
+                        onSave({ wp: sheet.wp - ability.wp });
+                        setUsed({ id: ability.id, before: sheet.wp });
+                      }}
+                    >
+                      Use ({ability.wp} WP)
+                    </Button>
+                    {sheet.wp < ability.wp ? (
+                      <span className="text-xs text-danger">
+                        Not enough WP ({sheet.wp} left)
+                      </span>
+                    ) : used?.id === ability.id ? (
+                      <span className="flex items-center gap-2 text-xs text-muted">
+                        WP {used.before} → {sheet.wp}
+                        <button
+                          type="button"
+                          className="text-primary underline-offset-2 hover:underline"
+                          onClick={() => {
+                            onSave({ wp: used.before });
+                            setUsed(null);
+                          }}
+                        >
+                          Undo
+                        </button>
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
               </li>
             ),
           )}
@@ -211,10 +250,13 @@ export function Protection({
   sheet,
   canEdit,
   onSave,
+  packItems = [],
 }: {
   sheet: CharacterSheetData;
   canEdit: boolean;
   onSave: Save;
+  /** Names of what this character carries, to pick armour from. */
+  packItems?: readonly string[];
 }) {
   const set = (slot: "armour" | "helmet", fields: Partial<ArmourPiece>) =>
     onSave({
@@ -244,7 +286,40 @@ export function Protection({
               key={slot}
               className="grid items-end gap-2 rounded-sm border border-border bg-surface2 p-3 panel:grid-cols-[1fr_auto]"
             >
+              {canEdit && packItems.length > 0 ? (
+                // Pick what is actually in the pack; the core rules' armour
+                // and helmets fill their rating and banes in, so checks get
+                // the right banes without anyone looking them up.
+                <div className="panel:col-span-2">
+                  <label
+                    htmlFor={`${slot}-pick`}
+                    className="mb-1 block text-sm font-medium text-muted"
+                  >
+                    {label} from your pack
+                  </label>
+                  <select
+                    id={`${slot}-pick`}
+                    value=""
+                    onChange={(e) => {
+                      const name = e.target.value;
+                      if (!name) return;
+                      set(slot, { name, ...(armourDefaultsFor(name, slot) ?? {}) });
+                    }}
+                    className="h-9 w-full rounded-md border border-border bg-surface px-2 text-base text-text"
+                  >
+                    <option value="">Choose an item…</option>
+                    {packItems.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : null}
               <TextInput
+                // Keyed on the value so a pick from the pack shows at once;
+                // the field otherwise keeps the draft it started with.
+                key={`${slot}-name-${piece.name}`}
                 id={`${slot}-name`}
                 label={label}
                 value={piece.name}
@@ -277,6 +352,7 @@ export function Protection({
               </div>
               <div className="panel:col-span-2">
                 <TextInput
+                  key={`${slot}-banes-${piece.banes}`}
                   id={`${slot}-banes`}
                   label="Bane on"
                   value={piece.banes}

@@ -29,6 +29,13 @@
   document.addEventListener("DOMContentLoaded", mark);
   window.addEventListener("load", mark);
 
+  // Results of rolls thrown from the tray, so a skill check can be judged
+  // (success, Dragon, Demon) without the player reading the dice out.
+  window.arcaOnRollResults = function (event) {
+    if (!event) return;
+    window.dispatchEvent(new CustomEvent("arca:ts-roll", { detail: event }));
+  };
+
   window.arcaOnSymbioteState = function (event) {
     if (!event || event.kind !== "hasInitialized") return;
     mark();

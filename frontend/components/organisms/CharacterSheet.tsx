@@ -39,6 +39,12 @@ import { Icon } from "@frontend/components/atoms/Icon";
 import { IconButton } from "@frontend/components/atoms/IconButton";
 import { NumberStepper } from "@frontend/components/atoms/NumberStepper";
 import { RollButton } from "@frontend/components/atoms/RollButton";
+import {
+  CheckButton,
+  CheckToast,
+  type RolledCheck,
+} from "@frontend/components/molecules/CheckButton";
+import { banesFor } from "@backend/domain/checks";
 import { DiceFinder } from "@frontend/components/organisms/DiceFinder";
 import {
   DerivedStrip,
@@ -87,8 +93,11 @@ import {
 export function CharacterSheet({
   character,
   canEdit,
+  packItems = [],
 }: {
   character: CharacterView;
+  /** Names of what this character carries — the armour picker's choices. */
+  packItems?: readonly string[];
   /** False only if the permission rules ever widen read beyond write. Today
    *  anyone who can open a sheet can edit it, but rendering the read-only case
    *  costs little and means the screen cannot leak an editable control. */
@@ -120,8 +129,45 @@ export function CharacterSheet({
     });
   };
 
+  // The last check rolled from this sheet, shown in a toast. A Dragon or a
+  // Demon on a skill marks it for advancement on the spot — the rule the
+  // player would otherwise have to remember.
+  const [lastRoll, setLastRoll] = useState<{
+    rolled: RolledCheck | null;
+    unread: string | null;
+    autoMarked: boolean;
+  }>({ rolled: null, unread: null, autoMarked: false });
+
+  const checks: Checks = {
+    onRolled: (rolled, skill) => {
+      let autoMarked = false;
+      if (
+        skill &&
+        canEdit &&
+        (rolled.result.dragon || rolled.result.demon) &&
+        !skillState(sheet.skills, skill).marked
+      ) {
+        save({
+          skills: {
+            ...sheet.skills,
+            [skill]: { ...skillState(sheet.skills, skill), marked: true },
+          },
+        });
+        autoMarked = true;
+      }
+      setLastRoll({ rolled, unread: null, autoMarked });
+    },
+    onUnread: (name) => setLastRoll({ rolled: null, unread: name, autoMarked: false }),
+  };
+
   return (
     <div className="flex flex-col gap-4">
+      <CheckToast
+        rolled={lastRoll.rolled}
+        unread={lastRoll.unread}
+        autoMarked={lastRoll.autoMarked}
+        onClose={() => setLastRoll({ rolled: null, unread: null, autoMarked: false })}
+      />
       {/* One live region for the whole sheet. A failed save has to say so
           somewhere a screen reader reaches, and the alternative — a message per
           control — is thirty regions competing to be announced. */}
@@ -142,7 +188,7 @@ export function CharacterSheet({
         onError={setError}
       />
 
-      <Attributes sheet={sheet} canEdit={canEdit} onSave={save} />
+      <Attributes sheet={sheet} canEdit={canEdit} onSave={save} checks={checks} />
 
       {/* Skills, then what is tracked during play, then what is looked up.
           One column in the docked panel; two once there is room; three on a
@@ -153,13 +199,13 @@ export function CharacterSheet({
             stack on the right; at 2xl all three sit side by side. One render
             of each, placed by the grid — never a hidden duplicate. */}
         <div className="xl:row-span-2 2xl:row-span-1">
-          <Skills sheet={sheet} canEdit={canEdit} onSave={save} />
+          <Skills sheet={sheet} canEdit={canEdit} onSave={save} checks={checks} />
         </div>
 
         <div className="flex flex-col gap-4">
           <Vitals sheet={sheet} canEdit={canEdit} onSave={save} />
           <RestBox sheet={sheet} canEdit={canEdit} onSave={save} />
-          <Protection sheet={sheet} canEdit={canEdit} onSave={save} />
+          <Protection sheet={sheet} canEdit={canEdit} onSave={save} packItems={packItems} />
           <Purse sheet={sheet} canEdit={canEdit} onSave={save} />
         </div>
 
@@ -169,6 +215,12 @@ export function CharacterSheet({
       </div>
     </div>
   );
+}
+
+/** What a check button reports back to the sheet. */
+interface Checks {
+  onRolled: (rolled: RolledCheck, skill?: string) => void;
+  onUnread: (name: string) => void;
 }
 
 /* ================================================================== *
@@ -561,10 +613,12 @@ function Attributes({
   sheet,
   canEdit,
   onSave,
+  checks,
 }: {
   sheet: CharacterSheetData;
   canEdit: boolean;
   onSave: (patch: Partial<CharacterSheetData>) => void;
+  checks: Checks;
 }) {
   const setAttribute = (key: AttributeKey, value: number) =>
     onSave({ attributes: { ...sheet.attributes, [key]: value } });
@@ -596,6 +650,8 @@ function Attributes({
             canEdit={canEdit}
             onScore={(value) => setAttribute(key, value)}
             onCondition={(on) => setCondition(conditionFor(key).key, on)}
+            banes={banesFor(sheet, key)}
+            checks={checks}
           />
         ))}
       </div>
@@ -612,6 +668,8 @@ function AttributeBox({
   canEdit,
   onScore,
   onCondition,
+  banes,
+  checks,
 }: {
   attribute: AttributeKey;
   score: number;
@@ -619,6 +677,8 @@ function AttributeBox({
   canEdit: boolean;
   onScore: (value: number) => void;
   onCondition: (on: boolean) => void;
+  banes: string[];
+  checks: Checks;
 }) {
   const { label: conditionLabel } = conditionFor(attribute);
 
@@ -638,9 +698,12 @@ function AttributeBox({
         </label>
         <span className="flex items-center justify-between gap-1 text-xs text-faint">
           {ATTRIBUTE_LABELS[attribute]}
-          <RollButton
-            notation="D20"
-            label={`${ATTRIBUTE_LABELS[attribute]} (${score})`}
+          <CheckButton
+            name={ATTRIBUTE_LABELS[attribute]}
+            target={score}
+            banes={banes}
+            onRolled={(rolled) => checks.onRolled(rolled)}
+            onUnread={checks.onUnread}
             className="-my-1"
           />
         </span>
@@ -702,10 +765,12 @@ function Skills({
   sheet,
   canEdit,
   onSave,
+  checks,
 }: {
   sheet: CharacterSheetData;
   canEdit: boolean;
   onSave: (patch: Partial<CharacterSheetData>) => void;
+  checks: Checks;
 }) {
   // Thirty-three skills is a lot of rows in a 380px panel, and most of them are
   // untrained most of the time. The filter is the difference between a sheet
@@ -794,6 +859,7 @@ function Skills({
             editingLevels={editingLevels && canEdit}
             canEdit={canEdit}
             onSkill={setSkill}
+            checks={checks}
           />
         ))}
       </div>
@@ -897,6 +963,7 @@ function SkillGroup({
   editingLevels,
   canEdit,
   onSkill,
+  checks,
 }: {
   kind: SkillKind;
   label: string;
@@ -905,6 +972,7 @@ function SkillGroup({
   editingLevels: boolean;
   canEdit: boolean;
   onSkill: (name: string, patch: SkillPatch) => void;
+  checks: Checks;
 }) {
   const rows = SKILLS.filter((s) => s.kind === kind).filter(
     (s) => !trainedOnly || skillState(sheet.skills, s.name).trained,
@@ -990,7 +1058,16 @@ function SkillGroup({
                 </span>
               )}
 
-              <RollButton notation="D20" label={`${skill.name} (${level})`} />
+              {/* Rolls the check — in TaleSpire's tray inside the Symbiote, in
+                  the browser otherwise — with banes from the attribute's
+                  condition and from armour that lists this skill. */}
+              <CheckButton
+                name={skill.name}
+                target={level}
+                banes={banesFor(sheet, skill.attribute, skill.name)}
+                onRolled={(rolled) => checks.onRolled(rolled, skill.name)}
+                onUnread={checks.onUnread}
+              />
 
               {/* The advancement tick. Earned on a dragon or a demon, spent
                   between sessions. `relative` contains the sr-only span (see

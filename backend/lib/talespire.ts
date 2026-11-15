@@ -34,6 +34,7 @@ interface TaleSpireApi {
       descriptors: RollDescriptor[],
       quietResults: boolean,
     ) => Promise<string>;
+    evaluateDiceResultsGroup?: (group: unknown) => Promise<number>;
   };
   players?: {
     whoAmI?: () => Promise<{ id: string; name: string }>;
@@ -123,5 +124,67 @@ export async function taleSpireCampaign(): Promise<{ id: string; name: string } 
   } catch {
     // Not in a campaign (TaleSpire's main menu): nothing to link to.
     return undefined;
+  }
+}
+
+/** Fired by `symbiote/arca-bridge.js` for each TaleSpire dice result. */
+export const TS_ROLL_EVENT = "arca:ts-roll";
+
+interface RollResultsEvent {
+  kind: "rollResults" | "rollRemoved";
+  payload: { rollId: string; resultsGroups?: unknown[] };
+}
+
+/**
+ * Throw `count` d20s from TaleSpire's tray, labelled, and wait for what they
+ * came up as — one number per die, in order. `null` outside TaleSpire, if
+ * TaleSpire refuses the roll, if the player clears the tray instead of
+ * throwing, or after `timeoutMs` (the dice are thrown by hand, so it waits).
+ *
+ * Each die is its own group so a bane's extra d20 comes back as its own
+ * value rather than summed into the first.
+ */
+export async function rollD20sInTaleSpire(
+  count: number,
+  label: string,
+  timeoutMs = 120_000,
+): Promise<number[] | null> {
+  if (!isSymbiote()) return null;
+  const dice = window.TS?.dice;
+  if (typeof dice?.putDiceInTray !== "function") return null;
+  const evaluate = dice.evaluateDiceResultsGroup;
+  if (typeof evaluate !== "function") return null;
+
+  // Listen before throwing, so a fast result cannot arrive unheard.
+  let resolveEvent: (event: RollResultsEvent | null) => void = () => undefined;
+  const arrived = new Promise<RollResultsEvent | null>((resolve) => {
+    resolveEvent = resolve;
+  });
+  let rollId: string | null = null;
+  const pending: RollResultsEvent[] = [];
+  const onRoll = (e: Event) => {
+    const detail = (e as CustomEvent<RollResultsEvent>).detail;
+    if (rollId === null) pending.push(detail);
+    else if (detail?.payload?.rollId === rollId) resolveEvent(detail);
+  };
+  window.addEventListener(TS_ROLL_EVENT, onRoll);
+  const timer = window.setTimeout(() => resolveEvent(null), timeoutMs);
+
+  try {
+    const descriptors = Array.from({ length: count }, () => ({ name: label, roll: "1d20" }));
+    rollId = await dice.putDiceInTray(descriptors, false);
+    const early = pending.find((p) => p?.payload?.rollId === rollId);
+    if (early) resolveEvent(early);
+
+    const event = await arrived;
+    if (!event || event.kind !== "rollResults" || !event.payload.resultsGroups) return null;
+    const values = await Promise.all(event.payload.resultsGroups.map((g) => evaluate(g)));
+    return values.every((v) => Number.isFinite(v)) ? values : null;
+  } catch {
+    // Refused (not on a board, rate limited): the caller says so.
+    return null;
+  } finally {
+    window.clearTimeout(timer);
+    window.removeEventListener(TS_ROLL_EVENT, onRoll);
   }
 }
