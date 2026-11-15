@@ -1,6 +1,5 @@
 # Arca
 
-[![Made with AI](https://img.shields.io/badge/Made_with-AI_assistance-blue)](AI-USAGE.md)
 
 Built with help from Claude (Anthropic) through Claude Code, which wrote most of the code from September 2026 on, directed and reviewed by me. Details: [AI-USAGE.md](AI-USAGE.md).
 
