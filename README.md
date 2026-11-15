@@ -1,7 +1,7 @@
 # Arca
 
 
-Built with help from Claude (Anthropic) through Claude Code, which wrote most of the code from September 2026 on, directed and reviewed by me. Details: [AI-USAGE.md](AI-USAGE.md).
+Built with help from Claude (Anthropic) through Claude Code, which wrote most of the code from September 2026 on, directed and reviewed by me.
 
 TaleSpire Symbiote for our Dragonbane Westmarch campaign: a GUI database for tracking inventories across containers, with live sync and real-time collaboration. Stretch goal adds character sheets (attributes, skills, equipment, spells) plus diceFinder, parsing dice notation for one-click TaleSpire rolls.
 
