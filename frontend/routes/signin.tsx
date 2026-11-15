@@ -205,8 +205,12 @@ function SignInForm({
       </Button>
 
       <p className="text-center text-sm text-muted">
-        Forgot it? There is no reset mail to send — ask the GM to clear your
-        password and sign in again.
+        <a
+          href="/forgot"
+          className="font-medium text-primary underline-offset-4 hover:underline"
+        >
+          Forgot your password?
+        </a>
       </p>
     </form>
   );

@@ -236,6 +236,10 @@ export default async function MembersPage({
                     is the difference between a member who forgot their
                     password and one who never had one, and the GM needs to
                     tell them apart before reaching for Reset. */}
+                {member.resetRequested && member.hasPassword ? (
+                  // They asked from the sign-in screen's "Forgot password?".
+                  <Chip tone="danger">Asked for a reset</Chip>
+                ) : null}
                 {member.hasPassword ? null : (
                   <Chip tone="warning">No password yet</Chip>
                 )}

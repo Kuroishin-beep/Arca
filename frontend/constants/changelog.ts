@@ -18,6 +18,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    id: "2026-11-16-talespire-accounts",
+    date: "2026-11-16",
+    title: "Plain links, smoother TaleSpire, password help",
+    changes: [
+      "Links are just the name now — /c/guild-stash — and old links still work, even after a rename.",
+      "Inside TaleSpire, Arca opens straight into your campaign once your GM links the two.",
+      "You stay signed in while you keep using Arca.",
+      "Forgot your password? Ask from the sign-in screen and your GM can reset it.",
+      "Change your password from your name in the top bar.",
+      "An installer for the TaleSpire Symbiote.",
+    ],
+  },
+  {
     id: "2026-11-16-sheet-advancement",
     date: "2026-11-16",
     title: "Advancement, kin and a roomier sheet",

@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import type { Principal } from "@backend/domain/view";
 
 export type SyncStatus = "idle" | "syncing" | "error";
@@ -100,7 +102,13 @@ export function Avatar({
  */
 export function UserBadge({ principal }: { principal: Principal }) {
   return (
-    <div className="flex min-w-0 shrink items-center gap-2">
+    // Your account page (password and who you are signed in as) is one click
+    // on your own name.
+    <Link
+      href="/account"
+      className="flex min-w-0 shrink items-center gap-2 rounded-md hover:bg-surface2"
+      aria-label={`Account: ${principal.displayName}`}
+    >
       <Avatar name={principal.displayName} />
       <span
         className="hidden min-w-0 max-w-48 truncate text-xs font-medium text-muted md:inline"
@@ -110,6 +118,6 @@ export function UserBadge({ principal }: { principal: Principal }) {
             The address is one hover away. */}
         {principal.displayName} · {principal.role === "gm" ? "GM" : "Player"}
       </span>
-    </div>
+    </Link>
   );
 }
