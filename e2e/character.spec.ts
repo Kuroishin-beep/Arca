@@ -321,7 +321,9 @@ test.describe("character sheet polish", () => {
     await first.click();
     await page.waitForURL(
       (url) =>
-        url.pathname === `/c/${KOVA_CONTAINER_ID}` &&
+        // Readable URL: the name, then the id's last eight hex digits.
+        url.pathname.startsWith("/c/") &&
+        url.pathname.endsWith(KOVA_CONTAINER_ID.slice(-8)) &&
         url.searchParams.has("item"),
     );
     await expect(
@@ -447,6 +449,40 @@ test.describe("inside TaleSpire", () => {
     await kova.goto(`/character/${KOVA_CONTAINER_ID}`);
     await expect(kova.locator("html")).not.toHaveAttribute("data-ts-colors", /.*/);
     await expect(kova.locator("[data-theme-toggle]")).toBeVisible();
+    await kova.context().close();
+  });
+});
+
+test.describe("readable URLs", () => {
+  test("an old id link lands on the readable address, keeping the view", async ({
+    browser,
+  }) => {
+    const kova = await signInAs(browser, "Kova");
+    const suffix = KOVA_CONTAINER_ID.slice(-8);
+
+    const response = await kova.goto(`/c/${KOVA_CONTAINER_ID}?q=rope`);
+    expect(response?.status()).toBe(200);
+    // A real redirect before anything rendered, not a second navigation later.
+    expect(response?.request().redirectedFrom()).not.toBeNull();
+    const container = new URL(kova.url());
+    expect(container.pathname).toMatch(new RegExp(`^/c/[a-z0-9-]+-${suffix}$`));
+    expect(container.searchParams.get("q")).toBe("rope");
+
+    await kova.goto(`/character/${KOVA_CONTAINER_ID}`);
+    expect(new URL(kova.url()).pathname).toMatch(
+      new RegExp(`^/character/[a-z0-9-]+-${suffix}$`),
+    );
+
+    // A stale name with the right suffix still finds it, and is corrected.
+    await kova.goto(`/c/some-old-name-${suffix}`);
+    expect(new URL(kova.url()).pathname).toBe(container.pathname);
+    await kova.context().close();
+  });
+
+  test("a database has one canonical address", async ({ browser }) => {
+    const kova = await signInAs(browser, "Kova");
+    await kova.goto("/db/WEAPON");
+    expect(new URL(kova.url()).pathname).toBe("/db/weapon");
     await kova.context().close();
   });
 });

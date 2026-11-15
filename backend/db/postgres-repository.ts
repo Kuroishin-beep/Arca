@@ -15,7 +15,7 @@
  * the table owner, and Postgres exempts owners from RLS. See the header of that
  * migration for the two steps that activate it (phase 1).
  */
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, like, sql } from "drizzle-orm";
 
 import { sheetFromProperties } from "@backend/domain/character";
 import {
@@ -708,6 +708,24 @@ async function setTypes(objectId: string, typeNames: string[]): Promise<void> {
 export const postgresRepository: ArcaRepository = {
   async listContainers(principal) {
     return visibleContainers(principal, await loadContainers());
+  },
+
+  async findContainerIdsBySuffix(_principal, suffix) {
+    // The uuid's text form ends in its last 12 hex digits, so a suffix of 8
+    // is a plain LIKE on the text. Parameterised; the suffix is validated as
+    // hex by `parseContainerRef` before it gets here anyway.
+    const rows = await db()
+      .select({ id: containers.objectId })
+      .from(containers)
+      .innerJoin(objects, eq(objects.id, containers.objectId))
+      .where(
+        and(
+          eq(objects.campaignId, campaignId()),
+          isNull(objects.archivedAt),
+          like(sql<string>`${containers.objectId}::text`, `%${suffix.toLowerCase()}`),
+        ),
+      );
+    return rows.map((r) => r.id);
   },
 
   async getContainer(principal, containerId) {

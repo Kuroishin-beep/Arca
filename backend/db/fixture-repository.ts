@@ -349,6 +349,13 @@ export const fixtureRepository: ArcaRepository = {
     return visibleContainers(principal, store().containers.map(hydrate));
   },
 
+  async findContainerIdsBySuffix(_principal, suffix) {
+    const wanted = suffix.toLowerCase();
+    return store()
+      .containers.map((c) => c.id as string)
+      .filter((id) => id.toLowerCase().endsWith(wanted));
+  },
+
   async getContainer(principal, containerId) {
     const raw = store().containers.find((c) => c.id === containerId);
     if (!raw) return null;

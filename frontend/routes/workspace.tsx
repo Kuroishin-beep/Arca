@@ -21,6 +21,8 @@ import {
 } from "@frontend/components/organisms/MoveItemDialog";
 import { ItemTable } from "@frontend/components/organisms/ItemTable";
 import { repository } from "@backend/db";
+import { resolveContainerId } from "@backend/lib/container-ref";
+import { containerPath, sheetPath } from "@backend/lib/paths";
 import { CAMPAIGN_NAME } from "@backend/db/seed-data";
 import { listDatabases } from "@backend/domain/database";
 import {
@@ -78,17 +80,21 @@ export default async function WorkspacePage({
   const principal = await currentPrincipal();
   if (!principal) redirect("/signin");
 
-  const { containerId } = await params;
+  const { containerId: ref } = await params;
   const sp = await searchParams;
   const query = sp.q ?? "";
   const repo = repository();
+
+  // The URL names a container by a readable ref (`packmule-honky-6f3a91c2`),
+  // or by the bare id older links carry — see `backend/lib/paths.ts`.
+  const containerId = await resolveContainerId(repo, principal, ref);
 
   // A container that exists but is not theirs, and one that does not exist at
   // all, are answered separately — but neither answer says what is inside.
   // The two reads are independent, so they run together.
   const [containers, lookup] = await Promise.all([
     repo.listContainers(principal),
-    repo.getContainer(principal, containerId).then(
+    (containerId ? repo.getContainer(principal, containerId) : Promise.resolve(null)).then(
       (found) => ({ found, denied: null }),
       (error: unknown) => {
         if (error instanceof PermissionError) return { found: null, denied: error };
@@ -100,9 +106,14 @@ export default async function WorkspacePage({
     return <Forbidden message={lookup.denied.message} containers={containers} />;
   }
   const container = lookup.found;
-  if (!container) {
+  if (!container || !containerId) {
     return <Forbidden message="No such container." containers={containers} />;
   }
+
+  // Old id links and renamed containers were already redirected to the
+  // current address by this route's layout (container-layout.tsx).
+  /** This screen's own address; every link below is built on it. */
+  const here = containerPath(container);
 
   // Everything below depends only on the container being readable, so it is
   // fetched in one round of parallel reads rather than one after another.
@@ -163,7 +174,7 @@ export default async function WorkspacePage({
     if (sp.sort) params.set("sort", sp.sort);
     if (sp.dir) params.set("dir", sp.dir);
     const qs = params.toString();
-    return `/c/${containerId}${qs ? `?${qs}` : ""}`;
+    return `${here}${qs ? `?${qs}` : ""}`;
   };
 
   const selected = sp.item
@@ -171,7 +182,7 @@ export default async function WorkspacePage({
     : null;
   const editable = canWrite(principal, container);
 
-  const closeHref = `/c/${containerId}${
+  const closeHref = `${here}${
     sp.item ? `?item=${sp.item}` : query ? `?q=${encodeURIComponent(query)}` : ""
   }`;
 
@@ -191,7 +202,7 @@ export default async function WorkspacePage({
     if (sp.dir) p.set("dir", sp.dir);
     if (!railCollapsed) p.set("rail", "0");
     const qs = p.toString();
-    return `/c/${containerId}${qs ? `?${qs}` : ""}`;
+    return `${here}${qs ? `?${qs}` : ""}`;
   })();
 
   // Destinations: every container the principal can READ, annotated with
@@ -211,7 +222,7 @@ export default async function WorkspacePage({
   // The Sidebar renders this only for someone who may create something — but
   // the action checks the principal again server-side, because a link is not a
   // permission.
-  const newContainerHref = `/c/${containerId}?dialog=new-container`;
+  const newContainerHref = `${here}?dialog=new-container`;
 
   // The kinds this principal may bring into existence, and whether they may
   // reshape one that already exists. Computed here, in server code, and passed
@@ -222,7 +233,7 @@ export default async function WorkspacePage({
   // Somewhere to land after retiring, since the current container will be gone.
   const retireFallbackHref = (() => {
     const other = containers.find((c) => c.id !== containerId);
-    return other ? `/c/${other.id}` : undefined;
+    return other ? containerPath(other) : undefined;
   })();
 
   /**
@@ -250,7 +261,7 @@ export default async function WorkspacePage({
 
       <div className="fixed inset-0 z-20 lg:hidden">
         <Link
-          href={`/c/${containerId}${query ? `?q=${encodeURIComponent(query)}` : ""}`}
+          href={`${here}${query ? `?q=${encodeURIComponent(query)}` : ""}`}
           aria-label="Close item detail"
           className="absolute inset-0 bg-black/60"
         />
@@ -282,17 +293,17 @@ export default async function WorkspacePage({
         campaignName={principal.campaignName ?? CAMPAIGN_NAME}
         selectedId={containerId}
         newContainerHref={newContainerHref}
-        newDatabaseHref={canCreate ? `/c/${containerId}?dialog=add` : undefined}
-        searchAction={`/c/${containerId}`}
+        newDatabaseHref={canCreate ? `${here}?dialog=add` : undefined}
+        searchAction={`${here}`}
         query={query}
         placeholder={`Search ${container.name}…`}
         navOpen={drawerOpen}
-        drawerHref={`/c/${containerId}?nav=1`}
+        drawerHref={`${here}?nav=1`}
         railCollapsed={railCollapsed}
         railHref={railHref}
         closeHref={closeHref}
         quickAccess={{
-          href: `/c/${containerId}`,
+          href: `${here}`,
           label: container.name,
           kind: "container",
         }}
@@ -327,7 +338,7 @@ export default async function WorkspacePage({
                     sheet belongs beside the container's own name. */}
                 {container.type === "character" ? (
                   <ButtonLink
-                    href={`/character/${containerId}`}
+                    href={sheetPath(container)}
                     size="sm"
                     icon="users"
                   >
@@ -341,7 +352,7 @@ export default async function WorkspacePage({
                     fallback rather than the default. */}
                 {editable ? (
                   <ButtonLink
-                    href={`/c/${containerId}?dialog=catalog`}
+                    href={`${here}?dialog=catalog`}
                     size="sm"
                     icon="table"
                   >
@@ -351,7 +362,7 @@ export default async function WorkspacePage({
 
                 {canCreate ? (
                   <ButtonLink
-                    href={`/c/${containerId}?dialog=add`}
+                    href={`${here}?dialog=add`}
                     variant="primary"
                     size="sm"
                     icon="plus"
@@ -401,8 +412,8 @@ export default async function WorkspacePage({
                     <Link
                       href={
                         selectedTags.length > 0
-                          ? `/c/${containerId}?tags=${encodeURIComponent(selectedTags.join(","))}`
-                          : `/c/${containerId}`
+                          ? `${here}?tags=${encodeURIComponent(selectedTags.join(","))}`
+                          : `${here}`
                       }
                       className="text-muted hover:text-text"
                     >
@@ -418,7 +429,7 @@ export default async function WorkspacePage({
                       {items.length} of {allItems.length}
                     </span>
                     <Link
-                      href={`/c/${containerId}`}
+                      href={`${here}`}
                       className="font-medium text-primary underline-offset-4 hover:underline"
                     >
                       Clear
@@ -439,7 +450,7 @@ export default async function WorkspacePage({
             <div className="w-full xl:max-w-5xl">
               <ItemTable
                 items={items}
-                containerId={containerId}
+                basePath={here}
                 sort={sort}
                 selectedId={selected?.id}
                 canEdit={editable}
@@ -495,7 +506,7 @@ export default async function WorkspacePage({
         <ShareDialog
           container={container}
           members={members}
-          closeHref={`/c/${containerId}`}
+          closeHref={`${here}`}
           canManage={isGm}
         />
       ) : null}
@@ -503,7 +514,7 @@ export default async function WorkspacePage({
       {sp.dialog === "new-container" && allowedTypes.length > 0 ? (
         <ContainerEditorDialog
           members={members}
-          closeHref={`/c/${containerId}`}
+          closeHref={`${here}`}
           allowedTypes={allowedTypes}
           canReshape={isGm}
           selfId={principal.userId}
@@ -518,7 +529,7 @@ export default async function WorkspacePage({
         <ContainerEditorDialog
           members={members}
           container={container}
-          closeHref={`/c/${containerId}`}
+          closeHref={`${here}`}
           retireFallbackHref={canRetireThis ? retireFallbackHref : undefined}
           allowedTypes={allowedTypes}
           canReshape={isGm}
@@ -557,7 +568,7 @@ function Forbidden({
         {message} Its contents were never sent to your device.
       </p>
       {fallback ? (
-        <ButtonLink href={`/c/${fallback.id}`} className="mt-5">
+        <ButtonLink href={containerPath(fallback)} className="mt-5">
           Back to {fallback.name}
         </ButtonLink>
       ) : null}

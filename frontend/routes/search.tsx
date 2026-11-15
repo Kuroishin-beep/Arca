@@ -14,6 +14,7 @@ import {
   creatableContainerTypes,
 } from "@backend/lib/permissions";
 import { currentPrincipal } from "@backend/lib/session";
+import { containerPath } from "@backend/lib/paths";
 
 export const metadata: Metadata = { title: "Search" };
 
@@ -60,11 +61,11 @@ export default async function SearchPage({
       campaignName={principal.campaignName ?? CAMPAIGN_NAME}
       newContainerHref={
         writable && creatableContainerTypes(principal).length > 0
-          ? `/c/${writable.id}?dialog=new-container`
+          ? `${containerPath(writable)}?dialog=new-container`
           : undefined
       }
       newDatabaseHref={
-        writable && canCreateItem(principal) ? `/c/${writable.id}?dialog=add` : undefined
+        writable && canCreateItem(principal) ? `${containerPath(writable)}?dialog=add` : undefined
       }
       searchAction="/search"
       query={query}

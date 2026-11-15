@@ -5,6 +5,7 @@ import { MenuDetails } from "@frontend/components/molecules/MenuDetails";
 import { RevealToggle } from "@frontend/components/organisms/RevealToggle";
 import type { ContainerView, Principal } from "@backend/domain/view";
 import { canCreateItem, canRetireContainer } from "@backend/lib/permissions";
+import { containerPath } from "@backend/lib/paths";
 
 /**
  * Share, and the overflow menu — the right-hand end of Wireframe.png's strip
@@ -32,7 +33,7 @@ export function ContainerActions({
   editable: boolean;
 }) {
   const isGm = principal.role === "gm";
-  const base = `/c/${container.id}`;
+  const base = containerPath(container);
   const canRetire = canRetireContainer(principal, container);
 
   return (

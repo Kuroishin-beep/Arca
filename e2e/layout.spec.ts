@@ -126,7 +126,7 @@ test.describe("the workspace shell", () => {
     await dialog.locator("#weight").fill("1");
     await dialog.getByRole("button", { name: /save item/i }).click();
 
-    await page.waitForURL(/\/c\/00000000-0000-4000-8000-000000000201/);
+    await page.waitForURL(/\/c\/[^/?]*00000201/);
     await expect(page.locator("table tbody tr").filter({ hasText: name })).toContainText("3");
   });
 });

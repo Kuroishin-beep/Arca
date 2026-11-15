@@ -43,7 +43,8 @@ async function newContainer(page: Page, name: string): Promise<string> {
   await dialog.getByLabel("Name").fill(name);
   await dialog.getByRole("radio", { name: /shared/i }).check();
   await dialog.getByRole("button", { name: /^create$/i }).click();
-  await page.waitForURL(/\/c\/[0-9a-f-]+$/);
+  // The readable address (name-<8 hex>), not a bare id on its way there.
+  await page.waitForURL(/\/c\/(?![0-9a-f]{8}-[0-9a-f]{4}-)[^/?]+$/);
   return new URL(page.url()).pathname;
 }
 

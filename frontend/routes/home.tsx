@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { repository } from "@backend/db";
 import { currentPrincipal } from "@backend/lib/session";
+import { containerPath } from "@backend/lib/paths";
 
 /**
  * The entry point. There is no landing page: Arca opens inside a panel that is
@@ -19,5 +20,5 @@ export default async function Home() {
   const landing = containers.find((c) => c.type === "party") ?? containers[0];
   if (!landing) redirect("/signin?error=no-containers");
 
-  redirect(`/c/${landing.id}`);
+  redirect(encodeURI(containerPath(landing)));
 }

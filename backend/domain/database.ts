@@ -40,6 +40,7 @@
  */
 import type { ArcaRepository } from "@backend/db/repository";
 import { canRead } from "@backend/lib/permissions";
+import { decodeSegment, slugify } from "@backend/lib/paths";
 import type { Stats } from "@backend/domain/item-fields";
 import type { ContainerView, ItemView, Principal } from "@backend/domain/view";
 
@@ -94,10 +95,10 @@ interface Placed {
  * one pass over a list that is already in memory.
  */
 export function slugifyType(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+  // One slug rule for the whole app (backend/lib/paths.ts). It used to delete
+  // every non-ASCII letter, so "Équipement" became /db/quipement and a type
+  // named in another script had no URL at all.
+  return slugify(decodeSegment(name));
 }
 
 /** Every container this principal may read, with its items. The one place that

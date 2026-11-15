@@ -20,6 +20,7 @@ import {
 } from "@backend/domain/view";
 import { canCreateItem, canWrite, creatableContainerTypes } from "@backend/lib/permissions";
 import { currentPrincipal } from "@backend/lib/session";
+import { containerPath, decodeSegment, queryString } from "@backend/lib/paths";
 
 /**
  * A database — Wireframe.png's second sidebar section, rendered as the table in
@@ -62,8 +63,15 @@ export default async function DatabasePage({
     readDatabase(repo, principal, slug),
   ]);
 
+  // Any spelling that finds the type — "Weapon", "WEAPON", an encoded
+  // accent — is sent to the one canonical slug, so a database has one URL.
+  const canonical = database ? slugifyType(database.name) : null;
+  if (canonical && decodeSegment(slug) !== canonical) {
+    redirect(`/db/${encodeURIComponent(canonical)}${queryString(sp)}`);
+  }
+
   const railCollapsed = sp.rail === "0";
-  const base = `/db/${slug}`;
+  const base = `/db/${encodeURIComponent(canonical ?? slugifyType(slug))}`;
   const keep = (extra: Record<string, string>) => {
     const p = new URLSearchParams();
     if (query) p.set("q", query);
@@ -97,11 +105,11 @@ export default async function DatabasePage({
     selectedDatabase: database ? slugifyType(slug) : undefined,
     newContainerHref:
       writable && creatableContainerTypes(principal).length > 0
-        ? `/c/${writable.id}?dialog=new-container`
+        ? `${containerPath(writable)}?dialog=new-container`
         : undefined,
     // GM-only, like the dialog it opens: creating from scratch is the GM's.
     newDatabaseHref:
-      writable && canCreateItem(principal) ? `/c/${writable.id}?dialog=add` : undefined,
+      writable && canCreateItem(principal) ? `${containerPath(writable)}?dialog=add` : undefined,
     searchAction: base,
     query,
     placeholder: database ? `Search ${database.name}…` : "Search…",
@@ -239,7 +247,7 @@ export function DatabaseTable({
           // panel of wherever it is held, or its catalogue entry when nobody
           // is carrying one.
           const detailsHref = first
-            ? `/c/${first.container.id}?item=${first.itemId}`
+            ? `${containerPath(first.container)}?item=${first.itemId}`
             : "/catalog";
           return (
             <tr
@@ -306,7 +314,7 @@ export function DatabaseTable({
                     {row.holdings.map((holding) => (
                       <li key={holding.itemId}>
                         <Link
-                          href={`/c/${holding.container.id}?item=${holding.itemId}`}
+                          href={`${containerPath(holding.container)}?item=${holding.itemId}`}
                           className="flex items-center gap-2 text-muted hover:text-text"
                         >
                           <ContainerDot type={holding.container.type} />

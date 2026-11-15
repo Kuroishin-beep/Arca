@@ -12,6 +12,7 @@ import {
   creatableContainerTypes,
   writeDeniedReason,
 } from "@backend/lib/permissions";
+import { containerPath } from "@backend/lib/paths";
 
 /**
  * The sidebar — Wireframe.png, left column.
@@ -115,7 +116,7 @@ export function Sidebar({
           {containers.map((container) => (
             <Link
               key={container.id}
-              href={`/c/${container.id}`}
+              href={containerPath(container)}
               aria-current={container.id === selectedId ? "page" : undefined}
               title={container.name}
               className={`grid h-9 w-9 shrink-0 place-items-center rounded-md ${

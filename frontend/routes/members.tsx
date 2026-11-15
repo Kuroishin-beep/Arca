@@ -22,6 +22,7 @@ import {
   creatableContainerTypes,
 } from "@backend/lib/permissions";
 import { currentPrincipal } from "@backend/lib/session";
+import { containerPath, sheetPath } from "@backend/lib/paths";
 
 export const metadata: Metadata = { title: "Members" };
 
@@ -99,11 +100,11 @@ export default async function MembersPage({
     campaignName: principal.campaignName ?? CAMPAIGN_NAME,
     newContainerHref:
       writable && creatableContainerTypes(principal).length > 0
-        ? `/c/${writable.id}?dialog=new-container`
+        ? `${containerPath(writable)}?dialog=new-container`
         : undefined,
     // GM-only, like the dialog it opens: creating from scratch is the GM's.
     newDatabaseHref:
-      writable && canCreateItem(principal) ? `/c/${writable.id}?dialog=add` : undefined,
+      writable && canCreateItem(principal) ? `${containerPath(writable)}?dialog=add` : undefined,
     navOpen: sp.nav === "1",
     drawerHref: "/members?nav=1",
     railCollapsed,
@@ -221,7 +222,7 @@ export default async function MembersPage({
                     name. One identity, four places, nothing to keep in sync. */}
                 {characterOf.has(member.userId) ? (
                   <Link
-                    href={`/character/${characterOf.get(member.userId)!.id}`}
+                    href={sheetPath(characterOf.get(member.userId)!)}
                     className="shrink-0 text-sm text-muted hover:text-primary"
                   >
                     plays{" "}

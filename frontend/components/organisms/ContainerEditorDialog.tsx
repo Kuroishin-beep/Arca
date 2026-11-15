@@ -14,6 +14,7 @@ import { Modal } from "@frontend/components/molecules/Modal";
 import { RetireContainerButton } from "@frontend/components/organisms/RetireContainerButton";
 import type { ContainerType } from "@backend/domain/types";
 import type { ContainerView, Principal } from "@backend/domain/view";
+import { containerPath } from "@backend/lib/paths";
 
 /**
  * Create or edit a container — SCOPE.md §3.
@@ -149,7 +150,17 @@ export function ContainerEditorDialog({
         // Straight into the thing just made — an empty container is exactly
         // where you want to be, because the next step is putting something in
         // it.
-        router.push(`/c/${result.data!.containerId}`);
+        // Its readable address, built from the name just typed, so the
+        // browser lands there directly instead of via a redirect.
+        router.push(
+          containerPath({
+            id: result.data!.containerId,
+            name: (() => {
+              const typed = formData.get("name");
+              return typeof typed === "string" ? typed : "";
+            })(),
+          }),
+        );
       }
       // Push only — see ItemEditorDialog. The action revalidates, so the
       // push fetches fresh; a refresh fired straight after raced it, and could

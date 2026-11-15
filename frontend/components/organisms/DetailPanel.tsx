@@ -16,6 +16,7 @@ import {
 } from "@backend/domain/view";
 import { slugifyType } from "@backend/domain/database";
 import { fieldsForTypes } from "@backend/domain/item-fields";
+import { containerPath } from "@backend/lib/paths";
 
 /**
  * The selected item, its properties, where it lives, and the conversation about
@@ -51,11 +52,11 @@ export function DetailPanel({
     ]);
   }
 
-  const closeHref = `/c/${container.id}${query ? `?q=${encodeURIComponent(query)}` : ""}`;
+  const closeHref = `${containerPath(container)}${query ? `?q=${encodeURIComponent(query)}` : ""}`;
   const withItem = (extra: Record<string, string>) => {
     const params = new URLSearchParams({ item: item.id, ...extra });
     if (query) params.set("q", query);
-    return `/c/${container.id}?${params.toString()}`;
+    return `${containerPath(container)}?${params.toString()}`;
   };
 
   return (

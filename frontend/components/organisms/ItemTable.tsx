@@ -34,7 +34,7 @@ import {
  */
 export function ItemTable({
   items: serverItems,
-  containerId,
+  basePath,
   sort,
   selectedId,
   canEdit,
@@ -42,7 +42,7 @@ export function ItemTable({
   query,
 }: {
   items: ItemView[];
-  containerId: string;
+  basePath: string;
   sort: Sort;
   selectedId?: string;
   canEdit: boolean;
@@ -78,7 +78,7 @@ export function ItemTable({
         title={`No match for “${query.trim()}”`}
         body="Nothing here matches, including item tags and types."
         action={
-          <ButtonLink href={`/c/${containerId}`} variant="secondary" size="sm">
+          <ButtonLink href={`${basePath}`} variant="secondary" size="sm">
             Clear search
           </ButtonLink>
         }
@@ -90,7 +90,7 @@ export function ItemTable({
         action={
           canCreate ? (
             <ButtonLink
-              href={`/c/${containerId}?dialog=add`}
+              href={`${basePath}?dialog=add`}
               variant="primary"
               size="sm"
               icon="plus"
@@ -99,7 +99,7 @@ export function ItemTable({
             </ButtonLink>
           ) : canEdit ? (
             <ButtonLink
-              href={`/c/${containerId}?dialog=catalog`}
+              href={`${basePath}?dialog=catalog`}
               variant="primary"
               size="sm"
               icon="table"
@@ -119,7 +119,7 @@ export function ItemTable({
         {items.map((item) => (
           <li key={item.id}>
             <Link
-              href={rowHref(containerId, item.id, query)}
+              href={rowHref(basePath, item.id, query)}
               className={`block border-b border-border px-3 py-2 ${
                 item.id === selectedId ? "bg-surface2" : ""
               }`}
@@ -170,7 +170,7 @@ export function ItemTable({
               column="name"
               label="Name"
               sort={sort}
-              containerId={containerId}
+              basePath={basePath}
               query={query}
               className="min-w-44 px-3 md:px-4"
             />
@@ -178,7 +178,7 @@ export function ItemTable({
               column="qty"
               label="Qty"
               sort={sort}
-              containerId={containerId}
+              basePath={basePath}
               query={query}
               numeric
               className="w-16 px-3"
@@ -187,7 +187,7 @@ export function ItemTable({
               column="weight"
               label="Wt"
               sort={sort}
-              containerId={containerId}
+              basePath={basePath}
               query={query}
               numeric
               className="w-20 px-3"
@@ -196,7 +196,7 @@ export function ItemTable({
               column="value"
               label="Value"
               sort={sort}
-              containerId={containerId}
+              basePath={basePath}
               query={query}
               numeric
               className="hidden w-20 px-3 md:table-cell"
@@ -260,7 +260,7 @@ export function ItemTable({
                     Effect) squeezing every name down to its first letters. */}
                 <td className="min-w-44 max-w-0 px-3 md:px-4">
                   <Link
-                    href={rowHref(containerId, item.id, query)}
+                    href={rowHref(basePath, item.id, query)}
                     title={item.name}
                     className="flex items-center gap-2"
                   >
@@ -323,7 +323,7 @@ export function ItemTable({
                 </td>
                 <td className="hidden px-2 text-right lg:table-cell">
                   <Link
-                    href={rowHref(containerId, item.id, query)}
+                    href={rowHref(basePath, item.id, query)}
                     className={`grid h-7 w-7 place-items-center rounded-md text-muted hover:bg-surface3 hover:text-text focus-visible:opacity-100 group-hover:opacity-100 ${
                       selected ? "opacity-100" : "opacity-0"
                     }`}
@@ -377,10 +377,10 @@ function Tags({ tags }: { tags: readonly string[] }) {
   );
 }
 
-function rowHref(containerId: string, itemId: string, query: string): string {
+function rowHref(basePath: string, itemId: string, query: string): string {
   const params = new URLSearchParams({ item: itemId });
   if (query.trim() !== "") params.set("q", query);
-  return `/c/${containerId}?${params.toString()}`;
+  return `${basePath}?${params.toString()}`;
 }
 
 /**
@@ -392,7 +392,7 @@ function SortableHeader({
   column,
   label,
   sort,
-  containerId,
+  basePath,
   query,
   numeric,
   className = "",
@@ -400,7 +400,7 @@ function SortableHeader({
   column: SortColumn;
   label: string;
   sort: Sort;
-  containerId: string;
+  basePath: string;
   query: string;
   numeric?: boolean;
   className?: string;
@@ -420,7 +420,7 @@ function SortableHeader({
       className={`py-2.5 text-xs font-semibold uppercase tracking-wide text-muted ${className}`}
     >
       <Link
-        href={`/c/${containerId}?${params.toString()}`}
+        href={`${basePath}?${params.toString()}`}
         className={`flex items-center gap-1 hover:text-text ${
           numeric ? "justify-end" : ""
         }`}

@@ -15,6 +15,7 @@ import {
   creatableContainerTypes,
 } from "@backend/lib/permissions";
 import { currentPrincipal } from "@backend/lib/session";
+import { containerPath } from "@backend/lib/paths";
 
 export const metadata: Metadata = { title: "Catalogue" };
 
@@ -57,11 +58,11 @@ export default async function CatalogPage({
     campaignName: principal.campaignName ?? CAMPAIGN_NAME,
     newContainerHref:
       writable && creatableContainerTypes(principal).length > 0
-        ? `/c/${writable.id}?dialog=new-container`
+        ? `${containerPath(writable)}?dialog=new-container`
         : undefined,
     // GM-only, like the dialog it opens: creating from scratch is the GM's.
     newDatabaseHref:
-      writable && canCreateItem(principal) ? `/c/${writable.id}?dialog=add` : undefined,
+      writable && canCreateItem(principal) ? `${containerPath(writable)}?dialog=add` : undefined,
     navOpen: sp.nav === "1",
     drawerHref: "/catalog?nav=1",
     railCollapsed,

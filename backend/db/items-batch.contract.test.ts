@@ -57,3 +57,12 @@ describe("listItemsIn", () => {
     ).rejects.toBeInstanceOf(PermissionError);
   });
 });
+
+describe("findContainerIdsBySuffix", () => {
+  it("finds a container by its id's last eight hex digits", async () => {
+    expect(
+      await fixtureRepository.findContainerIdsBySuffix(gm, KOVA_CONTAINER_ID.slice(-8)),
+    ).toEqual([KOVA_CONTAINER_ID]);
+    expect(await fixtureRepository.findContainerIdsBySuffix(gm, "ffffffff")).toEqual([]);
+  });
+});

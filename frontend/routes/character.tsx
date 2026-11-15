@@ -9,6 +9,13 @@ import { WeightMeter } from "@frontend/components/molecules/WeightMeter";
 import { CharacterSheet } from "@frontend/components/organisms/CharacterSheet";
 import { WorkspaceShell } from "@frontend/components/organisms/WorkspaceShell";
 import { repository } from "@backend/db";
+import { resolveContainerId } from "@backend/lib/container-ref";
+import {
+  containerPath,
+  isCanonicalRef,
+  queryString,
+  sheetPath,
+} from "@backend/lib/paths";
 import { CAMPAIGN_NAME } from "@backend/db/seed-data";
 import { listDatabases } from "@backend/domain/database";
 import { TINY_TAG, inventoryBreakdown } from "@backend/domain/inventory";
@@ -52,9 +59,11 @@ export async function generateMetadata({
   const fallback: Metadata = { title: "Character sheet" };
   const principal = await currentPrincipal();
   if (!principal) return fallback;
-  const { containerId } = await params;
+  const repo = repository();
+  const containerId = await resolveContainerId(repo, principal, (await params).containerId);
+  if (!containerId) return fallback;
   try {
-    const container = await repository().getContainer(principal, containerId);
+    const container = await repo.getContainer(principal, containerId);
     return container?.type === "character" ? { title: container.name } : fallback;
   } catch (error) {
     // A sheet the viewer cannot read keeps the generic title; the page itself
@@ -74,9 +83,13 @@ export default async function CharacterSheetPage({
   const principal = await currentPrincipal();
   if (!principal) redirect("/signin");
 
-  const { containerId } = await params;
+  const { containerId: ref } = await params;
   const sp = await searchParams;
   const repo = repository();
+
+  // A readable ref (`kova-00000201`) or a legacy bare id — `backend/lib/paths.ts`.
+  const containerId = await resolveContainerId(repo, principal, ref);
+  if (!containerId) notFound();
 
   let container;
   try {
@@ -86,6 +99,14 @@ export default async function CharacterSheetPage({
     throw error;
   }
   if (!container || container.type !== "character") notFound();
+
+  // Old id links and renamed characters land on the current address — after
+  // the read check, so nobody learns a sheet's name by guessing its id.
+  if (!isCanonicalRef(ref, container)) {
+    redirect(encodeURI(sheetPath(container)) + queryString(sp));
+  }
+  /** The inventory this sheet's equipment lives in. */
+  const inventoryPath = containerPath(container);
 
   // `getCharacter` re-checks the principal itself; a null here means the
   // container exists and is not a character, which `notFound` already covered.
@@ -99,7 +120,7 @@ export default async function CharacterSheetPage({
     repo.listContainers(principal),
     listDatabases(repo, principal),
   ]);
-  const here = `/character/${containerId}`;
+  const here = sheetPath(container);
   const railCollapsed = sp.rail === "0";
   const writable = containers.find((c) => canWrite(principal, c));
   const shell = {
@@ -110,10 +131,10 @@ export default async function CharacterSheetPage({
     selectedId: containerId,
     newContainerHref:
       writable && creatableContainerTypes(principal).length > 0
-        ? `/c/${writable.id}?dialog=new-container`
+        ? `${containerPath(writable)}?dialog=new-container`
         : undefined,
     newDatabaseHref:
-      writable && canCreateItem(principal) ? `/c/${writable.id}?dialog=add` : undefined,
+      writable && canCreateItem(principal) ? `${containerPath(writable)}?dialog=add` : undefined,
     navOpen: sp.nav === "1",
     drawerHref: `${here}?nav=1`,
     railCollapsed,
@@ -146,7 +167,7 @@ export default async function CharacterSheetPage({
               under. */}
           <h1 className="sr-only">Character sheet: {character.name}</h1>
           <div className="flex flex-wrap items-center gap-2">
-            <ButtonLink href={`/c/${containerId}`} size="sm" icon="pack">
+            <ButtonLink href={inventoryPath} size="sm" icon="pack">
               Back to inventory
             </ButtonLink>
             <ButtonLink href="/dice" size="sm">
@@ -182,12 +203,12 @@ export default async function CharacterSheetPage({
               </div>
             </div>
 
-            <WeaponsAtHand items={inventory.weapons} containerId={containerId} />
+            <WeaponsAtHand items={inventory.weapons} inventoryPath={inventoryPath} />
             <EquipmentTable
               title="Inventory"
               subtitle="one slot per row · half STR, rounded up"
               items={inventory.carried}
-              containerId={containerId}
+              inventoryPath={inventoryPath}
               emptyLabel="Nothing in the pack."
               count={
                 <Chip
@@ -206,16 +227,16 @@ export default async function CharacterSheetPage({
                 title="Worn"
                 subtitle="the armour and helmet on the sheet · no slot"
                 items={inventory.worn}
-                containerId={containerId}
+                inventoryPath={inventoryPath}
                 emptyLabel=""
               />
             ) : null}
-            <TinyItems items={inventory.tiny} containerId={containerId} />
+            <TinyItems items={inventory.tiny} inventoryPath={inventoryPath} />
 
             <p className="border-t border-border p-3 text-sm text-muted">
               Add, move or split items from the{" "}
               <Link
-                href={`/c/${containerId}`}
+                href={inventoryPath}
                 className="text-primary underline underline-offset-2"
               >
                 inventory
@@ -234,14 +255,14 @@ function EquipmentTable({
   subtitle,
   items,
   emptyLabel,
-  containerId,
+  inventoryPath,
   count,
 }: {
   title: string;
   subtitle: string;
   items: ItemView[];
   emptyLabel: string;
-  containerId: string;
+  inventoryPath: string;
   /** Replaces the plain row count in the header (the inventory's slot meter). */
   count?: React.ReactNode;
 }) {
@@ -302,7 +323,7 @@ function EquipmentTable({
               >
                 <td className="max-w-0 px-4">
                   <Link
-                    href={`/c/${containerId}?item=${item.id}`}
+                    href={`${inventoryPath}?item=${item.id}`}
                     className="block truncate text-text hover:text-primary hover:underline"
                   >
                     {item.name}
@@ -344,10 +365,10 @@ function EquipmentTable({
  */
 function WeaponsAtHand({
   items,
-  containerId,
+  inventoryPath,
 }: {
   items: ItemView[];
-  containerId: string;
+  inventoryPath: string;
 }) {
   const stat = (item: ItemView, key: string) =>
     item.stats[key]?.trim() ? (
@@ -400,7 +421,7 @@ function WeaponsAtHand({
                 <tr key={item.id} className="h-10 border-b border-border last:border-0 hover:bg-surface2">
                   <td className="min-w-32 max-w-0 px-4">
                     <Link
-                      href={`/c/${containerId}?item=${item.id}`}
+                      href={`${inventoryPath}?item=${item.id}`}
                       title={item.name}
                       className="block truncate text-text hover:text-primary hover:underline"
                     >
@@ -445,10 +466,10 @@ function WeaponsAtHand({
  */
 function TinyItems({
   items,
-  containerId,
+  inventoryPath,
 }: {
   items: ItemView[];
-  containerId: string;
+  inventoryPath: string;
 }) {
   return (
     <div className="border-b border-border px-4 py-3">
@@ -471,7 +492,7 @@ function TinyItems({
           {items.map((item) => (
             <li key={item.id}>
               <Link
-                href={`/c/${containerId}?item=${item.id}`}
+                href={`${inventoryPath}?item=${item.id}`}
                 className="inline-flex items-center gap-1 rounded-sm border border-border bg-surface2 px-2 py-1 text-base text-text hover:text-primary"
               >
                 {item.name}

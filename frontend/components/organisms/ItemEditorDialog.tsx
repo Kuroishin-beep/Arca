@@ -10,6 +10,7 @@ import { Icon } from "@frontend/components/atoms/Icon";
 import { Modal } from "@frontend/components/molecules/Modal";
 import { StatFields } from "@frontend/components/molecules/StatFields";
 import type { ContainerView, ItemView } from "@backend/domain/view";
+import { containerPath } from "@backend/lib/paths";
 
 /**
  * Add and edit are the same form. The only differences are the title, whether
@@ -77,7 +78,17 @@ export function ItemEditorDialog({
       // A new item: go to where it was put, which the container picker may
       // have changed from the container the dialog was opened on.
       const chosen = formData.get("containerId");
-      router.push(!editing && typeof chosen === "string" ? `/c/${chosen}` : closeHref);
+      const target =
+        !editing && typeof chosen === "string"
+          ? [container, ...(destinations ?? [])].find((c) => c.id === chosen)
+          : undefined;
+      router.push(
+        target
+          ? containerPath(target)
+          : !editing && typeof chosen === "string"
+            ? `/c/${chosen}` // not in the list: the server redirects it
+            : closeHref,
+      );
     });
   };
 

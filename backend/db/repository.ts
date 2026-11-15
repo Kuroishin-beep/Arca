@@ -159,6 +159,17 @@ export interface ArcaRepository {
   listItems(principal: Principal, containerId: string): Promise<ItemView[]>;
 
   /**
+   * The ids of live containers in the current campaign whose id ends in these
+   * eight hex digits — how a readable URL (`/c/packmule-honky-6f3a91c2`) finds
+   * its container. Deliberately NOT permission-filtered: it answers only "is
+   * there such an id", and the caller still goes through `getContainer`,
+   * which is where a sealed container is refused. Usually one id; more than
+   * one is a collision the caller must treat as not found. Takes the
+   * principal only to run in their campaign (`scopedRepository`).
+   */
+  findContainerIdsBySuffix(principal: Principal, suffix: string): Promise<string[]>;
+
+  /**
    * `listItems` for several containers at once, keyed by container id. The
    * same gate: every id must be readable, and one that is not throws rather
    * than being skipped — a caller asking for a sealed vault is a bug, not a

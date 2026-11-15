@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ContainerDot, ContainerIcon } from "@frontend/components/atoms/Chip";
 import { Icon } from "@frontend/components/atoms/Icon";
 import type { ContainerView } from "@backend/domain/view";
+import { containerPath } from "@backend/lib/paths";
 
 /**
  * One container in the sidebar.
@@ -60,7 +61,7 @@ export function ContainerRow({
 
   return (
     <Link
-      href={`/c/${container.id}`}
+      href={containerPath(container)}
       aria-current={selected ? "page" : undefined}
       className={[
         "flex items-center gap-2 rounded-md px-2 text-base",
