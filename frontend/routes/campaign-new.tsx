@@ -63,6 +63,7 @@ export default async function NewCampaignPage({
             <TextField
               id="campaign-name"
               name="name"
+              autoComplete="off"
               label="Campaign name"
               required
               maxLength={80}

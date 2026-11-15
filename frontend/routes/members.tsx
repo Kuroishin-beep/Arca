@@ -317,6 +317,10 @@ export default async function MembersPage({
                 name="displayName"
                 type="text"
                 required
+                // Someone ELSE's name: the browser's suggestions are the GM's
+                // own saved details, and Enter on an open suggestion list
+                // replaced a typed "-" with one of them ("Person").
+                autoComplete="off"
                 maxLength={80}
                 className="h-10 w-full rounded-md border border-border bg-surface2 px-2 text-base text-text"
               />
@@ -334,6 +338,7 @@ export default async function MembersPage({
                 name="email"
                 type="email"
                 required
+                autoComplete="off"
                 inputMode="email"
                 autoCapitalize="none"
                 spellCheck={false}

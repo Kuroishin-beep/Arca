@@ -153,6 +153,7 @@ export function ItemEditorDialog({
           <TextField
             id="name"
             name="name"
+            autoComplete="off"
             label="Name"
             required
             readOnly={isCopy}

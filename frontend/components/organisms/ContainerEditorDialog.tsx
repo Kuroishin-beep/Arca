@@ -205,6 +205,7 @@ export function ContainerEditorDialog({
           <TextField
             id="name"
             name="name"
+            autoComplete="off"
             label="Name"
             required
             autoFocus
