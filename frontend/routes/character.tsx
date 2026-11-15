@@ -1,8 +1,9 @@
+import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { ButtonLink } from "@frontend/components/atoms/Button";
 import { Chip, TagChip } from "@frontend/components/atoms/Chip";
-import { Avatar } from "@frontend/components/atoms/Status";
 import { WeightMeter } from "@frontend/components/molecules/WeightMeter";
 import { CharacterSheet } from "@frontend/components/organisms/CharacterSheet";
 import { WorkspaceShell } from "@frontend/components/organisms/WorkspaceShell";
@@ -40,6 +41,27 @@ import { currentPrincipal } from "@backend/lib/session";
  * reach another player's sheet at all, because they cannot read the container
  * it hangs off.
  */
+/** The tab reads "Kova · Arca" rather than one more "Arca". */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ containerId: string }>;
+}): Promise<Metadata> {
+  const fallback: Metadata = { title: "Character sheet" };
+  const principal = await currentPrincipal();
+  if (!principal) return fallback;
+  const { containerId } = await params;
+  try {
+    const container = await repository().getContainer(principal, containerId);
+    return container?.type === "character" ? { title: container.name } : fallback;
+  } catch (error) {
+    // A sheet the viewer cannot read keeps the generic title; the page itself
+    // answers with notFound. Anything else is a real failure.
+    if (error instanceof PermissionError) return fallback;
+    throw error;
+  }
+}
+
 export default async function CharacterSheetPage({
   params,
   searchParams,
@@ -107,7 +129,11 @@ export default async function CharacterSheetPage({
 
   return (
     <WorkspaceShell {...shell}>
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      {/* `relative` makes this pane the containing block for every sr-only
+          span on the sheet (pips, steppers, marks). Without it their absolute
+          boxes hung off the document and the page scrolled into blank space
+          below the shell — ~1400px of it on a phone. */}
+      <div className="relative min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex max-w-5xl flex-col gap-4 p-3 md:p-6">
           {/* The page's heading, for screen readers. The visible name is an
               editable field rather than a heading — so it can be renamed in
@@ -125,9 +151,6 @@ export default async function CharacterSheetPage({
             {!editable ? (
               <Chip tone="neutral">Read only</Chip>
             ) : null}
-            <span className="ml-auto flex items-center gap-2">
-              <Avatar name={character.name} size={28} />
-            </span>
           </div>
 
           {/* Everything above the equipment is the sheet proper, and all of it
@@ -157,22 +180,28 @@ export default async function CharacterSheetPage({
 
             <EquipmentTable
               title="Weapons"
-              subtitle="carries the Weapon type"
+              subtitle="tagged Weapon"
               items={weapons}
+              containerId={containerId}
               emptyLabel="Nothing tagged as a weapon."
             />
             <EquipmentTable
               title="Carried"
               subtitle="everything else"
               items={carried}
+              containerId={containerId}
               emptyLabel="Nothing else carried."
             />
 
-            <p className="border-t border-border p-3 text-sm text-faint">
-              Weight and encumbrance are derived from the containment edges at
-              read time — there is no stored total to fall out of date. Items
-              are added and moved from the inventory screen, which is where the
-              write rules for a container live.
+            <p className="border-t border-border p-3 text-sm text-muted">
+              Add, move or split items from the{" "}
+              <Link
+                href={`/c/${containerId}`}
+                className="text-primary underline underline-offset-2"
+              >
+                inventory
+              </Link>
+              . Carried weight updates on its own.
             </p>
           </section>
         </div>
@@ -186,11 +215,13 @@ function EquipmentTable({
   subtitle,
   items,
   emptyLabel,
+  containerId,
 }: {
   title: string;
   subtitle: string;
   items: ItemView[];
   emptyLabel: string;
+  containerId: string;
 }) {
   return (
     <div className="border-b border-border last:border-0">
@@ -246,7 +277,12 @@ function EquipmentTable({
                 className="h-9 border-b border-border last:border-0 hover:bg-surface2"
               >
                 <td className="max-w-0 px-4">
-                  <span className="block truncate text-text">{item.name}</span>
+                  <Link
+                    href={`/c/${containerId}?item=${item.id}`}
+                    className="block truncate text-text hover:text-primary hover:underline"
+                  >
+                    {item.name}
+                  </Link>
                 </td>
                 <td className="hidden px-3 panel:table-cell">
                   <div className="flex flex-wrap gap-1">

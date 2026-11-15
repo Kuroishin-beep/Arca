@@ -278,3 +278,54 @@ test.describe("the character sheet", () => {
     await kova.context().close();
   });
 });
+
+test.describe("character sheet polish", () => {
+  test("the page never scrolls past the app shell", async ({ browser }) => {
+    // The advancement-mark labels held sr-only spans with no positioned
+    // ancestor, so they hung off the document and added ~670px of blank
+    // scroll beneath the shell. The sheet scrolls inside its own pane only.
+    const page = await signInAs(browser, "Kova");
+    for (const size of [
+      { width: 1280, height: 900 },
+      { width: 375, height: 812 },
+    ]) {
+      await page.setViewportSize(size);
+      await page.goto(`/character/${KOVA_CONTAINER_ID}`);
+      await expect(page.getByRole("heading", { name: "Skills", exact: true })).toBeVisible();
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollHeight - window.innerHeight,
+      );
+      expect(overflow).toBeLessThanOrEqual(1);
+    }
+  });
+
+  test("the tab is titled after the character", async ({ browser }) => {
+    const page = await signInAs(browser, "Kova");
+    await page.goto(`/character/${KOVA_CONTAINER_ID}`);
+    const heading = await page.locator("h1").first().textContent();
+    const name = (heading ?? "").replace(/^Character sheet:\s*/, "").trim();
+    expect(name.length).toBeGreaterThan(0);
+    await expect(page).toHaveTitle(`${name} · Arca`);
+  });
+
+  test("an equipment row opens that item in the inventory", async ({
+    browser,
+  }) => {
+    const page = await signInAs(browser, "Kova");
+    await page.goto(`/character/${KOVA_CONTAINER_ID}`);
+    const equipment = page.locator("section", {
+      has: page.getByRole("heading", { name: "Equipment" }),
+    });
+    const first = equipment.getByRole("row").nth(1).getByRole("link");
+    const itemName = (await first.textContent())?.trim() ?? "";
+    await first.click();
+    await page.waitForURL(
+      (url) =>
+        url.pathname === `/c/${KOVA_CONTAINER_ID}` &&
+        url.searchParams.has("item"),
+    );
+    await expect(
+      page.getByRole("heading", { name: itemName }).first(),
+    ).toBeVisible();
+  });
+});

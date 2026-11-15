@@ -692,7 +692,8 @@ function Skills({
         <h2 className="font-serif text-lg font-bold text-text">Skills</h2>
         <div className="flex items-center gap-3">
           <span className="text-xs text-faint">
-            {trainedCount} trained · value is the base chance, doubled
+            {trainedCount} trained · trained skills double the base chance ·
+            right-hand box marks a skill for advancement
           </span>
           {/* Labelled with the ACTION, not the state. A button reading "Show
               all" while everything is already shown is a button that has told
@@ -806,7 +807,13 @@ function SkillGroup({
               {/* The advancement tick. Earned on a dragon or a demon, spent
                   between sessions — so it is a state a player sets during play,
                   not a derived one. */}
-              <label className="shrink-0" title="Advancement mark">
+              {/* `relative` contains the sr-only span: without a positioned
+                  ancestor its absolute box landed on the document itself and
+                  gave the whole page ~670px of blank scroll under the shell. */}
+              <label
+                className="relative flex shrink-0 items-center"
+                title="Advancement mark"
+              >
                 <input
                   type="checkbox"
                   checked={state.marked}
@@ -837,12 +844,8 @@ function NoSpells() {
     <section className="rounded-lg border border-border bg-surface p-4">
       <h2 className="mb-1 font-serif text-lg font-bold text-text">Spells</h2>
       <p className="text-base text-muted">
-        This section appears once a magic skill is trained — Animism,
-        Elementalism or Mentalism.
-      </p>
-      <p className="mt-1 text-sm text-faint">
-        Which is the object-graph point made small: a spell list is a property
-        of what the character IS, not a section every sheet has to carry empty.
+        Train a magic skill — Animism, Elementalism or Mentalism — and the spell
+        list opens here.
       </p>
     </section>
   );

@@ -1,1 +1,1 @@
-export { default } from "@frontend/routes/character";
+export { default, generateMetadata } from "@frontend/routes/character";
