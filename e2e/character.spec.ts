@@ -413,3 +413,40 @@ test.describe("the Dragonbane sheet", () => {
     await kova.context().close();
   });
 });
+
+test.describe("inside TaleSpire", () => {
+  test("TaleSpire's colours replace Arca's, and the theme toggle goes", async ({
+    browser,
+  }) => {
+    const kova = await signInAs(browser, "Kova");
+    // What TaleSpire's "colorStyles" extra provides, then Arca's own bridge —
+    // in the order the manifest lists them.
+    await kova.addInitScript(() => {
+      const style = document.createElement("style");
+      document.addEventListener("DOMContentLoaded", () => document.head.appendChild(style));
+      style.textContent =
+        ":root{--ts-background-primary:rgb(10, 20, 30);--ts-background-secondary:rgb(20,30,40);" +
+        "--ts-background-tertiary:rgb(30,40,50);--ts-color-primary:rgb(240,240,240);" +
+        "--ts-color-secondary:rgb(180,180,180);--ts-accent-primary:rgb(200,120,40);" +
+        "--ts-accent-hover:rgb(220,140,60);--ts-accent-background:rgb(60,40,20);" +
+        "--ts-accessibility-border:rgb(120,120,120);--ts-color-danger:rgb(220,60,60);}";
+    });
+    await kova.addInitScript({ path: "symbiote/arca-bridge.js" });
+    await kova.goto(`/character/${KOVA_CONTAINER_ID}`);
+
+    await expect(kova.locator("html")).toHaveAttribute("data-ts-colors", "");
+    await expect
+      .poll(() => kova.evaluate(() => getComputedStyle(document.body).backgroundColor))
+      .toBe("rgb(10, 20, 30)");
+    await expect(kova.locator("[data-theme-toggle]")).toBeHidden();
+    await kova.context().close();
+  });
+
+  test("a plain browser tab keeps Arca's palette", async ({ browser }) => {
+    const kova = await signInAs(browser, "Kova");
+    await kova.goto(`/character/${KOVA_CONTAINER_ID}`);
+    await expect(kova.locator("html")).not.toHaveAttribute("data-ts-colors", /.*/);
+    await expect(kova.locator("[data-theme-toggle]")).toBeVisible();
+    await kova.context().close();
+  });
+});

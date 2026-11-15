@@ -5,6 +5,7 @@ import { signInAsAction } from "@backend/actions/session";
 import { Button } from "@frontend/components/atoms/Button";
 import { TextField } from "@frontend/components/atoms/Field";
 import { Icon } from "@frontend/components/atoms/Icon";
+import { Logo } from "@frontend/components/atoms/Logo";
 import { PasswordField } from "@frontend/components/atoms/PasswordField";
 import { ThemeToggle } from "@frontend/components/atoms/ThemeToggle";
 import { AuthTabs } from "@frontend/components/molecules/AuthTabs";
@@ -68,12 +69,7 @@ export default async function SignInPage({
 
       <div className="w-full max-w-sm">
         <div className="text-center">
-          <Icon
-            name="chest"
-            size={48}
-            strokeWidth={1.2}
-            className="mx-auto mb-4 text-primary"
-          />
+          <Logo size={56} className="mx-auto mb-4" />
           <h1 className="font-serif text-2xl font-bold text-text">Arca</h1>
           <p className="mt-2 text-base text-muted">
             Shared inventory for your Dragonbane table. Runs inside TaleSpire.

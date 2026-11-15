@@ -96,6 +96,8 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
       label={`Switch to ${next} theme`}
       size={15}
       className={className}
+      // Hidden inside TaleSpire, where TaleSpire's colours apply (globals.css).
+      data-theme-toggle=""
     />
   );
 }

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Icon } from "@frontend/components/atoms/Icon";
+import { Logo } from "@frontend/components/atoms/Logo";
 import { IconButton } from "@frontend/components/atoms/IconButton";
 import { ThemeToggle } from "@frontend/components/atoms/ThemeToggle";
 import { UserBadge } from "@frontend/components/atoms/Status";
@@ -52,7 +53,7 @@ export function TopBar({
       ) : null}
 
       <Link href="/" className="flex shrink-0 items-center gap-2 text-primary">
-        <Icon name="chest" size={18} />
+        <Logo size={22} />
         <span className="font-serif text-lg font-bold tracking-wide">Arca</span>
       </Link>
 

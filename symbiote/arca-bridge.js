@@ -6,16 +6,33 @@
  * before the app has hydrated — so this file owns the named handlers and
  * re-emits each as a DOM event the app listens for whenever it is ready
  * (backend/lib/talespire.ts). It must stay a plain script: no modules, no
- * build step, and nothing that assumes the app is there yet.
+ * build step, and nothing that assumes the app — or even <html> — is there yet.
  */
 (function () {
-  var root = document.documentElement;
-  // Lets CSS tighten the layout for the side panel without waiting for React.
-  root.setAttribute("data-symbiote", "talespire");
+  function root() {
+    return document.documentElement;
+  }
+
+  // TaleSpire's colours (globals.css, `data-ts-colors`), only once its
+  // "colorStyles" extra has actually defined them. Re-checked at each stage of
+  // loading, because when the extras land relative to the page is not
+  // specified, and re-applied in case hydrating <html> drops the attribute.
+  function mark() {
+    var html = root();
+    if (!html) return;
+    html.setAttribute("data-symbiote", "talespire");
+    var probe = getComputedStyle(html).getPropertyValue("--ts-background-primary");
+    if (probe && probe.trim() !== "") html.setAttribute("data-ts-colors", "");
+  }
+
+  mark();
+  document.addEventListener("DOMContentLoaded", mark);
+  window.addEventListener("load", mark);
 
   window.arcaOnSymbioteState = function (event) {
     if (!event || event.kind !== "hasInitialized") return;
-    root.setAttribute("data-symbiote-ready", "true");
+    mark();
+    if (root()) root().setAttribute("data-symbiote-ready", "true");
     window.dispatchEvent(new CustomEvent("arca:ts-ready"));
   };
 })();

@@ -377,3 +377,44 @@
     background: var(--color-border-strong);
   }
 }
+
+/* ----------------------------------------------------------------------------
+   Inside TaleSpire: TaleSpire's own colours.
+
+   The Symbiote manifest asks for TaleSpire's "colorStyles" and "fonts" extras,
+   which define --ts-* custom properties and the OptimusPrinceps face on the
+   page. `symbiote/arca-bridge.js` sets `data-ts-colors` on <html> only after
+   checking those properties actually exist, so a browser tab — or a TaleSpire
+   build that stopped injecting them — keeps Arca's own palette rather than
+   falling to unset colours.
+
+   Last in the file, and as specific as the light/dark blocks above, so it
+   wins over whichever of those applies: inside TaleSpire the panel should
+   look like TaleSpire, not like the theme toggle's last setting.
+
+   Status colours (success, warning, info) and the container-kind colours are
+   kept: TaleSpire defines no equivalents, and they carry meaning.
+   ---------------------------------------------------------------------------- */
+:root[data-ts-colors] {
+  --color-bg: var(--ts-background-primary);
+  --color-surface: var(--ts-background-secondary);
+  --color-surface-2: var(--ts-background-tertiary);
+  --color-surface-3: color-mix(in srgb, var(--ts-background-tertiary) 88%, var(--ts-color-primary));
+  --color-border: color-mix(in srgb, var(--ts-color-secondary) 28%, var(--ts-background-primary));
+  --color-border-strong: var(--ts-accessibility-border);
+  --color-text: var(--ts-color-primary);
+  --color-text-muted: var(--ts-color-secondary);
+  --color-text-faint: color-mix(in srgb, var(--ts-color-secondary) 80%, var(--ts-background-primary));
+  --color-text-invert: var(--ts-background-primary);
+  --color-primary: var(--ts-accent-primary);
+  --color-primary-hover: var(--ts-accent-hover);
+  --color-primary-weak: var(--ts-accent-background);
+  --color-danger: var(--ts-color-danger);
+  --color-danger-weak: color-mix(in srgb, var(--ts-color-danger) 16%, var(--ts-background-primary));
+  --font-serif: OptimusPrinceps, ui-serif, Georgia, "Times New Roman", serif;
+}
+
+/* The theme toggle has nothing to switch while TaleSpire sets the colours. */
+:root[data-ts-colors] [data-theme-toggle] {
+  display: none;
+}
