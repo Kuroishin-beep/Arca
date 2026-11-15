@@ -348,6 +348,28 @@ test.describe("the Dragonbane sheet", () => {
     await kova.context().close();
   });
 
+  test("the inventory counts slots from STR and keeps worn armour out", async ({
+    browser,
+  }) => {
+    const kova = await signInAs(browser, "Kova");
+    await kova.goto(`/character/${KOVA_CONTAINER_ID}`);
+    const equipment = kova.locator("section", {
+      has: kova.getByRole("heading", { name: "Equipment" }),
+    });
+    // Half STR, rounded up. Read rather than assumed: another test in this
+    // file raises Kova's STR, and the store is shared across the run.
+    const strength = Number(await kova.locator("#attr-STR").inputValue());
+    const slots = Math.ceil(strength / 2);
+    await expect(equipment).toContainText(new RegExp(`[0-9]+ / ${slots} +slots`));
+    // Leather armour is the armour named on her sheet, so it is worn, not packed.
+    const worn = equipment.locator("div", {
+      has: kova.getByRole("heading", { name: "Worn" }),
+    });
+    await expect(worn.getByRole("link", { name: "Leather armour" })).toBeVisible();
+    await expect(equipment.getByRole("heading", { name: "Tiny items" })).toBeVisible();
+    await kova.context().close();
+  });
+
   test("dice buttons appear only inside TaleSpire", async ({ browser }) => {
     const kova = await signInAs(browser, "Kova");
     await kova.goto(`/character/${KOVA_CONTAINER_ID}`);

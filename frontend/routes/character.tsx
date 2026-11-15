@@ -11,6 +11,7 @@ import { WorkspaceShell } from "@frontend/components/organisms/WorkspaceShell";
 import { repository } from "@backend/db";
 import { CAMPAIGN_NAME } from "@backend/db/seed-data";
 import { listDatabases } from "@backend/domain/database";
+import { TINY_TAG, inventoryBreakdown } from "@backend/domain/inventory";
 import {
   type ItemView,
   itemWeight,
@@ -122,11 +123,13 @@ export default async function CharacterSheetPage({
 
   const equipment = [...items].sort((a, b) => a.name.localeCompare(b.name));
 
-  // A real split, not a fabricated "equipped" slot Arca does not model: the
-  // `types` an item carries ARE stored data, and `Weapon` is one campaigns
-  // actually tag.
-  const weapons = equipment.filter((item) => item.types.includes("Weapon"));
-  const carried = equipment.filter((item) => !item.types.includes("Weapon"));
+  // The printed sheet's boxes — weapons at hand, worn armour, tiny items, and
+  // the slotted inventory — split by the rule in `backend/domain/inventory.ts`.
+  const inventory = inventoryBreakdown(
+    equipment,
+    character.sheet.attributes.STR,
+    character.sheet.protection,
+  );
 
   return (
     <WorkspaceShell {...shell}>
@@ -179,14 +182,35 @@ export default async function CharacterSheetPage({
               </div>
             </div>
 
-            <WeaponsAtHand items={weapons} containerId={containerId} />
+            <WeaponsAtHand items={inventory.weapons} containerId={containerId} />
             <EquipmentTable
-              title="Carried"
-              subtitle="everything else"
-              items={carried}
+              title="Inventory"
+              subtitle="one slot per row · half STR, rounded up"
+              items={inventory.carried}
               containerId={containerId}
-              emptyLabel="Nothing else carried."
+              emptyLabel="Nothing in the pack."
+              count={
+                <Chip
+                  tone={inventory.over ? "danger" : inventory.used === inventory.slots ? "warning" : "neutral"}
+                  className="ml-auto"
+                >
+                  <span className="font-mono tabular-nums">
+                    {inventory.used} / {inventory.slots}
+                  </span>{" "}
+                  slots{inventory.over ? " — over" : ""}
+                </Chip>
+              }
             />
+            {inventory.worn.length > 0 ? (
+              <EquipmentTable
+                title="Worn"
+                subtitle="the armour and helmet on the sheet · no slot"
+                items={inventory.worn}
+                containerId={containerId}
+                emptyLabel=""
+              />
+            ) : null}
+            <TinyItems items={inventory.tiny} containerId={containerId} />
 
             <p className="border-t border-border p-3 text-sm text-muted">
               Add, move or split items from the{" "}
@@ -211,12 +235,15 @@ function EquipmentTable({
   items,
   emptyLabel,
   containerId,
+  count,
 }: {
   title: string;
   subtitle: string;
   items: ItemView[];
   emptyLabel: string;
   containerId: string;
+  /** Replaces the plain row count in the header (the inventory's slot meter). */
+  count?: React.ReactNode;
 }) {
   return (
     <div className="border-b border-border last:border-0">
@@ -225,9 +252,11 @@ function EquipmentTable({
           {title}
         </h3>
         <span className="text-sm text-faint">{subtitle}</span>
-        <Chip tone="neutral" className="ml-auto">
-          {items.length}
-        </Chip>
+        {count ?? (
+          <Chip tone="neutral" className="ml-auto">
+            {items.length}
+          </Chip>
+        )}
       </div>
 
       {items.length === 0 ? (
@@ -404,6 +433,55 @@ function WeaponsAtHand({
             </tbody>
           </table>
         </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The sheet's "Tiny items" box: things too small to take a slot. An item is
+ * tiny when it carries the `tiny` tag, so moving one here is a tag edit in the
+ * inventory rather than a second list to keep in step.
+ */
+function TinyItems({
+  items,
+  containerId,
+}: {
+  items: ItemView[];
+  containerId: string;
+}) {
+  return (
+    <div className="border-b border-border px-4 py-3">
+      <div className="flex items-center gap-2">
+        <h3 className="font-serif text-sm font-bold uppercase tracking-wider text-muted">
+          Tiny items
+        </h3>
+        <span className="text-sm text-faint">no slot</span>
+        <Chip tone="neutral" className="ml-auto">
+          {items.length}
+        </Chip>
+      </div>
+      {items.length === 0 ? (
+        <p className="mt-2 text-base text-muted">
+          Tag an item <span className="font-mono text-text">{TINY_TAG}</span> in the
+          inventory — a ring, a key, a letter — and it moves here.
+        </p>
+      ) : (
+        <ul className="mt-2 flex flex-wrap gap-2">
+          {items.map((item) => (
+            <li key={item.id}>
+              <Link
+                href={`/c/${containerId}?item=${item.id}`}
+                className="inline-flex items-center gap-1 rounded-sm border border-border bg-surface2 px-2 py-1 text-base text-text hover:text-primary"
+              >
+                {item.name}
+                {item.qty > 1 ? (
+                  <span className="font-mono text-sm tabular-nums text-muted">×{item.qty}</span>
+                ) : null}
+              </Link>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
