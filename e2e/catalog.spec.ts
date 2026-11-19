@@ -200,7 +200,8 @@ test.describe("the catalogue", () => {
     await saved(kova, () =>
       dialog.getByRole("button", { name: /save/i }).click(),
     );
-    await expect(kova.getByRole("dialog")).toHaveCount(0);
+    // Saved and closed — back on the item's own detail card.
+    await expect(kova.getByRole("dialog", { name: "Edit item" })).toHaveCount(0);
     await kova.context().close();
   });
 

@@ -8,6 +8,7 @@ import { CatalogPickerDialog } from "@frontend/components/organisms/CatalogPicke
 import { ContainerActions } from "@frontend/components/organisms/ContainerActions";
 import { ContainerEditorDialog } from "@frontend/components/organisms/ContainerEditorDialog";
 import { DetailPanel } from "@frontend/components/organisms/DetailPanel";
+import { CenteredDialog } from "@frontend/components/molecules/CenteredDialog";
 import { ShareDialog } from "@frontend/components/organisms/ShareDialog";
 import { WorkspaceShell } from "@frontend/components/organisms/WorkspaceShell";
 import {
@@ -247,41 +248,23 @@ export default async function WorkspacePage({
    * scroll independently, and nesting it would put the item detail inside the
    * scroll container of the table it is describing.
    */
-  const detailPanel = selected ? (
-    <>
-      <aside
-        aria-label="Item detail"
-        className="hidden w-[var(--detail-w)] shrink-0 flex-col overflow-y-auto border-l border-border bg-surface lg:flex"
-      >
-        <DetailPanel
-          item={selected}
-          container={container}
-          comments={comments}
-          canEdit={editable}
-          query={query}
-        />
-      </aside>
-
-      <div className="fixed inset-0 z-20 lg:hidden">
-        <Link
-          href={`${here}${query ? `?q=${encodeURIComponent(query)}` : ""}`}
-          aria-label="Close item detail"
-          className="absolute inset-0 bg-black/60"
-        />
-        <aside
-          aria-label="Item detail"
-          className="absolute inset-y-0 right-0 flex w-full max-w-sm flex-col overflow-y-auto border-l border-border bg-surface"
-        >
-          <DetailPanel
-            item={selected}
-            container={container}
-            comments={comments}
-            canEdit={editable}
-            query={query}
-          />
-        </aside>
-      </div>
-    </>
+  // The item detail, as a card in the middle of the screen at every width.
+  // A pinned column beside the table squeezed both in TaleSpire's side panel.
+  // Hidden while another dialog (edit, move) is open over it — one card at a
+  // time; closing that one comes back here.
+  const detailPanel = selected && !sp.dialog ? (
+    <CenteredDialog
+      label="Item detail"
+      closeHref={`${here}${query ? `?q=${encodeURIComponent(query)}` : ""}`}
+    >
+      <DetailPanel
+        item={selected}
+        container={container}
+        comments={comments}
+        canEdit={editable}
+        query={query}
+      />
+    </CenteredDialog>
   ) : null;
 
   return (
