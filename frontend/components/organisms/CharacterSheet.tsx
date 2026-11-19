@@ -43,6 +43,7 @@ import {
   CheckButton,
   CheckToast,
   type RolledCheck,
+  type UnreadCheck,
 } from "@frontend/components/molecules/CheckButton";
 import { banesFor } from "@backend/domain/checks";
 import { DiceFinder } from "@frontend/components/organisms/DiceFinder";
@@ -133,7 +134,7 @@ export function CharacterSheet({
   // player would otherwise have to remember.
   const [lastRoll, setLastRoll] = useState<{
     rolled: RolledCheck | null;
-    unread: string | null;
+    unread: UnreadCheck | null;
     autoMarked: boolean;
   }>({ rolled: null, unread: null, autoMarked: false });
 
@@ -156,7 +157,7 @@ export function CharacterSheet({
       }
       setLastRoll({ rolled, unread: null, autoMarked });
     },
-    onUnread: (name) => setLastRoll({ rolled: null, unread: name, autoMarked: false }),
+    onUnread: (check) => setLastRoll({ rolled: null, unread: check, autoMarked: false }),
   };
 
   return (
@@ -165,6 +166,7 @@ export function CharacterSheet({
         rolled={lastRoll.rolled}
         unread={lastRoll.unread}
         autoMarked={lastRoll.autoMarked}
+        onManual={(rolled, skill) => checks.onRolled(rolled, skill)}
         onClose={() => setLastRoll({ rolled: null, unread: null, autoMarked: false })}
       />
       {/* One live region for the whole sheet. A failed save has to say so
@@ -218,7 +220,7 @@ export function CharacterSheet({
 /** What a check button reports back to the sheet. */
 interface Checks {
   onRolled: (rolled: RolledCheck, skill?: string) => void;
-  onUnread: (name: string) => void;
+  onUnread: (check: UnreadCheck) => void;
 }
 
 /* ================================================================== *
@@ -1064,7 +1066,7 @@ function SkillGroup({
                 target={level}
                 banes={banesFor(sheet, skill.attribute, skill.name)}
                 onRolled={(rolled) => checks.onRolled(rolled, skill.name)}
-                onUnread={checks.onUnread}
+                onUnread={(check) => checks.onUnread({ ...check, skill: skill.name })}
               />
 
               {/* The advancement tick. Earned on a dragon or a demon, spent

@@ -113,12 +113,26 @@ export function armourDefaultsFor(
   return known ? { ...known.piece } : null;
 }
 
-/** How many d20s a check with this edge throws: one, or one per bane plus
- *  one (at least two), or two for a boon. */
-export function diceFor(edge: Edge, baneCount: number): number {
-  if (edge === "normal") return 1;
-  if (edge === "boon") return 2;
-  return 1 + Math.max(1, baneCount);
+/**
+ * The roll's net modifier: banes negative, boons positive, 0 a plain d20.
+ * Boons and banes cancel one for one, so the table states the NET — the
+ * scale on the sheet runs -3…+3. Each step is one more d20.
+ */
+export const MODIFIERS = [-3, -2, -1, 0, 1, 2, 3] as const;
+export type Modifier = (typeof MODIFIERS)[number];
+
+export function edgeOf(modifier: number): Edge {
+  return modifier < 0 ? "bane" : modifier > 0 ? "boon" : "normal";
+}
+
+/** d20s thrown for a net modifier: one, plus one per boon or bane. */
+export function diceForModifier(modifier: number): number {
+  return 1 + Math.abs(modifier);
+}
+
+/** The suggestion for the scale: one bane per reason, capped at -3. */
+export function suggestedModifier(banes: readonly string[]): Modifier {
+  return (banes.length === 0 ? 0 : -Math.min(3, banes.length)) as Modifier;
 }
 
 /**

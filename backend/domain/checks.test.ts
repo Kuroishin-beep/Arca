@@ -4,7 +4,9 @@ import { emptySheet } from "./character";
 import {
   armourDefaultsFor,
   banesFor,
-  diceFor,
+  diceForModifier,
+  edgeOf,
+  suggestedModifier,
   resolveCheck,
   rollD20s,
   weaponDamageBonus,
@@ -27,11 +29,23 @@ describe("resolveCheck", () => {
     expect(result).toMatchObject({ kept: 3, success: true, edge: "boon" });
   });
 
-  it("throws one die plainly, two for a boon, one per bane plus one", () => {
-    expect(diceFor("normal", 2)).toBe(1);
-    expect(diceFor("boon", 0)).toBe(2);
-    expect(diceFor("bane", 0)).toBe(2);
-    expect(diceFor("bane", 2)).toBe(3);
+  it("reads the -3…+3 scale: banes below zero, boons above, one die per step", () => {
+    expect(edgeOf(-2)).toBe("bane");
+    expect(edgeOf(0)).toBe("normal");
+    expect(edgeOf(3)).toBe("boon");
+    expect(diceForModifier(0)).toBe(1);
+    expect(diceForModifier(-2)).toBe(3);
+    expect(diceForModifier(3)).toBe(4);
+  });
+
+  it("suggests one bane per reason, at most three", () => {
+    expect(suggestedModifier([])).toBe(0);
+    expect(suggestedModifier(["Dazed", "Chainmail"])).toBe(-2);
+    expect(suggestedModifier(["a", "b", "c", "d"])).toBe(-3);
+  });
+
+  it("keeps the best of several boons", () => {
+    expect(resolveCheck(10, [18, 9, 14], "boon").kept).toBe(9);
   });
 
   it("calls a 1 a Dragon and a 20 a Demon, whatever the target", () => {

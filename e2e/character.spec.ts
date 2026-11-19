@@ -376,19 +376,20 @@ test.describe("the Dragonbane sheet", () => {
     await kova.goto(`/character/${KOVA_CONTAINER_ID}`);
     const row = kova.locator("li").filter({ hasText: "Awareness" }).first();
     await row.getByRole("button", { name: /^roll awareness \(\d+\)/i }).click();
-    // It asks first: Boon, Normal or Bane — Normal suggested, with no bane.
+    // It asks first, on a scale from -3 (banes) to +3 (boons); with nothing
+    // to bane it, the plain d20 is the suggestion.
     const choice = row.getByRole("group", { name: /how to roll awareness/i });
-    await expect(choice.getByRole("button", { name: /^normal/i })).toContainText("suggested");
+    await expect(choice.getByRole("button", { name: /^normal.*suggested/i })).toHaveText("1");
     await choice.getByRole("button", { name: /^normal/i }).click();
 
     const toast = kova.getByRole("status").filter({ hasText: "Awareness" });
     await expect(toast).toContainText(/rolled \d+ vs \d+/);
     await expect(toast).toContainText(/success|failure|dragon|demon/i);
 
-    // A boon throws two and keeps the best.
+    // Two boons throw three d20 and keep the best.
     await row.getByRole("button", { name: /^roll awareness \(\d+\)/i }).click();
-    await choice.getByRole("button", { name: /^boon/i }).click();
-    await expect(toast).toContainText(/boon: dice \d+, \d+, best kept/i);
+    await choice.getByRole("button", { name: /^2 boons/i }).click();
+    await expect(toast).toContainText(/2 boons: dice \d+, \d+, \d+, best kept/i);
     await kova.context().close();
   });
 
@@ -650,6 +651,44 @@ test.describe("skills, advancement and abilities", () => {
     const kova = await signInAs(browser, "Kova");
     await kova.goto(`/character/${KOVA_CONTAINER_ID}`);
     await expect(kova.locator("#dice #notation")).toBeVisible();
+    await kova.context().close();
+  });
+});
+
+test.describe("when TaleSpire sends no result", () => {
+  test("the player types what the dice showed and Arca still judges it", async ({ browser }) => {
+    const kova = await signInAs(browser, "Kova");
+    // A TaleSpire whose tray is cleared instead of thrown: no result arrives.
+    await kova.addInitScript(() => {
+      (window as unknown as { TS: unknown }).TS = {
+        dice: {
+          putDiceInTray: () => {
+            window.setTimeout(() => {
+              window.dispatchEvent(
+                new CustomEvent("arca:ts-roll", {
+                  detail: { kind: "rollRemoved", payload: { rollId: "roll-9" } },
+                }),
+              );
+            }, 50);
+            return Promise.resolve("roll-9");
+          },
+          evaluateDiceResultsGroup: () => Promise.resolve(0),
+        },
+      };
+    });
+    await kova.goto(`/character/${KOVA_CONTAINER_ID}`);
+    const row = kova.locator("li").filter({ hasText: "Swimming" }).first();
+    await row.getByRole("button", { name: /^roll swimming/i }).click();
+    await row
+      .getByRole("group", { name: /how to roll swimming/i })
+      .getByRole("button", { name: /^normal/i })
+      .click();
+
+    const toast = kova.getByRole("status").filter({ hasText: "Swimming" });
+    await expect(toast).toContainText(/no result came back/i);
+    await toast.getByRole("textbox", { name: /d20 1 for swimming/i }).fill("1");
+    await saved(kova, () => toast.getByRole("button", { name: /^judge$/i }).click());
+    await expect(kova.getByRole("status").filter({ hasText: "Swimming" })).toContainText("Dragon!");
     await kova.context().close();
   });
 });
