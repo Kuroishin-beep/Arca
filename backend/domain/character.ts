@@ -187,6 +187,17 @@ export const Profile = z.object({
   appearance: z.string().max(500),
   weakness: z.string().max(500),
   memento: z.string().max(200),
+  /**
+   * A link to a portrait image. A link rather than an upload: Arca stores no
+   * files. Only http(s) — anything else (a `javascript:` URL) is refused, since
+   * this lands in an <img> every party member's browser loads.
+   */
+  portrait: z
+    .string()
+    .trim()
+    .max(500)
+    .refine((v) => v === "" || /^https?:\/\/\S+$/i.test(v), "A portrait must be an http(s) link.")
+    .optional(),
 });
 export type Profile = z.infer<typeof Profile>;
 
@@ -307,8 +318,20 @@ export const Spell = z.object({
   rank: z.coerce.number().int().min(0).max(3),
   school: z.string().trim().max(40),
   notes: z.string().max(500),
+  /** Prepared for casting. Magic tricks (rank 0) never need preparing. */
+  prepared: z.boolean().optional(),
 });
 export type Spell = z.infer<typeof Spell>;
+
+/** How many spells can be prepared at once: the INT base chance. */
+export function preparedSpellLimit(intelligence: number): number {
+  return baseChance(intelligence);
+}
+
+/** WP a cast costs: 1 for a magic trick, 2 per power level for a spell. */
+export function castCost(rank: number, powerLevel: number): number {
+  return rank === 0 ? 1 : 2 * powerLevel;
+}
 
 export const Spells = z.array(Spell).max(100);
 export type Spells = z.infer<typeof Spells>;

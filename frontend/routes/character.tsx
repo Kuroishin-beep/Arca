@@ -2,11 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
-import { ButtonLink } from "@frontend/components/atoms/Button";
 import { RollButton } from "@frontend/components/atoms/RollButton";
 import { Chip } from "@frontend/components/atoms/Chip";
 import { WeightMeter } from "@frontend/components/molecules/WeightMeter";
-import { CharacterSheet } from "@frontend/components/organisms/CharacterSheet";
+import {
+  CharacterSheet,
+  type SheetTab,
+} from "@frontend/components/organisms/CharacterSheet";
+import { Icon, type IconName } from "@frontend/components/atoms/Icon";
 import { WorkspaceShell } from "@frontend/components/organisms/WorkspaceShell";
 import { repository } from "@backend/db";
 import { resolveContainerId } from "@backend/lib/container-ref";
@@ -80,7 +83,7 @@ export default async function CharacterSheetPage({
   searchParams,
 }: {
   params: Promise<{ containerId: string }>;
-  searchParams: Promise<{ nav?: string; rail?: string }>;
+  searchParams: Promise<{ nav?: string; rail?: string; tab?: string }>;
 }) {
   const principal = await currentPrincipal();
   if (!principal) redirect("/signin");
@@ -124,6 +127,7 @@ export default async function CharacterSheetPage({
   ]);
   const here = sheetPath(container);
   const railCollapsed = sp.rail === "0";
+  const tab: SheetTab = SHEET_TABS.some((t) => t.key === sp.tab) ? (sp.tab as SheetTab) : "sheet";
   const writable = containers.find((c) => canWrite(principal, c));
   const shell = {
     principal,
@@ -169,13 +173,7 @@ export default async function CharacterSheetPage({
               under. */}
           <h1 className="sr-only">Character sheet: {character.name}</h1>
           <div className="flex flex-wrap items-center gap-2">
-            <ButtonLink href={inventoryPath} size="sm" icon="pack">
-              Back to inventory
-            </ButtonLink>
-            {/* DiceFinder is on this page now; this jumps to it. */}
-            <ButtonLink href="#dice" size="sm" icon="d20">
-              Dice
-            </ButtonLink>
+            <SheetTabs here={here} inventoryPath={inventoryPath} tab={tab} rail={railCollapsed} />
             {!editable ? (
               <Chip tone="neutral">Read only</Chip>
             ) : null}
@@ -186,12 +184,14 @@ export default async function CharacterSheetPage({
           <CharacterSheet
             character={character}
             canEdit={editable}
+            tab={tab}
             packItems={[...new Set(equipment.map((item) => item.name))]}
           />
 
           {/* Equipment is the one section that is NOT stored on the character:
               it is the containment view of the same container, which is the
               whole reason a sheet did not need its own inventory model. */}
+          {tab === "sheet" ? (
           <section className="rounded-lg border border-border bg-surface">
             <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">
               <h2 className="font-serif text-lg font-bold text-text">
@@ -259,6 +259,7 @@ export default async function CharacterSheetPage({
               . Carried weight updates on its own.
             </p>
           </section>
+          ) : null}
         </div>
       </div>
     </WorkspaceShell>
@@ -561,5 +562,65 @@ function Money({ purse, coins }: { purse: Purse; coins: number }) {
         </p>
       )}
     </div>
+  );
+}
+
+const SHEET_TABS: { key: SheetTab; label: string; icon: IconName }[] = [
+  { key: "sheet", label: "Sheet", icon: "users" },
+  { key: "abilities", label: "Abilities", icon: "arrow-up" },
+  { key: "spells", label: "Spells", icon: "eye" },
+  { key: "dice", label: "Dice", icon: "d20" },
+];
+
+/**
+ * The sheet's tabs: Inventory (this character's container), then the sheet's
+ * own sections. Links, not client state, so a tab is an address — "open my
+ * spells" is a bookmark — and each loads only what it shows.
+ */
+function SheetTabs({
+  here,
+  inventoryPath,
+  tab,
+  rail,
+}: {
+  here: string;
+  inventoryPath: string;
+  tab: SheetTab;
+  rail: boolean;
+}) {
+  const href = (key: SheetTab) => {
+    const p = new URLSearchParams();
+    if (key !== "sheet") p.set("tab", key);
+    if (rail) p.set("rail", "0");
+    const qs = p.toString();
+    return qs ? `${here}?${qs}` : here;
+  };
+  const base =
+    "inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm font-medium";
+  return (
+    <nav aria-label="Character sheet sections" className="flex flex-wrap gap-1">
+      <Link href={inventoryPath} className={`${base} border-border bg-surface text-text hover:bg-surface2`}>
+        <Icon name="pack" size={14} />
+        Inventory
+      </Link>
+      {SHEET_TABS.map((t) => {
+        const active = t.key === tab;
+        return (
+          <Link
+            key={t.key}
+            href={href(t.key)}
+            aria-current={active ? "page" : undefined}
+            className={`${base} ${
+              active
+                ? "border-primary bg-primary text-invert"
+                : "border-border bg-surface text-text hover:bg-surface2"
+            }`}
+          >
+            <Icon name={t.icon} size={14} />
+            {t.label}
+          </Link>
+        );
+      })}
+    </nav>
   );
 }

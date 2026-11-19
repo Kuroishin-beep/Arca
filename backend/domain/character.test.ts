@@ -21,6 +21,9 @@ import {
   skillLevel,
   skillValue,
   advancementTarget,
+  Profile,
+  castCost,
+  preparedSpellLimit,
 } from "./character";
 
 /**
@@ -310,4 +313,30 @@ describe("skill levels and advancement", () => {
     expect(advancementTarget(14)).toBe(14);
     expect(advancementTarget(18)).toBeNull();
 });
+});
+
+describe("spells", () => {
+  it("prepares as many spells as the INT base chance", () => {
+    expect(preparedSpellLimit(14)).toBe(6);
+    expect(preparedSpellLimit(10)).toBe(5);
+  });
+
+  it("costs 1 WP for a trick, 2 per power level for a spell", () => {
+    expect(castCost(0, 1)).toBe(1);
+    expect(castCost(1, 1)).toBe(2);
+    expect(castCost(2, 3)).toBe(6);
+  });
+});
+
+describe("portrait link", () => {
+  const base = emptySheet().profile;
+  it("accepts an http(s) link or nothing", () => {
+    expect(Profile.safeParse({ ...base, portrait: "https://example.com/a.png" }).success).toBe(true);
+    expect(Profile.safeParse({ ...base, portrait: "" }).success).toBe(true);
+    expect(Profile.safeParse(base).success).toBe(true);
+  });
+  it("refuses anything else", () => {
+    expect(Profile.safeParse({ ...base, portrait: "javascript:alert(1)" }).success).toBe(false);
+    expect(Profile.safeParse({ ...base, portrait: "data:image/png;base64,AA" }).success).toBe(false);
+  });
 });

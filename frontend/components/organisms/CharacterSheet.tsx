@@ -32,6 +32,8 @@ import {
   skillValue,
   SKILL_LEVEL_MAX,
   advancementTarget,
+  castCost,
+  preparedSpellLimit,
 } from "@backend/domain/character";
 import type { CharacterView } from "@backend/domain/view";
 import { Button } from "@frontend/components/atoms/Button";
@@ -94,8 +96,11 @@ export function CharacterSheet({
   character,
   canEdit,
   packItems = [],
+  tab = "sheet",
 }: {
   character: CharacterView;
+  /** Which section is showing — the tabs above the sheet set it. */
+  tab?: SheetTab;
   /** Names of what this character carries — the armour picker's choices. */
   packItems?: readonly string[];
   /** False only if the permission rules ever widen read beyond write. Today
@@ -181,41 +186,58 @@ export function CharacterSheet({
         ) : null}
       </div>
 
-      <Identity
-        character={character}
-        sheet={sheet}
-        canEdit={canEdit}
-        onSave={save}
-        onError={setError}
-      />
+      {/* One section of the sheet at a time, picked by the tabs above it
+          (?tab=). The sheet proper is the default; abilities, spells and dice
+          each get the whole width instead of a column at the bottom. */}
+      {tab === "sheet" ? (
+        <>
+          <Identity
+            character={character}
+            sheet={sheet}
+            canEdit={canEdit}
+            onSave={save}
+            onError={setError}
+          />
 
-      <Attributes sheet={sheet} canEdit={canEdit} onSave={save} checks={checks} />
+          <Attributes sheet={sheet} canEdit={canEdit} onSave={save} checks={checks} />
 
-      {/* Skills, then what is tracked during play, then what is looked up.
-          One column in the docked panel; two once there is room; three on a
-          wide screen, so the sheet uses the width instead of leaving it
-          empty either side. */}
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] 2xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1fr)]">
-        {/* At xl, Skills spans both rows of the left column and the other two
-            stack on the right; at 2xl all three sit side by side. One render
-            of each, placed by the grid — never a hidden duplicate. */}
-        <div className="xl:row-span-2 2xl:row-span-1">
-          <Skills sheet={sheet} canEdit={canEdit} onSave={save} checks={checks} />
-        </div>
+          {/* Skills down the left, what is tracked during play down the
+              right — the printed sheet's two halves. One column in the
+              docked panel. */}
+          <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+            <Skills sheet={sheet} canEdit={canEdit} onSave={save} checks={checks} />
+            <div className="flex flex-col gap-4">
+              <Vitals sheet={sheet} canEdit={canEdit} onSave={save} />
+              <RestBox sheet={sheet} canEdit={canEdit} onSave={save} />
+              <Protection sheet={sheet} canEdit={canEdit} onSave={save} packItems={packItems} />
+            </div>
+          </div>
+        </>
+      ) : null}
 
-        <div className="flex flex-col gap-4">
-          <Vitals sheet={sheet} canEdit={canEdit} onSave={save} />
-          <RestBox sheet={sheet} canEdit={canEdit} onSave={save} />
-          <Protection sheet={sheet} canEdit={canEdit} onSave={save} packItems={packItems} />
-        </div>
+      {tab === "abilities" ? (
+        <HeroicAbilities sheet={sheet} canEdit={canEdit} onSave={save} />
+      ) : null}
 
-        <div className="flex flex-col gap-4">
-          <LookupColumn sheet={sheet} canEdit={canEdit} onSave={save} castsSpells={derived.castsSpells} />
-        </div>
-      </div>
+      {tab === "spells" ? (
+        derived.castsSpells ? (
+          <Spells sheet={sheet} canEdit={canEdit} onSave={save} />
+        ) : (
+          <NoSpells />
+        )
+      ) : null}
+
+      {tab === "dice" ? (
+        <section id="dice" className={SHEET_BOX}>
+          <h2 className={`mb-2 ${SHEET_HEADING}`}>Dice</h2>
+          <DiceFinder />
+        </section>
+      ) : null}
     </div>
   );
 }
+
+export type SheetTab = "sheet" | "abilities" | "spells" | "dice";
 
 /** What a check button reports back to the sheet. */
 interface Checks {
@@ -283,7 +305,8 @@ function Identity({
 
   return (
     <section className={SHEET_BOX}>
-      <div className="flex flex-col gap-3 panel:flex-row panel:items-start">
+      <div className="flex items-start gap-3">
+        <Portrait url={sheet.profile.portrait} name={character.name} />
         <div className="min-w-0 flex-1">
           <label htmlFor="character-name" className="sr-only">
             Character name
@@ -361,6 +384,23 @@ function Identity({
           onCommit={(v) => setProfile({ memento: v })}
         />
       </div>
+
+      {canEdit ? (
+        <div className="mt-3">
+          <TextInput
+            key={`portrait-${sheet.profile.portrait ?? ""}`}
+            id="portrait"
+            label="Portrait image link"
+            value={sheet.profile.portrait ?? ""}
+            placeholder="https://… (an image from Discord, an art site…)"
+            onCommit={(v) => {
+              const link = v.trim();
+              if (link === "" || /^https?:\/\/\S+$/i.test(link)) setProfile({ portrait: link });
+              else onError("A portrait must be an http(s) link to an image.");
+            }}
+          />
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -640,7 +680,7 @@ function Attributes({
           inside 380px gives it 110px. The hard rule is no horizontal scroll at
           375px, and a stepper that does not fit its column is how you break
           it. */}
-      <div className="grid grid-cols-1 gap-3 panel:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-6">
         {ATTRIBUTE_KEYS.map((key) => (
           <AttributeBox
             key={key}
@@ -682,31 +722,33 @@ function AttributeBox({
 }) {
   const { label: conditionLabel } = conditionFor(attribute);
 
+  // Compact: the docked TaleSpire panel is ~380px, and six tall boxes pushed
+  // the skills a full screen down. Name and die on one line, base chance and
+  // condition on another.
   return (
     <div
-      className={`flex flex-col gap-2 rounded-md border p-3 ${
+      className={`flex flex-col gap-1.5 rounded-md border p-2 ${
         condition ? "border-warning bg-warning-weak" : "border-border bg-surface2"
       }`}
     >
-      <div>
+      <div className="flex items-center justify-between gap-1">
         <label
           htmlFor={`attr-${attribute}`}
-          className="block font-mono text-sm font-bold text-text"
+          className="font-mono text-sm font-bold text-text"
           title={ATTRIBUTE_LABELS[attribute]}
         >
           {attribute}
+          <span className="ml-1 font-sans text-xs font-normal text-faint">
+            {ATTRIBUTE_LABELS[attribute]}
+          </span>
         </label>
-        <span className="flex items-center justify-between gap-1 text-xs text-faint">
-          {ATTRIBUTE_LABELS[attribute]}
-          <CheckButton
-            name={ATTRIBUTE_LABELS[attribute]}
-            target={score}
-            banes={banes}
-            onRolled={(rolled) => checks.onRolled(rolled)}
-            onUnread={checks.onUnread}
-            className="-my-1"
-          />
-        </span>
+        <CheckButton
+          name={ATTRIBUTE_LABELS[attribute]}
+          target={score}
+          banes={banes}
+          onRolled={(rolled) => checks.onRolled(rolled)}
+          onUnread={checks.onUnread}
+        />
       </div>
 
       {canEdit ? (
@@ -720,37 +762,28 @@ function AttributeBox({
           size="sm"
         />
       ) : (
-        <p className="font-mono text-xl font-bold tabular-nums text-text">
-          {score}
-        </p>
+        <p className="font-mono text-xl font-bold tabular-nums text-text">{score}</p>
       )}
 
-      <p className="text-xs text-muted">
-        Base chance{" "}
-        <span className="font-mono tabular-nums text-text">
-          {baseChance(score)}
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-xs">
+        <span className="text-muted">
+          Base chance{" "}
+          <span className="font-mono tabular-nums text-text">{baseChance(score)}</span>
         </span>
-      </p>
-
-      <label
-        className={`flex items-center gap-2 text-xs ${
-          canEdit ? "cursor-pointer" : ""
-        }`}
-      >
-        <input
-          type="checkbox"
-          checked={condition}
-          disabled={!canEdit}
-          onChange={(e) => onCondition(e.target.checked)}
-          className="h-4 w-4 shrink-0 accent-[var(--color-warning)]"
-        />
-        <span className={condition ? "font-medium text-warning" : "text-faint"}>
-          {conditionLabel}
-        </span>
-        <span className="sr-only">
-          , a condition on {ATTRIBUTE_LABELS[attribute]}
-        </span>
-      </label>
+        <label className={`relative flex items-center gap-1.5 ${canEdit ? "cursor-pointer" : ""}`}>
+          <input
+            type="checkbox"
+            checked={condition}
+            disabled={!canEdit}
+            onChange={(e) => onCondition(e.target.checked)}
+            className="h-4 w-4 shrink-0 accent-[var(--color-warning)]"
+          />
+          <span className={condition ? "font-medium text-warning" : "text-faint"}>
+            {conditionLabel}
+          </span>
+          <span className="sr-only">, a condition on {ATTRIBUTE_LABELS[attribute]}</span>
+        </label>
+      </div>
     </div>
   );
 }
@@ -1124,135 +1157,237 @@ function Spells({
 }) {
   // Read-only until the pencil, like heroic abilities.
   const [editingId, setEditingId] = useState<string | null>(null);
+  /** The last cast, so its WP can be given back. */
+  const [cast, setCast] = useState<{ id: string; before: number; label: string } | null>(null);
   const setSpells = (spells: Spell[]) => onSave({ spells });
 
-  const add = () => {
+  const add = (rank: number) => {
     const id =
       typeof crypto !== "undefined" && "randomUUID" in crypto
         ? crypto.randomUUID()
         : `spell-${Date.now()}`;
-    setSpells([...sheet.spells, { id, name: "New spell", rank: 1, school: "", notes: "" }]);
+    setSpells([
+      ...sheet.spells,
+      { id, name: rank === 0 ? "New trick" : "New spell", rank, school: "", notes: "", prepared: false },
+    ]);
     setEditingId(id);
   };
 
   const patch = (id: string, fields: Partial<Spell>) =>
-    setSpells(
-      sheet.spells.map((s) => (s.id === id ? { ...s, ...fields } : s)),
+    setSpells(sheet.spells.map((s) => (s.id === id ? { ...s, ...fields } : s)));
+
+  const spend = (spell: Spell, powerLevel: number) => {
+    const cost = castCost(spell.rank, powerLevel);
+    if (sheet.wp < cost) return;
+    onSave({ wp: sheet.wp - cost });
+    setCast({
+      id: spell.id,
+      before: sheet.wp,
+      label: spell.rank === 0 ? spell.name : `${spell.name} at power ${powerLevel}`,
+    });
+  };
+
+  const tricks = sheet.spells.filter((s) => s.rank === 0);
+  const spells = sheet.spells.filter((s) => s.rank > 0);
+  const limit = preparedSpellLimit(sheet.attributes.INT);
+  const prepared = spells.filter((s) => s.prepared).length;
+  const { maxWp } = derive(sheet);
+
+  const editForm = (spell: Spell) => (
+    <li
+      key={spell.id}
+      className="grid items-end gap-2 rounded-sm border border-primary bg-surface2 p-3 panel:grid-cols-[1fr_auto]"
+    >
+      <TextInput
+        id={`spell-name-${spell.id}`}
+        label="Name"
+        value={spell.name}
+        onCommit={(name) => {
+          if (name.trim()) patch(spell.id, { name: name.trim() });
+        }}
+      />
+      <div>
+        <label htmlFor={`spell-rank-${spell.id}`} className="mb-1 block text-sm font-medium text-muted">
+          Rank (0 = trick)
+        </label>
+        <NumberStepper
+          id={`spell-rank-${spell.id}`}
+          label="rank"
+          value={spell.rank}
+          min={0}
+          max={3}
+          size="sm"
+          onChange={(rank) => patch(spell.id, { rank })}
+        />
+      </div>
+      <div className="panel:col-span-2">
+        <TextInput
+          id={`spell-school-${spell.id}`}
+          label="School"
+          value={spell.school}
+          placeholder="Elementalism"
+          onCommit={(school) => patch(spell.id, { school })}
+        />
+      </div>
+      <div className="panel:col-span-2">
+        <LongText
+          id={`spell-notes-${spell.id}`}
+          label="Effect"
+          value={spell.notes}
+          placeholder="What it does."
+          onCommit={(notes) => patch(spell.id, { notes })}
+        />
+      </div>
+      <div className="flex items-center gap-2 panel:col-span-2">
+        <Button size="sm" variant="primary" icon="check" onClick={() => setEditingId(null)}>
+          Done
+        </Button>
+        <Button
+          size="sm"
+          variant="danger"
+          icon="trash"
+          className="ml-auto"
+          onClick={() => {
+            setSpells(sheet.spells.filter((s) => s.id !== spell.id));
+            setEditingId(null);
+          }}
+        >
+          Forget
+        </Button>
+      </div>
+    </li>
+  );
+
+  const card = (spell: Spell) => {
+    const isTrick = spell.rank === 0;
+    const canPrepare = spell.prepared || prepared < limit;
+    return (
+      <li key={spell.id} className="rounded-sm border border-border bg-surface2 p-3">
+        <div className="flex items-start gap-2">
+          <h3 className="min-w-0 flex-1 font-medium text-text">{spell.name}</h3>
+          <span className="shrink-0 rounded-sm bg-accent-weak px-1.5 py-0.5 font-mono text-xs text-accent">
+            {isTrick ? "Trick" : `Rank ${spell.rank}`}
+          </span>
+          {canEdit ? (
+            <IconButton
+              icon="edit"
+              label={`Edit ${spell.name}`}
+              size={14}
+              onClick={() => setEditingId(spell.id)}
+              className="-my-1 h-7 w-7"
+            />
+          ) : null}
+        </div>
+        {spell.school.trim() ? (
+          <p className="text-xs uppercase tracking-wide text-faint">{spell.school}</p>
+        ) : null}
+        {spell.notes.trim() ? (
+          <p className="mt-1 whitespace-pre-line text-sm text-muted">{spell.notes}</p>
+        ) : null}
+        {canEdit ? (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {isTrick ? (
+              <Button size="sm" variant="secondary" disabled={sheet.wp < 1} onClick={() => spend(spell, 1)}>
+                Cast (1 WP)
+              </Button>
+            ) : (
+              <>
+                <label className="relative mr-1 flex items-center gap-1.5 text-sm text-text">
+                  <input
+                    type="checkbox"
+                    checked={spell.prepared ?? false}
+                    disabled={!canPrepare}
+                    onChange={(e) => patch(spell.id, { prepared: e.target.checked })}
+                    className="h-4 w-4 accent-[var(--color-primary)]"
+                  />
+                  Prepared
+                </label>
+                {spell.prepared
+                  ? [1, 2, 3].map((pl) => (
+                      <Button
+                        key={pl}
+                        size="sm"
+                        variant="secondary"
+                        disabled={sheet.wp < castCost(spell.rank, pl)}
+                        onClick={() => spend(spell, pl)}
+                      >
+                        Cast {pl} ({castCost(spell.rank, pl)} WP)
+                      </Button>
+                    ))
+                  : !canPrepare ? (
+                      <span className="text-xs text-faint">Unprepare another first ({limit} at most)</span>
+                    ) : null}
+              </>
+            )}
+            {cast?.id === spell.id ? (
+              <span className="flex items-center gap-2 text-xs text-muted">
+                WP {cast.before} → {sheet.wp}
+                <button
+                  type="button"
+                  className="text-primary underline-offset-2 hover:underline"
+                  onClick={() => {
+                    onSave({ wp: cast.before });
+                    setCast(null);
+                  }}
+                >
+                  Undo
+                </button>
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+      </li>
     );
+  };
 
   return (
     <section className={SHEET_BOX}>
-      <div className="mb-3 flex items-baseline justify-between gap-2">
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <h2 className={SHEET_HEADING}>Spells</h2>
-        <span className="text-xs text-faint">
-          {sheet.spells.length} known
+        <span className="flex items-center gap-2">
+          <span className="text-xs text-faint">
+            Prepared {prepared} / {limit} (INT base chance)
+          </span>
+          <span
+            data-testid="spells-wp"
+            className="rounded-sm bg-info-weak px-2 py-0.5 font-mono text-sm tabular-nums text-info"
+          >
+            WP {sheet.wp} / {maxWp}
+          </span>
         </span>
       </div>
 
-      {sheet.spells.length === 0 ? (
-        <p className="mb-3 text-base text-muted">Nothing learned yet.</p>
+      <h3 className="mb-2 font-serif text-sm font-bold uppercase tracking-wider text-muted">
+        Magic tricks <span className="font-sans text-xs normal-case tracking-normal text-faint">· 1 WP · no preparing</span>
+      </h3>
+      {tricks.length === 0 ? (
+        <p className="mb-3 text-base text-muted">No magic tricks yet.</p>
       ) : (
         <ul className="mb-3 flex flex-col gap-2">
-          {sheet.spells.map((spell) =>
-            editingId === spell.id && canEdit ? (
-              <li
-                key={spell.id}
-                className="grid items-end gap-2 rounded-sm border border-primary bg-surface2 p-3 panel:grid-cols-[1fr_auto]"
-              >
-                <TextInput
-                  id={`spell-name-${spell.id}`}
-                  label="Name"
-                  value={spell.name}
-                  onCommit={(name) => {
-                    if (name.trim()) patch(spell.id, { name: name.trim() });
-                  }}
-                />
-                <div>
-                  <label
-                    htmlFor={`spell-rank-${spell.id}`}
-                    className="mb-1 block text-sm font-medium text-muted"
-                  >
-                    Rank
-                  </label>
-                  <NumberStepper
-                    id={`spell-rank-${spell.id}`}
-                    label="rank"
-                    value={spell.rank}
-                    min={0}
-                    max={3}
-                    size="sm"
-                    onChange={(rank) => patch(spell.id, { rank })}
-                  />
-                </div>
-                <div className="panel:col-span-2">
-                  <TextInput
-                    id={`spell-school-${spell.id}`}
-                    label="School"
-                    value={spell.school}
-                    placeholder="Elementalism"
-                    onCommit={(school) => patch(spell.id, { school })}
-                  />
-                </div>
-                <div className="panel:col-span-2">
-                  <LongText
-                    id={`spell-notes-${spell.id}`}
-                    label="Effect"
-                    value={spell.notes}
-                    placeholder="What it does."
-                    onCommit={(notes) => patch(spell.id, { notes })}
-                  />
-                </div>
-                <div className="flex items-center gap-2 panel:col-span-2">
-                  <Button size="sm" variant="primary" icon="check" onClick={() => setEditingId(null)}>
-                    Done
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="danger"
-                    icon="trash"
-                    className="ml-auto"
-                    onClick={() => {
-                      setSpells(sheet.spells.filter((s) => s.id !== spell.id));
-                      setEditingId(null);
-                    }}
-                  >
-                    Forget
-                  </Button>
-                </div>
-              </li>
-            ) : (
-              <li key={spell.id} className="rounded-sm border border-border bg-surface2 p-3">
-                <div className="flex items-start gap-2">
-                  <h3 className="min-w-0 flex-1 font-medium text-text">{spell.name}</h3>
-                  <span className="shrink-0 rounded-sm bg-accent-weak px-1.5 py-0.5 font-mono text-xs text-accent">
-                    {spell.rank === 0 ? "Trick" : `Rank ${spell.rank}`}
-                  </span>
-                  {canEdit ? (
-                    <IconButton
-                      icon="edit"
-                      label={`Edit ${spell.name}`}
-                      size={14}
-                      onClick={() => setEditingId(spell.id)}
-                      className="-my-1 h-7 w-7"
-                    />
-                  ) : null}
-                </div>
-                {spell.school.trim() ? (
-                  <p className="text-xs uppercase tracking-wide text-faint">{spell.school}</p>
-                ) : null}
-                {spell.notes.trim() ? (
-                  <p className="mt-1 whitespace-pre-line text-sm text-muted">{spell.notes}</p>
-                ) : null}
-              </li>
-            ),
-          )}
+          {tricks.map((s) => (editingId === s.id && canEdit ? editForm(s) : card(s)))}
+        </ul>
+      )}
+
+      <h3 className="mb-2 font-serif text-sm font-bold uppercase tracking-wider text-muted">
+        Spells <span className="font-sans text-xs normal-case tracking-normal text-faint">· 2 WP per power level · prepare to cast</span>
+      </h3>
+      {spells.length === 0 ? (
+        <p className="mb-3 text-base text-muted">No spells learned yet.</p>
+      ) : (
+        <ul className="mb-3 flex flex-col gap-2">
+          {spells.map((s) => (editingId === s.id && canEdit ? editForm(s) : card(s)))}
         </ul>
       )}
 
       {canEdit ? (
-        <Button size="sm" icon="plus" onClick={add}>
-          Add spell
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" icon="plus" onClick={() => add(1)}>
+            Add spell
+          </Button>
+          <Button size="sm" icon="plus" variant="ghost" onClick={() => add(0)}>
+            Add magic trick
+          </Button>
+        </div>
       ) : null}
     </section>
   );
@@ -1320,32 +1455,29 @@ function KinPicker({
 }
 
 /**
- * Dice, heroic abilities and spells: the column a player LOOKS THINGS UP in.
- * DiceFinder lives here so rolling never means leaving the sheet.
+ * The character's portrait, from the link on their sheet — or their initial
+ * when there is none, or the link does not load.
  */
-function LookupColumn({
-  sheet,
-  canEdit,
-  onSave,
-  castsSpells,
-}: {
-  sheet: CharacterSheetData;
-  canEdit: boolean;
-  onSave: (patch: Partial<CharacterSheetData>) => void;
-  castsSpells: boolean;
-}) {
-  return (
-    <>
-      <section id="dice" className={`scroll-mt-4 ${SHEET_BOX}`}>
-        <h2 className={`mb-2 ${SHEET_HEADING}`}>Dice</h2>
-        <DiceFinder />
-      </section>
-      <HeroicAbilities sheet={sheet} canEdit={canEdit} onSave={onSave} />
-      {castsSpells ? (
-        <Spells sheet={sheet} canEdit={canEdit} onSave={onSave} />
-      ) : (
-        <NoSpells />
-      )}
-    </>
+function Portrait({ url, name }: { url?: string; name: string }) {
+  const [broken, setBroken] = useState<string | null>(null);
+  const show = url && url !== broken;
+  return show ? (
+    // A plain <img>: the link can point anywhere, and next/image would need
+    // every host listed in advance.
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={url}
+      alt={`Portrait of ${name}`}
+      onError={() => setBroken(url)}
+      referrerPolicy="no-referrer"
+      className="h-16 w-16 shrink-0 rounded-md border border-border-strong object-cover md:h-20 md:w-20"
+    />
+  ) : (
+    <span
+      aria-hidden="true"
+      className="grid h-16 w-16 shrink-0 place-items-center rounded-md border border-border bg-surface2 font-serif text-2xl font-bold text-muted md:h-20 md:w-20"
+    >
+      {name.trim().charAt(0).toUpperCase() || "?"}
+    </span>
   );
 }

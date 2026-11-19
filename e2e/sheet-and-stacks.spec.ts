@@ -83,7 +83,9 @@ test.describe("the October fixes", () => {
     const sidebar = kova.getByRole("navigation", { name: "Containers" }).first();
     await expect(sidebar).toBeVisible();
     await expect(sidebar.getByRole("link", { name: /party wagon/i }).first()).toBeVisible();
-    await expect(kova.getByRole("link", { name: /back to inventory/i })).toBeVisible();
+    await expect(
+      kova.getByRole("navigation", { name: "Character sheet sections" }).getByRole("link", { name: "Inventory" }),
+    ).toBeVisible();
     await kova.context().close();
   });
 

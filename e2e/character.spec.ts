@@ -227,7 +227,10 @@ test.describe("the character sheet", () => {
 
     // Back to the inventory, where the sidebar and the heading both read the
     // container's name — the same field the sheet just wrote.
-    await kova.getByRole("link", { name: /back to inventory/i }).click();
+    await kova
+      .getByRole("navigation", { name: "Character sheet sections" })
+      .getByRole("link", { name: "Inventory" })
+      .click();
     await kova.waitForURL(/\/c\//);
 
     await expect(kova.getByRole("heading", { name: renamed })).toBeVisible();
@@ -462,12 +465,10 @@ test.describe("the Dragonbane sheet", () => {
 
   test("using a heroic ability spends its WP, and can be undone", async ({ browser }) => {
     const kova = await signInAs(browser, "Kova");
-    await kova.goto(`/character/${KOVA_CONTAINER_ID}`);
+    await kova.goto(`/character/${KOVA_CONTAINER_ID}?tab=abilities`);
     const name = `Probe ${Date.now().toString().slice(-5)}`;
-    const willpower = kova.locator("section").filter({
-      has: kova.getByRole("heading", { level: 2, name: /willpower/i }),
-    });
-    const wp = async () => Number((await willpower.locator("p.font-serif").first().innerText()).split("/")[0]);
+    const wp = async () =>
+      Number(/WP (\d+)/.exec(await kova.getByTestId("abilities-wp").innerText())?.[1]);
 
     await saved(kova, () => kova.getByRole("button", { name: /add ability/i }).click());
     const field = kova.locator('input[id^="ability-name-"]');
@@ -629,7 +630,7 @@ test.describe("skills, advancement and abilities", () => {
     browser,
   }) => {
     const kova = await signInAs(browser, "Kova");
-    await kova.goto(`/character/${KOVA_CONTAINER_ID}`);
+    await kova.goto(`/character/${KOVA_CONTAINER_ID}?tab=abilities`);
     const name = `Probe ${Date.now().toString().slice(-5)}`;
 
     await saved(kova, () => kova.getByRole("button", { name: /add ability/i }).click());
@@ -647,10 +648,19 @@ test.describe("skills, advancement and abilities", () => {
     await kova.context().close();
   });
 
-  test("the dice roller is on the sheet", async ({ browser }) => {
+  test("the sheet has tabs for inventory, abilities, spells and dice", async ({ browser }) => {
     const kova = await signInAs(browser, "Kova");
     await kova.goto(`/character/${KOVA_CONTAINER_ID}`);
+    const tabs = kova.getByRole("navigation", { name: "Character sheet sections" });
+    await tabs.getByRole("link", { name: "Dice" }).click();
+    await kova.waitForURL(/tab=dice/);
     await expect(kova.locator("#dice #notation")).toBeVisible();
+    await tabs.getByRole("link", { name: "Abilities" }).click();
+    await kova.waitForURL(/tab=abilities/);
+    await expect(kova.getByRole("heading", { name: /heroic abilities/i })).toBeVisible();
+    await expect(kova.getByRole("heading", { name: "Skills", exact: true })).toHaveCount(0);
+    await tabs.getByRole("link", { name: "Inventory" }).click();
+    await kova.waitForURL(/\/c\/kova/);
     await kova.context().close();
   });
 });
@@ -691,4 +701,55 @@ test.describe("when TaleSpire sends no result", () => {
     await expect(kova.getByRole("status").filter({ hasText: "Swimming" })).toContainText("Dragon!");
     await kova.context().close();
   });
+});
+
+test.describe("spells", () => {
+  test("tricks cast for 1 WP; spells must be prepared, then cost 2 WP per power level", async ({
+    browser,
+  }) => {
+    const kova = await signInAs(browser, "Kova");
+    await kova.goto(`/character/${KOVA_CONTAINER_ID}`);
+    // Spells open once a magic skill is trained.
+    const mentalism = kova.locator("li").filter({ hasText: "Mentalism" }).first().locator('input[type="checkbox"]').first();
+    if (!(await mentalism.isChecked())) await saved(kova, () => mentalism.check());
+
+    await kova.goto(`/character/${KOVA_CONTAINER_ID}?tab=spells`);
+    const wp = async () =>
+      Number(/WP (\d+)/.exec(await kova.getByTestId("spells-wp").innerText())?.[1]);
+    const start = await wp();
+
+    await saved(kova, () => kova.getByRole("button", { name: /add magic trick/i }).click());
+    await kova.getByRole("button", { name: /^done$/i }).click();
+    await saved(kova, () => kova.getByRole("button", { name: /^cast \(1 wp\)$/i }).click());
+    await expect.poll(wp).toBe(start - 1);
+
+    await saved(kova, () => kova.getByRole("button", { name: /^add spell$/i }).click());
+    await kova.getByRole("button", { name: /^done$/i }).click();
+    const spell = kova.locator("li").filter({ has: kova.getByRole("heading", { name: "New spell" }) });
+    await expect(spell.getByRole("button", { name: /^cast 1/i })).toHaveCount(0);
+    await saved(kova, () => spell.getByRole("checkbox", { name: /prepared/i }).check());
+    await saved(kova, () => spell.getByRole("button", { name: /^cast 1 \(2 wp\)$/i }).click());
+    await expect.poll(wp).toBe(start - 3);
+
+    // Put things back for the other tests.
+    await spell.getByRole("button", { name: /^edit new spell$/i }).click();
+    await saved(kova, () => kova.getByRole("button", { name: /^forget$/i }).click());
+    await kova.getByRole("button", { name: /^edit new trick$/i }).click();
+    await saved(kova, () => kova.getByRole("button", { name: /^forget$/i }).click());
+    await kova.context().close();
+  });
+});
+
+test("a portrait link shows the picture on the sheet", async ({ browser }) => {
+  const kova = await signInAs(browser, "Kova");
+  await kova.goto(`/character/${KOVA_CONTAINER_ID}`);
+  const link = new URL("/apple-icon.png", kova.url()).toString();
+  await kova.locator("#portrait").fill(link);
+  await saved(kova, () => kova.locator("#portrait").press("Enter"));
+  await kova.reload();
+  await expect(kova.getByRole("img", { name: /portrait of kova/i })).toHaveAttribute("src", link);
+  // And off again, for the other tests.
+  await kova.locator("#portrait").fill("");
+  await saved(kova, () => kova.locator("#portrait").press("Enter"));
+  await kova.context().close();
 });

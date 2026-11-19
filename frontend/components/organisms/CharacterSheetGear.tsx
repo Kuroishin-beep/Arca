@@ -103,7 +103,14 @@ export function HeroicAbilities({
     <section className={SHEET_BOX}>
       <div className="mb-3 flex items-baseline justify-between gap-2">
         <h2 className={SHEET_HEADING}>Heroic abilities</h2>
-        <span className="text-xs text-faint">Kin, profession and earned</span>
+        {/* Willpower right here: using an ability spends it, and on this tab
+            the Willpower box is out of sight. */}
+        <span
+          data-testid="abilities-wp"
+          className="rounded-sm bg-info-weak px-2 py-0.5 font-mono text-sm tabular-nums text-info"
+        >
+          WP {sheet.wp} / {derive(sheet).maxWp}
+        </span>
       </div>
 
       {sheet.abilities.length === 0 ? (
