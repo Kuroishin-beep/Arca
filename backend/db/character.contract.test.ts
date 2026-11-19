@@ -77,13 +77,25 @@ describe("reading a sheet", () => {
   });
 
   /**
-   * The rule that matters: a character sheet is as private as the pack it
-   * hangs off, and it is the SAME check — so this cannot drift from the
-   * container rules by being a second implementation of them.
+   * A sheet is visible to the owner, the GM, and party members (players in
+   * one shared container together) — see `canViewSheet`. With no party shared,
+   * another player's sheet is refused like the pack it hangs off.
    */
-  it("refuses another player's", async () => {
+  it("refuses another player's when they share no party", async () => {
+    const parties = (await fixtureRepository.listContainers(gm)).filter((c) => c.type === "party");
+    for (const party of parties) {
+      await fixtureRepository.setContainerMembers(gm, party.id, [KOVA_ID]);
+    }
     await expect(
       fixtureRepository.getCharacter(milo, KOVA_CONTAINER_ID),
+    ).rejects.toBeInstanceOf(PermissionError);
+  });
+
+  it("shows a party member's sheet, read-only", async () => {
+    const sheet = await fixtureRepository.getCharacter(milo, KOVA_CONTAINER_ID);
+    expect(sheet?.name).toBe("Kova");
+    await expect(
+      fixtureRepository.updateCharacter(milo, patch({ hp: 1 })),
     ).rejects.toBeInstanceOf(PermissionError);
   });
 

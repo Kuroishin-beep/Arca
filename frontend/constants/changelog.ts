@@ -18,6 +18,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    id: "2026-11-19-table-feedback",
+    date: "2026-11-19",
+    title: "Party sheets, spells, tabs and a boon/bane scale",
+    changes: [
+      "See your party's character sheets (read-only) under Party in the sidebar — their packs stay private.",
+      "Character sheets have tabs: Inventory, Sheet, Abilities, Spells, Dice.",
+      "Spells: prepare up to your INT base chance, cast at power 1–3 for 2 WP each; magic tricks cost 1 WP.",
+      "Rolls use a scale from −3 (banes) to +3 (boons); if TaleSpire sends no result, type it in.",
+      "Weapon damage includes your STR or AGL damage bonus.",
+      "Money is counted from the coins in your pack.",
+      "Portraits from an image link; item details open as a card in the middle; catalogue search.",
+    ],
+  },
+  {
     id: "2026-11-16-automatic-rolls",
     date: "2026-11-16",
     title: "Rolls that judge themselves",

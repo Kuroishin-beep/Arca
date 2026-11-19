@@ -43,6 +43,7 @@ export function WorkspaceShell({
   quickAccess,
   actions,
   aside,
+  party,
   catalogOpen,
   children,
 }: {
@@ -85,12 +86,15 @@ export function WorkspaceShell({
    *  so the content scrolls and the panel scrolls independently, which is the
    *  behaviour the docked detail panel has always had. */
   aside?: React.ReactNode;
+  /** Party members' characters, for the sidebar's read-only Party list. */
+  party?: { id: string; name: string; ref: string }[];
   children: React.ReactNode;
 }) {
   const nav = (
     <Sidebar
       containers={containers}
       databases={databases}
+      party={party}
       principal={principal}
       selectedId={selectedId}
       selectedDatabase={selectedDatabase}

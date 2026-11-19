@@ -147,6 +147,15 @@ export interface ArcaRepository {
   ): Promise<CharacterView | null>;
 
   /**
+   * Characters whose SHEETS this principal may view but whose inventories they
+   * may not read — their party members' (`canViewSheet`). What the sidebar's
+   * Party section lists. Never includes a character they can already open.
+   */
+  listPartyCharacters(
+    principal: Principal,
+  ): Promise<{ id: string; name: string; ref: string }[]>;
+
+  /**
    * Write one or more sections of a sheet.
    *
    * Gated on `canWrite` for the container, which already says exactly the right

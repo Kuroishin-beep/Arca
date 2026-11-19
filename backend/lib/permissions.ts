@@ -59,6 +59,33 @@ export function canWrite(
  * the GM could choose, so containers nobody has restricted behave as they did.
  * Reading and writing share the rule: being in a shared container means both.
  */
+/**
+ * Whether a principal may VIEW a character's sheet — read-only, the inventory
+ * stays behind `canRead`. Anyone who may read the character may; beyond that,
+ * party members see each other: a player and the character's owner who are
+ * both in one shared ("party") container. A shared container with no member
+ * list is the whole table, so by default every player sees every sheet.
+ *
+ * Takes every container in the campaign, unfiltered — the party that links
+ * two players may be one the viewer can read, but the question is about the
+ * OWNER's membership too.
+ */
+export function canViewSheet(
+  principal: Principal,
+  character: ContainerView,
+  all: readonly ContainerView[],
+): boolean {
+  if (canRead(principal, character)) return true;
+  if (character.type !== "character" || character.ownerId === null) return false;
+  const owner = character.ownerId;
+  return all.some(
+    (c) =>
+      c.type === "party" &&
+      (c.memberIds === null ||
+        (c.memberIds.includes(principal.userId) && c.memberIds.includes(owner))),
+  );
+}
+
 function inShared(principal: Principal, container: ContainerView): boolean {
   return (
     container.memberIds === null ||

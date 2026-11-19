@@ -176,22 +176,27 @@ test.describe("the character sheet", () => {
     await kova.context().close();
   });
 
-  test("a player cannot open another player's sheet", async ({ browser }) => {
-    // Kova finds her own sheet's URL, the honest way.
-    const kova = await signInAs(browser, "Kova");
-    await openSheet(kova, KOVA_CONTAINER_ID);
-    const kovasSheet = new URL(kova.url()).pathname;
-    await kova.context().close();
-
+  test("a party member sees another player's sheet read-only, but not their pack", async ({
+    browser,
+  }) => {
+    // Kova and Milo share the seeded party (a shared container for the whole
+    // table), so Milo finds Kova under Party in the sidebar.
     const milo = await signInAs(browser, "Milo");
-    const response = await milo.goto(kovasSheet);
+    const party = milo.getByRole("navigation", { name: "Containers" }).first();
+    await party.getByRole("link", { name: /^kova$/i }).click();
+    await milo.waitForURL(/\/character\/kova/);
 
-    // 404, not 403: telling a player that a sheet EXISTS and is closed to them
-    // is the same small leak the workspace refuses to make about containers
-    // (SCOPE.md §12.3).
-    expect(response?.status()).toBe(404);
-    await expect(milo.locator("#character-name")).toHaveCount(0);
+    // The sheet, read-only: nothing editable, no equipment, no inventory tab.
+    await expect(milo.getByText("Party member · read only")).toBeVisible();
+    await expect(milo.locator("#character-name")).toBeDisabled();
+    await expect(milo.getByRole("heading", { name: "Equipment" })).toHaveCount(0);
+    await expect(
+      milo.getByRole("navigation", { name: "Character sheet sections" }).getByRole("link", { name: "Inventory" }),
+    ).toHaveCount(0);
 
+    // The pack itself is still sealed.
+    await milo.goto(`/c/${KOVA_CONTAINER_ID}`);
+    await expect(milo.getByRole("heading", { name: "Sealed" })).toBeVisible();
     await milo.context().close();
   });
 

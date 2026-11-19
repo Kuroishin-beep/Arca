@@ -39,6 +39,8 @@ import { campaignId, campaignOf, defaultCampaignId, inCampaign } from "@backend/
 import { containerRefs, rememberName } from "@backend/lib/paths";
 import {
   PermissionError,
+  canRead,
+  canViewSheet,
   assertCanEditContainer,
   assertCanCreateItem,
   assertCanManageAccess,
@@ -1111,8 +1113,13 @@ export const postgresRepository: ArcaRepository = {
   },
 
   async getCharacter(principal, containerId) {
-    const container = await requireContainer(containerId);
-    assertCanRead(principal, container);
+    const all = await loadContainers();
+    const container = all.find((c) => c.id === containerId);
+    if (!container) throw new NotFoundError("No such container.");
+    // The sheet, not the inventory: party members may view it read-only.
+    if (!canViewSheet(principal, container, all)) {
+      throw new PermissionError("That character is not yours to open.");
+    }
     if (container.type !== "character") return null;
 
     // The sheet lives on the container's OWN object — the same property bag
@@ -1125,6 +1132,16 @@ export const postgresRepository: ArcaRepository = {
       ownerId: container.ownerId,
       sheet: sheetFromProperties(props.get(containerId)),
     };
+  },
+
+  async listPartyCharacters(principal) {
+    const all = await loadContainers();
+    return all
+      .filter(
+        (c) =>
+          c.type === "character" && !canRead(principal, c) && canViewSheet(principal, c, all),
+      )
+      .map((c) => ({ id: c.id, name: c.name, ref: c.ref }));
   },
 
   async updateCharacter(principal, input) {

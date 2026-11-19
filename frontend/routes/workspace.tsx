@@ -125,7 +125,7 @@ export default async function WorkspacePage({
     sp.dialog === "new-container" || sp.dialog === "edit-container";
   const shareOpen = sp.dialog === "share";
   const isGm = principal.role === "gm";
-  const [allItems, comments, databases, members] = await Promise.all([
+  const [allItems, comments, databases, members, party] = await Promise.all([
     repo.listItems(principal, containerId),
     repo.listComments(principal, containerId),
     // The Databases section of the sidebar. Derived from the types on objects
@@ -139,6 +139,8 @@ export default async function WorkspacePage({
     shareOpen || (containerDialogOpen && isGm)
       ? repo.listMembers(principal)
       : Promise.resolve([]),
+    // Party members' characters, for the sidebar's read-only Party list.
+    repo.listPartyCharacters(principal),
   ]);
 
   const sort: Sort = {
@@ -301,6 +303,7 @@ export default async function WorkspacePage({
           />
         }
         aside={detailPanel}
+        party={party}
       >
           <div className="shrink-0 border-b border-border bg-bg px-3 pt-3 md:px-4 md:pt-4">
             <div className="flex flex-wrap items-center gap-3">

@@ -40,6 +40,8 @@ import {
 } from "@backend/domain/view";
 import {
   PermissionError,
+  canRead,
+  canViewSheet,
   assertCanEditContainer,
   assertCanCreateItem,
   assertCanManageAccess,
@@ -478,7 +480,10 @@ export const fixtureRepository: ArcaRepository = {
 
   async getCharacter(principal, containerId): Promise<CharacterView | null> {
     const container = findContainer(containerId);
-    assertCanRead(principal, container);
+    // The sheet, not the inventory: party members may view it read-only.
+    if (!canViewSheet(principal, container, store().containers.map(hydrate))) {
+      throw new PermissionError("That character is not yours to open.");
+    }
     if (container.type !== "character") return null;
 
     return {
@@ -489,6 +494,16 @@ export const fixtureRepository: ArcaRepository = {
       // lowered while HP sat at the old maximum has to render legally.
       sheet: clampSheet(store().characters[containerId] ?? emptySheet()),
     };
+  },
+
+  async listPartyCharacters(principal) {
+    const all = store().containers.map(hydrate);
+    return all
+      .filter(
+        (c) =>
+          c.type === "character" && !canRead(principal, c) && canViewSheet(principal, c, all),
+      )
+      .map((c) => ({ id: c.id, name: c.name, ref: c.ref }));
   },
 
   async updateCharacter(

@@ -12,7 +12,7 @@ import {
   creatableContainerTypes,
   writeDeniedReason,
 } from "@backend/lib/permissions";
-import { containerPath } from "@backend/lib/paths";
+import { containerPath, sheetPath } from "@backend/lib/paths";
 
 /**
  * The sidebar — Wireframe.png, left column.
@@ -47,6 +47,7 @@ export function Sidebar({
   selectedId,
   /** Slug of the open database, when the current screen is one. */
   selectedDatabase,
+  party = [],
   /** Containers the principal may not READ at all, shown as locked rows so the
    *  list does not silently change shape between GM and player. */
   lockedContainers = [],
@@ -81,6 +82,8 @@ export function Sidebar({
   principal: Principal;
   selectedId?: string;
   selectedDatabase?: string;
+  /** Party members' characters: their sheets, read-only (`canViewSheet`). */
+  party?: { id: string; name: string; ref: string }[];
   lockedContainers?: ContainerView[];
   newContainerHref?: string;
   newDatabaseHref?: string;
@@ -288,6 +291,42 @@ export function Sidebar({
           <NewLink href={newContainerHref}>New container</NewLink>
         ) : null}
       </Section>
+
+      {!compact && party.length > 0 ? (
+        // Other characters at the table, by their sheets — read-only, and
+        // their packs stay theirs. The GM decides who is in a party from a
+        // shared container's Share dialog.
+        <Section title="Party" hint="Their sheets, read-only">
+          <ul className="flex flex-col gap-1">
+            {party.map((member) => {
+              const selected = member.id === selectedId;
+              return (
+                <li key={member.id}>
+                  <Link
+                    href={sheetPath(member)}
+                    aria-current={selected ? "page" : undefined}
+                    className={[
+                      "flex items-center gap-2 rounded-md px-2 text-base",
+                      "h-11 panel:h-9",
+                      selected
+                        ? "border-l-2 border-primary bg-surface2 font-medium text-text"
+                        : "text-text hover:bg-surface2",
+                    ].join(" ")}
+                  >
+                    <Icon
+                      name="users"
+                      size={15}
+                      className={`shrink-0 ${selected ? "text-primary" : "text-muted"}`}
+                    />
+                    <span className="min-w-0 flex-1 truncate">{member.name}</span>
+                    <Icon name="eye" size={13} className="shrink-0 text-faint" />
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </Section>
+      ) : null}
 
       {/* "What are these?" was the first question about this section: each is
           every item of one type (Weapon, Gear…) across every container you can

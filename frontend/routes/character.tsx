@@ -12,12 +12,12 @@ import {
 import { Icon, type IconName } from "@frontend/components/atoms/Icon";
 import { WorkspaceShell } from "@frontend/components/organisms/WorkspaceShell";
 import { repository } from "@backend/db";
-import { resolveContainerId } from "@backend/lib/container-ref";
+import { currentRef, resolveContainerId } from "@backend/lib/container-ref";
 import {
   containerPath,
-  isCanonicalRef,
+  containerRef,
+  decodeSegment,
   queryString,
-  sheetPath,
 } from "@backend/lib/paths";
 import { CAMPAIGN_NAME } from "@backend/db/seed-data";
 import { listDatabases } from "@backend/domain/database";
@@ -96,36 +96,49 @@ export default async function CharacterSheetPage({
   const containerId = await resolveContainerId(repo, principal, ref);
   if (!containerId) notFound();
 
-  let container;
+  // The container if this viewer may open it; a party member may not, but may
+  // still VIEW the sheet (read-only, no inventory) — `canViewSheet`.
+  let container = null;
   try {
     container = await repo.getContainer(principal, containerId);
+  } catch (error) {
+    if (!(error instanceof PermissionError)) throw error;
+  }
+  if (container && container.type !== "character") notFound();
+
+  // `getCharacter` decides who may see the SHEET: the owner, the GM, and
+  // party members. Anyone else gets the same 404 as a sheet that is not there.
+  let character;
+  try {
+    character = await repo.getCharacter(principal, containerId);
   } catch (error) {
     if (error instanceof PermissionError) notFound();
     throw error;
   }
-  if (!container || container.type !== "character") notFound();
+  if (!character) notFound();
+  /** Viewing a party member's sheet: read-only, and their pack stays theirs. */
+  const sheetOnly = container === null;
 
   // Old id links and renamed characters land on the current address — after
-  // the read check, so nobody learns a sheet's name by guessing its id.
-  if (!isCanonicalRef(ref, container)) {
-    redirect(encodeURI(sheetPath(container)) + queryString(sp));
+  // the check, so nobody learns a sheet's name by guessing its id.
+  const currentAddress = container
+    ? containerRef(container)
+    : await currentRef(repo, principal, containerId);
+  if (decodeSegment(ref) !== currentAddress) {
+    redirect(encodeURI(`/character/${currentAddress}`) + queryString(sp));
   }
-  /** The inventory this sheet's equipment lives in. */
-  const inventoryPath = containerPath(container);
+  /** The inventory this sheet's equipment lives in — none for a party view. */
+  const inventoryPath = container ? containerPath(container) : null;
 
-  // `getCharacter` re-checks the principal itself; a null here means the
-  // container exists and is not a character, which `notFound` already covered.
-  const character = await repo.getCharacter(principal, containerId);
-  if (!character) notFound();
+  const editable = container !== null && canWrite(principal, container);
 
-  const editable = canWrite(principal, container);
-
-  const [items, containers, databases] = await Promise.all([
-    repo.listItems(principal, containerId),
+  const [items, containers, databases, party] = await Promise.all([
+    container ? repo.listItems(principal, containerId) : Promise.resolve([]),
     repo.listContainers(principal),
     listDatabases(repo, principal),
+    repo.listPartyCharacters(principal),
   ]);
-  const here = sheetPath(container);
+  const here = `/character/${currentAddress}`;
   const railCollapsed = sp.rail === "0";
   const tab: SheetTab = SHEET_TABS.some((t) => t.key === sp.tab) ? (sp.tab as SheetTab) : "sheet";
   const writable = containers.find((c) => canWrite(principal, c));
@@ -146,6 +159,7 @@ export default async function CharacterSheetPage({
     railCollapsed,
     railHref: railCollapsed ? here : `${here}?rail=0`,
     closeHref: here,
+    party,
   };
 
   const equipment = [...items].sort((a, b) => a.name.localeCompare(b.name));
@@ -175,7 +189,9 @@ export default async function CharacterSheetPage({
           <div className="flex flex-wrap items-center gap-2">
             <SheetTabs here={here} inventoryPath={inventoryPath} tab={tab} rail={railCollapsed} />
             {!editable ? (
-              <Chip tone="neutral">Read only</Chip>
+              <Chip tone="neutral">
+                {sheetOnly ? "Party member · read only" : "Read only"}
+              </Chip>
             ) : null}
           </div>
 
@@ -191,7 +207,7 @@ export default async function CharacterSheetPage({
           {/* Equipment is the one section that is NOT stored on the character:
               it is the containment view of the same container, which is the
               whole reason a sheet did not need its own inventory model. */}
-          {tab === "sheet" ? (
+          {tab === "sheet" && inventoryPath && container ? (
           <section className="rounded-lg border border-border bg-surface">
             <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">
               <h2 className="font-serif text-lg font-bold text-text">
@@ -584,7 +600,8 @@ function SheetTabs({
   rail,
 }: {
   here: string;
-  inventoryPath: string;
+  /** Null when viewing a party member's sheet: their pack is not shown. */
+  inventoryPath: string | null;
   tab: SheetTab;
   rail: boolean;
 }) {
@@ -599,10 +616,12 @@ function SheetTabs({
     "inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm font-medium";
   return (
     <nav aria-label="Character sheet sections" className="flex flex-wrap gap-1">
-      <Link href={inventoryPath} className={`${base} border-border bg-surface text-text hover:bg-surface2`}>
-        <Icon name="pack" size={14} />
-        Inventory
-      </Link>
+      {inventoryPath ? (
+        <Link href={inventoryPath} className={`${base} border-border bg-surface text-text hover:bg-surface2`}>
+          <Icon name="pack" size={14} />
+          Inventory
+        </Link>
+      ) : null}
       {SHEET_TABS.map((t) => {
         const active = t.key === tab;
         return (
