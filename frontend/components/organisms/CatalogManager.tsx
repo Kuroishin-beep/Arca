@@ -38,6 +38,20 @@ export function CatalogManager({
   const [editing, setEditing] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+
+  // Name, tags, types and type fields (Effect, Damage…) — what someone
+  // remembers about an item is rarely its exact name.
+  const needle = query.trim().toLowerCase();
+  const shown =
+    needle === ""
+      ? entries
+      : entries.filter((entry) =>
+          [entry.name, ...entry.tags, ...entry.types, ...Object.values(entry.stats)]
+            .join(" ")
+            .toLowerCase()
+            .includes(needle),
+        );
 
   return (
     <div className="mt-6 flex flex-col gap-2">
@@ -67,6 +81,34 @@ export function CatalogManager({
         )
       ) : null}
 
+      {entries.length > 0 ? (
+        <div className="relative">
+          <label htmlFor="catalog-search" className="sr-only">
+            Search the catalogue
+          </label>
+          <Icon
+            name="search"
+            size={14}
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint"
+          />
+          <input
+            id="catalog-search"
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={`Search ${entries.length} entries — name, tag, effect…`}
+            autoComplete="off"
+            className="h-10 w-full rounded-md border border-border bg-surface pl-8 pr-3 text-base text-text placeholder:text-faint"
+          />
+        </div>
+      ) : null}
+
+      {entries.length > 0 && shown.length === 0 ? (
+        <p className="rounded-md border border-border bg-surface p-4 text-base text-muted">
+          Nothing in the catalogue matches “{query.trim()}”.
+        </p>
+      ) : null}
+
       {entries.length === 0 ? (
         <p className="rounded-md border border-border bg-surface p-4 text-base text-muted">
           Nothing defined yet.{" "}
@@ -76,7 +118,7 @@ export function CatalogManager({
         </p>
       ) : (
         <ul className="flex flex-col gap-2">
-          {entries.map((entry) =>
+          {shown.map((entry) =>
             editing === entry.id ? (
               <li key={entry.id}>
                 <EntryForm

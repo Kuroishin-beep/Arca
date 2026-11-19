@@ -332,20 +332,18 @@ test.describe("character sheet polish", () => {
 });
 
 test.describe("the Dragonbane sheet", () => {
-  test("money and armour edits survive a reload", async ({ browser }) => {
+  test("armour edits survive a reload, and money is read from the pack", async ({ browser }) => {
     const kova = await signInAs(browser, "Kova");
     await kova.goto(`/character/${KOVA_CONTAINER_ID}`);
-
-    const gold = kova.locator("#money-gold");
-    const before = Number(await gold.inputValue());
-    await saved(kova, () => gold.fill(String(before + 3)));
 
     await kova.locator("#helmet-name").fill("Open helmet");
     await saved(kova, () => kova.locator("#helmet-name").press("Enter"));
 
     await kova.reload();
-    await expect(kova.locator("#money-gold")).toHaveValue(String(before + 3));
     await expect(kova.locator("#helmet-name")).toHaveValue("Open helmet");
+    // No money fields to type into: coins come from currency in the pack.
+    await expect(kova.locator("#money-gold")).toHaveCount(0);
+    await expect(kova.getByRole("heading", { name: "Money", level: 3 })).toBeVisible();
     await kova.context().close();
   });
 

@@ -8,13 +8,6 @@ import { useSymbiote } from "@frontend/components/atoms/RollButton";
 import { parseDiceNotation } from "@backend/lib/dice";
 import { rollDice } from "@backend/lib/talespire";
 
-interface HistoryEntry {
-  id: number;
-  notation: string;
-  at: Date;
-  delivered: boolean;
-}
-
 const QUICK = ["d20", "2d6", "1d8+2", "4d6kh3", "d100"];
 
 /**
@@ -27,7 +20,9 @@ const QUICK = ["d20", "2d6", "1d8+2", "4d6kh3", "d100"];
  */
 export function DiceFinder() {
   const [notation, setNotation] = useState("2d6+3");
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  // Only the last throw: TaleSpire keeps the table's dice history itself, and
+  // a list here grew without end over a session.
+  const [last, setLast] = useState<{ notation: string; delivered: boolean } | null>(null);
 
   // Re-read when TaleSpire finishes initialising, which can be after mount.
   const connected = useSymbiote();
@@ -37,10 +32,7 @@ export function DiceFinder() {
   const throwDice = async () => {
     if (!parsed.ok) return;
     const delivered = await rollDice(parsed.normalised);
-    setHistory((h) => [
-      { id: h.length, notation: parsed.normalised, at: new Date(), delivered },
-      ...h,
-    ]);
+    setLast({ notation: parsed.normalised, delivered });
   };
 
   return (
@@ -141,44 +133,12 @@ export function DiceFinder() {
         ) : null}
       </section>
 
-      <section className="rounded-lg border border-border bg-surface">
-        <div className="flex items-center gap-3 border-b border-border p-4">
-          <h2 className="font-serif text-lg font-bold text-text">History</h2>
-          <span className="ml-auto text-sm text-muted">This session</span>
-        </div>
-        {history.length === 0 ? (
-          <p className="p-4 text-base text-muted">Nothing thrown yet.</p>
-        ) : (
-          <ul>
-            {history.map((entry) => (
-              <li
-                key={entry.id}
-                className="flex items-center gap-3 border-b border-border px-4 py-3 last:border-0"
-              >
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-primary-weak">
-                  <Icon name="check" size={14} className="text-primary" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-base text-text">
-                    <span className="font-mono">{entry.notation}</span>
-                  </p>
-                  <p className="truncate text-sm text-muted">
-                    {entry.delivered
-                      ? "Sent to TaleSpire’s roller"
-                      : "Not delivered — no TaleSpire bridge"}
-                  </p>
-                </div>
-                <span className="shrink-0 text-xs text-faint">
-                  {entry.at.toLocaleTimeString()}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-        <p className="border-t border-border p-3 text-sm text-faint">
-          Results are read back from TaleSpire. Arca does not roll its own dice.
+      {last ? (
+        <p role="status" className="text-sm text-muted">
+          <span className="font-mono text-text">{last.notation}</span>{" "}
+          {last.delivered ? "sent to TaleSpire’s dice tray." : "not delivered — TaleSpire refused it."}
         </p>
-      </section>
+      ) : null}
     </>
   );
 }

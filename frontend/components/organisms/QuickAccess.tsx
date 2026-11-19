@@ -33,6 +33,14 @@ import { IconButton } from "@frontend/components/atoms/IconButton";
  * right side of the trade.
  */
 const KEY = "arca-quick-access";
+/**
+ * One strip per account AND campaign: a single browser-wide key showed one
+ * person's pins to whoever signed in next on the same machine, and pins from
+ * one campaign point at containers another does not have.
+ */
+function keyFor(owner: string): string {
+  return `${KEY}:${owner}`;
+}
 const CHANGED = "arca-quick-access-changed";
 const LIMIT = 8;
 
@@ -52,9 +60,9 @@ export interface QuickAccessEntry {
  * a second paint that flashes the wrong strip.
  * ------------------------------------------------------------------ */
 
-function read(): QuickAccessEntry[] {
+function read(key: string): QuickAccessEntry[] {
   try {
-    const raw = window.localStorage.getItem(KEY);
+    const raw = window.localStorage.getItem(key);
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
@@ -84,21 +92,20 @@ function read(): QuickAccessEntry[] {
  * array from `read()` on every call would re-render forever. The parsed value
  * is cached against the raw string and only rebuilt when that string changes.
  */
-let cachedRaw: string | null = null;
-let cachedValue: QuickAccessEntry[] = [];
+const cache = new Map<string, { raw: string | null; value: QuickAccessEntry[] }>();
 
-function snapshot(): QuickAccessEntry[] {
+function snapshot(key: string): QuickAccessEntry[] {
   let raw: string | null;
   try {
-    raw = window.localStorage.getItem(KEY);
+    raw = window.localStorage.getItem(key);
   } catch {
     raw = null;
   }
-  if (raw !== cachedRaw) {
-    cachedRaw = raw;
-    cachedValue = read();
-  }
-  return cachedValue;
+  const hit = cache.get(key);
+  if (hit && hit.raw === raw) return hit.value;
+  const value = read(key);
+  cache.set(key, { raw, value });
+  return value;
 }
 
 /** Stable, and empty: the server has no browser storage to read, and any other
@@ -119,9 +126,9 @@ function subscribe(onChange: () => void): () => void {
   };
 }
 
-function write(entries: QuickAccessEntry[]): void {
+function write(key: string, entries: QuickAccessEntry[]): void {
   try {
-    window.localStorage.setItem(KEY, JSON.stringify(entries.slice(0, LIMIT)));
+    window.localStorage.setItem(key, JSON.stringify(entries.slice(0, LIMIT)));
   } catch {
     // Out of quota, or storage blocked. The pin is lost, which is a strictly
     // better outcome than an unhandled rejection on a click.
@@ -135,12 +142,17 @@ function write(entries: QuickAccessEntry[]): void {
 
 export function QuickAccess({
   current,
+  owner,
 }: {
+  /** Whose pins: user id and campaign id. */
+  owner: string;
   /** What the `+` would pin — the page you are on. Absent on screens that are
    *  not a place, so the button does not offer to pin a dialog. */
   current?: QuickAccessEntry;
 }) {
-  const entries = useSyncExternalStore(subscribe, snapshot, serverSnapshot);
+  const key = keyFor(owner);
+  const clientSnapshot = useCallback(() => snapshot(key), [key]);
+  const entries = useSyncExternalStore(subscribe, clientSnapshot, serverSnapshot);
 
   const pinned = current
     ? entries.some((e) => e.href === current.href)
@@ -152,8 +164,8 @@ export function QuickAccess({
     // Unpinning is the same control, because a strip you can only add to fills
     // up and then needs a second, rarer control to empty — which is where a
     // pinned-items list usually goes wrong.
-    write(pinned ? without : [...without, current]);
-  }, [current, entries, pinned]);
+    write(key, pinned ? without : [...without, current]);
+  }, [current, entries, pinned, key]);
 
   // Nothing pinned and nothing to pin: render nothing rather than an empty bar
   // with a lone `+`, which reads as a broken toolbar.

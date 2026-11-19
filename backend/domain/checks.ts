@@ -120,3 +120,42 @@ export function diceFor(edge: Edge, baneCount: number): number {
   if (edge === "boon") return 2;
   return 1 + Math.max(1, baneCount);
 }
+
+/**
+ * Which weapon skill an item is used with, read from its name — Arca's items
+ * carry no skill field, and the name ("Bow, Short", "Dagger", "Longsword") is
+ * what the catalogue gives. `null` when nothing matches; most specific first,
+ * so a crossbow is not a bow.
+ */
+const WEAPON_SKILLS: { match: RegExp; skill: string }[] = [
+  { match: /crossbow/i, skill: "Crossbows" },
+  { match: /bow/i, skill: "Bows" },
+  { match: /knife|dagger|dirk|stiletto/i, skill: "Knives" },
+  { match: /sling/i, skill: "Slings" },
+  { match: /staff|staves|quarterstaff/i, skill: "Staves" },
+  { match: /spear|lance|trident|pike|halberd/i, skill: "Spears" },
+  { match: /hammer|mace|club|flail|morning\s*star|maul/i, skill: "Hammers" },
+  { match: /axe/i, skill: "Axes" },
+  { match: /sword|blade|sabre|saber|scimitar|rapier|falchion/i, skill: "Swords" },
+  { match: /fist|unarmed|brawl|gauntlet/i, skill: "Brawling" },
+];
+
+export function weaponSkillFor(itemName: string): string | null {
+  return WEAPON_SKILLS.find((w) => w.match.test(itemName))?.skill ?? null;
+}
+
+/**
+ * The damage bonus a weapon adds: STR's for a STR-skill weapon, AGL's for an
+ * AGL-skill weapon, none for a crossbow (its mechanism, not the arm, drives
+ * the bolt). An unrecognised weapon is treated as a STR weapon.
+ */
+export function weaponDamageBonus(
+  itemName: string,
+  bonuses: { STR: "D4" | "D6" | null; AGL: "D4" | "D6" | null },
+): { bonus: "D4" | "D6" | null; attribute: "STR" | "AGL" | null } {
+  const skill = weaponSkillFor(itemName);
+  if (skill === "Crossbows") return { bonus: null, attribute: null };
+  const agl = skill === "Bows" || skill === "Knives" || skill === "Slings" || skill === "Staves";
+  const attribute = agl ? "AGL" : "STR";
+  return { bonus: bonuses[attribute], attribute };
+}

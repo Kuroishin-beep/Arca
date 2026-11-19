@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import { emptySheet } from "./character";
-import { armourDefaultsFor, banesFor, diceFor, resolveCheck, rollD20s } from "./checks";
+import {
+  armourDefaultsFor,
+  banesFor,
+  diceFor,
+  resolveCheck,
+  rollD20s,
+  weaponDamageBonus,
+} from "./checks";
 
 describe("resolveCheck", () => {
   it("succeeds at or under the target", () => {
@@ -71,5 +78,21 @@ describe("rollD20s", () => {
     const dice = rollD20s(50);
     expect(dice).toHaveLength(50);
     expect(dice.every((d) => d >= 1 && d <= 20)).toBe(true);
+  });
+});
+
+describe("weapon damage bonus", () => {
+  const bonuses = { STR: "D4" as const, AGL: "D6" as const };
+
+  it("adds STR's bonus to STR weapons and AGL's to AGL weapons", () => {
+    expect(weaponDamageBonus("Longsword", bonuses)).toEqual({ bonus: "D4", attribute: "STR" });
+    expect(weaponDamageBonus("Hand axe", bonuses)).toEqual({ bonus: "D4", attribute: "STR" });
+    expect(weaponDamageBonus("Bow, Short", bonuses)).toEqual({ bonus: "D6", attribute: "AGL" });
+    expect(weaponDamageBonus("Dagger", bonuses)).toEqual({ bonus: "D6", attribute: "AGL" });
+  });
+
+  it("gives a crossbow none, and treats an unknown weapon as STR", () => {
+    expect(weaponDamageBonus("Light crossbow", bonuses).bonus).toBeNull();
+    expect(weaponDamageBonus("Strange thing", bonuses).attribute).toBe("STR");
   });
 });

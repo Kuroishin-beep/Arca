@@ -50,7 +50,6 @@ import {
   DerivedStrip,
   HeroicAbilities,
   Protection,
-  Purse,
   RestBox,
 } from "@frontend/components/organisms/CharacterSheetGear";
 import { SHEET_BOX, SHEET_HEADING } from "@frontend/components/molecules/SheetBox";
@@ -206,7 +205,6 @@ export function CharacterSheet({
           <Vitals sheet={sheet} canEdit={canEdit} onSave={save} />
           <RestBox sheet={sheet} canEdit={canEdit} onSave={save} />
           <Protection sheet={sheet} canEdit={canEdit} onSave={save} packItems={packItems} />
-          <Purse sheet={sheet} canEdit={canEdit} onSave={save} />
         </div>
 
         <div className="flex flex-col gap-4">

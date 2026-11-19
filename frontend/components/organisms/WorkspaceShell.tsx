@@ -220,7 +220,10 @@ export function WorkspaceShell({
               href={railHref}
               className="hidden h-7 w-7 md:grid"
             />
-            <QuickAccess current={quickAccess} />
+            <QuickAccess
+              current={quickAccess}
+              owner={`${principal.userId}:${principal.campaignId ?? ""}`}
+            />
 
             {actions ? (
               <div className="ml-auto flex shrink-0 items-center gap-1">

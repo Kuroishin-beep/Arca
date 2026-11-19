@@ -6,7 +6,6 @@ import {
   type ArmourPiece,
   type CharacterSheet as CharacterSheetData,
   type HeroicAbility,
-  type Money,
   derive,
 } from "@backend/domain/character";
 import { Button } from "@frontend/components/atoms/Button";
@@ -364,62 +363,6 @@ export function Protection({
             </div>
           );
         })}
-      </div>
-    </section>
-  );
-}
-
-/* ================================================================== *
- * Purse
- * ================================================================== */
-
-const COINS: { key: keyof Money; label: string }[] = [
-  { key: "gold", label: "Gold" },
-  { key: "silver", label: "Silver" },
-  { key: "copper", label: "Copper" },
-];
-
-export function Purse({
-  sheet,
-  canEdit,
-  onSave,
-}: {
-  sheet: CharacterSheetData;
-  canEdit: boolean;
-  onSave: Save;
-}) {
-  return (
-    <section className={SHEET_BOX}>
-      <div className="mb-3 flex items-baseline justify-between gap-2">
-        <h2 className={SHEET_HEADING}>Money</h2>
-        <span className="text-xs text-faint">1 gold = 10 silver = 100 copper</span>
-      </div>
-      <div className="grid grid-cols-1 gap-2 panel:grid-cols-3">
-        {COINS.map((coin) => (
-          <div key={coin.key} className="rounded-sm border border-border bg-surface2 p-2">
-            <label
-              htmlFor={`money-${coin.key}`}
-              className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted"
-            >
-              {coin.label}
-            </label>
-            {canEdit ? (
-              <NumberStepper
-                id={`money-${coin.key}`}
-                label={`${coin.label} coins`}
-                value={sheet.money[coin.key]}
-                min={0}
-                max={999_999}
-                size="sm"
-                onChange={(n) => onSave({ money: { ...sheet.money, [coin.key]: n } })}
-              />
-            ) : (
-              <p className="font-mono text-base tabular-nums text-text">
-                {sheet.money[coin.key]}
-              </p>
-            )}
-          </div>
-        ))}
       </div>
     </section>
   );

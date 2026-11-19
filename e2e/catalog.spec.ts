@@ -260,3 +260,16 @@ test.describe("the catalogue", () => {
     await gm.context().close();
   });
 });
+
+test("the catalogue can be searched by name, tag or effect", async ({ browser }) => {
+  const gm = await signInAs(browser, "Ravna");
+  await gm.goto("/catalog");
+  const search = gm.locator("#catalog-search");
+  await search.fill(TORCH.name.slice(0, 4));
+  await expect(gm.getByText(TORCH.name, { exact: true }).first()).toBeVisible();
+  await expect(gm.getByText(ROPE.name, { exact: true })).toHaveCount(0);
+
+  await search.fill("no such thing anywhere");
+  await expect(gm.getByText(/nothing in the catalogue matches/i)).toBeVisible();
+  await gm.context().close();
+});

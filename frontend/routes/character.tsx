@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { ButtonLink } from "@frontend/components/atoms/Button";
 import { RollButton } from "@frontend/components/atoms/RollButton";
-import { Chip, TagChip } from "@frontend/components/atoms/Chip";
+import { Chip } from "@frontend/components/atoms/Chip";
 import { WeightMeter } from "@frontend/components/molecules/WeightMeter";
 import { CharacterSheet } from "@frontend/components/organisms/CharacterSheet";
 import { WorkspaceShell } from "@frontend/components/organisms/WorkspaceShell";
@@ -18,7 +18,9 @@ import {
 } from "@backend/lib/paths";
 import { CAMPAIGN_NAME } from "@backend/db/seed-data";
 import { listDatabases } from "@backend/domain/database";
-import { TINY_TAG, inventoryBreakdown } from "@backend/domain/inventory";
+import { type Purse, TINY_TAG, inventoryBreakdown } from "@backend/domain/inventory";
+import { damageBonus } from "@backend/domain/character";
+import { weaponDamageBonus } from "@backend/domain/checks";
 import {
   type ItemView,
   itemWeight,
@@ -208,7 +210,14 @@ export default async function CharacterSheetPage({
               </div>
             </div>
 
-            <WeaponsAtHand items={inventory.weapons} inventoryPath={inventoryPath} />
+            <WeaponsAtHand
+              items={inventory.weapons}
+              inventoryPath={inventoryPath}
+              bonuses={{
+                STR: damageBonus(character.sheet.attributes.STR),
+                AGL: damageBonus(character.sheet.attributes.AGL),
+              }}
+            />
             <EquipmentTable
               title="Inventory"
               subtitle="one slot per row · half STR, rounded up"
@@ -237,6 +246,7 @@ export default async function CharacterSheetPage({
               />
             ) : null}
             <TinyItems items={inventory.tiny} inventoryPath={inventoryPath} />
+            <Money purse={inventory.purse} coins={inventory.coins.length} />
 
             <p className="border-t border-border p-3 text-sm text-muted">
               Add, move or split items from the{" "}
@@ -294,17 +304,14 @@ function EquipmentTable({
               <th scope="col" className="px-4 py-2 text-sm font-medium text-muted">
                 Item
               </th>
-              <th
-                scope="col"
-                className="hidden px-3 py-2 text-sm font-medium text-muted panel:table-cell"
-              >
-                Tags
-              </th>
+              {/* What an item DOES (its Effect), or the player's own note —
+                  more use at the table than its tags, and the tags took the
+                  width the names needed. */}
               <th
                 scope="col"
                 className="hidden px-3 py-2 text-sm font-medium text-muted md:table-cell"
               >
-                Notes
+                Effect / notes
               </th>
               <th
                 scope="col"
@@ -326,24 +333,22 @@ function EquipmentTable({
                 key={item.id}
                 className="h-9 border-b border-border last:border-0 hover:bg-surface2"
               >
-                <td className="max-w-0 px-4">
+                <td className="min-w-36 max-w-0 px-4 py-1">
+                  {/* Two lines before truncating, so "Currency, Gold Piece"
+                      and "Rope, Hemp (10 meters)" read in a narrow panel. */}
                   <Link
                     href={`${inventoryPath}?item=${item.id}`}
-                    className="block truncate text-text hover:text-primary hover:underline"
+                    title={item.name}
+                    className="line-clamp-2 text-text hover:text-primary hover:underline"
                   >
                     {item.name}
                   </Link>
                 </td>
-                <td className="hidden px-3 panel:table-cell">
-                  <div className="flex flex-wrap gap-1">
-                    {item.tags.map((tag) => (
-                      <TagChip key={tag} tag={tag} />
-                    ))}
-                  </div>
-                </td>
                 <td className="hidden max-w-0 px-3 text-muted md:table-cell">
-                  {item.notes ? (
-                    <span className="block truncate">{item.notes}</span>
+                  {item.stats.effect?.trim() || item.notes.trim() ? (
+                    <span className="block truncate" title={item.stats.effect || item.notes}>
+                      {item.stats.effect?.trim() || item.notes}
+                    </span>
                   ) : (
                     <span className="text-faint">—</span>
                   )}
@@ -371,9 +376,12 @@ function EquipmentTable({
 function WeaponsAtHand({
   items,
   inventoryPath,
+  bonuses,
 }: {
   items: ItemView[];
   inventoryPath: string;
+  /** STR and AGL damage bonuses, added to the weapons that use them. */
+  bonuses: { STR: "D4" | "D6" | null; AGL: "D4" | "D6" | null };
 }) {
   const stat = (item: ItemView, key: string) =>
     item.stats[key]?.trim() ? (
@@ -438,15 +446,28 @@ function WeaponsAtHand({
                     {stat(item, "str")}
                   </td>
                   <td className="px-3 font-mono text-text">
-                    <span className="inline-flex items-center gap-1">
-                      {stat(item, "damage")}
-                      {item.stats.damage?.trim() ? (
-                        <RollButton
-                          notation={item.stats.damage}
-                          label={`${item.name} damage`}
-                        />
-                      ) : null}
-                    </span>
+                    {(() => {
+                      const damage = item.stats.damage?.trim();
+                      // The STR or AGL damage bonus this weapon's skill uses,
+                      // added to the roll and shown beside the dice.
+                      const { bonus, attribute } = weaponDamageBonus(item.name, bonuses);
+                      return (
+                        <span className="inline-flex items-center gap-1">
+                          {stat(item, "damage")}
+                          {damage && bonus ? (
+                            <span className="text-primary" title={`${attribute} damage bonus`}>
+                              +{bonus}
+                            </span>
+                          ) : null}
+                          {damage ? (
+                            <RollButton
+                              notation={bonus ? `${damage}+${bonus}` : damage}
+                              label={`${item.name} damage${bonus ? ` (+${bonus} ${attribute})` : ""}`}
+                            />
+                          ) : null}
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td className="hidden px-3 font-mono text-text panel:table-cell">
                     {stat(item, "durability")}
@@ -508,6 +529,36 @@ function TinyItems({
             </li>
           ))}
         </ul>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Coins, read from the currency items in the pack ("Currency, Gold Piece" ×2)
+ * rather than typed into the sheet — so spending one in the inventory is the
+ * only bookkeeping, and the two can never disagree.
+ */
+function Money({ purse, coins }: { purse: Purse; coins: number }) {
+  return (
+    <div className="border-b border-border px-4 py-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="font-serif text-sm font-bold uppercase tracking-wider text-muted">
+          Money
+        </h3>
+        <span className="text-sm text-faint">from currency in the pack · no slot</span>
+      </div>
+      {coins === 0 ? (
+        <p className="mt-2 text-base text-muted">
+          No coins carried. Add “Currency, Gold Piece” (or Silver, Copper) from the
+          catalogue and they count here.
+        </p>
+      ) : (
+        <p className="mt-2 flex flex-wrap gap-3 font-mono text-base tabular-nums text-text">
+          <span>{purse.gold} gp</span>
+          <span>{purse.silver} sp</span>
+          <span>{purse.copper} cp</span>
+        </p>
       )}
     </div>
   );

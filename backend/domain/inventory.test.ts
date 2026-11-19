@@ -65,3 +65,22 @@ describe("inventoryBreakdown", () => {
     expect(result).toMatchObject({ used: 3, slots: 2, over: true });
   });
 });
+
+describe("coins", () => {
+  it("sums currency items into a purse, and takes no slots", () => {
+    const result = inventoryBreakdown(
+      [
+        item("Currency, Gold Piece", { qty: 2 }),
+        item("Currency, Silver Piece", { qty: 5 }),
+        item("Currency, Copper Piece", { qty: 20 }),
+        item("Copper coins", { qty: 3 }),
+        item("Rope"),
+      ],
+      10,
+      emptySheet().protection,
+    );
+    expect(result.purse).toEqual({ gold: 2, silver: 5, copper: 23 });
+    expect(result.coins).toHaveLength(4);
+    expect(result.used).toBe(1);
+  });
+});
